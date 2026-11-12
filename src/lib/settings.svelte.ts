@@ -4,7 +4,8 @@ import { mpv, set } from './player.svelte'
 import { queue } from './queue.svelte'
 import { kvGet, kvSet } from './persist'
 
-const defaults = { bitPerfect: true, soundCheck: false, passthrough: false, hwdec: true, onlineLyrics: true }
+// lyricsLanguage '' = the Windows display language
+const defaults = { bitPerfect: true, soundCheck: false, passthrough: false, hwdec: true, onlineLyrics: true, translateLyrics: false, lyricsLanguage: '', learnLyrics: false }
 type Settings = typeof defaults
 
 export const settings = $state<Settings>({ ...defaults })
@@ -36,6 +37,16 @@ export async function applyAudio() {
 /** Volume lives on the device in bit-perfect mode, so the samples are never scaled. */
 export const volume = () => (settings.bitPerfect ? (mpv.aoVolume ?? 100) : mpv.volume)
 export const setVolume = (v: number) => set(settings.bitPerfect ? 'ao-volume' : 'volume', Math.round(v))
+
+let target: number | null = null
+let settle: ReturnType<typeof setTimeout>
+/** Steps the volume; quick repeats (wheel, held key) build on the last request, since mpv reports it back later. */
+export function nudgeVolume(by: number) {
+  target = Math.min(100, Math.max(0, (target ?? volume()) + by))
+  setVolume(target)
+  clearTimeout(settle)
+  settle = setTimeout(() => (target = null), 400)
+}
 
 $effect.root(() => {
   $effect(() => {

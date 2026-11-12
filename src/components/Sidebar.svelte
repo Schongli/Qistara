@@ -9,6 +9,10 @@
   import MagnifyingGlass from 'phosphor-svelte/lib/MagnifyingGlass'
   import FolderOpen from 'phosphor-svelte/lib/FolderOpen'
   import Radio from 'phosphor-svelte/lib/Radio'
+  import SpotifyLogo from 'phosphor-svelte/lib/SpotifyLogo'
+  import { spotify } from '../lib/spotify.svelte'
+  import Cards from 'phosphor-svelte/lib/Cards'
+  import { vocab } from '../lib/learn.svelte'
   import MusicNotesSimple from 'phosphor-svelte/lib/MusicNotesSimple'
   import Heart from 'phosphor-svelte/lib/Heart'
   import ClockCounterClockwise from 'phosphor-svelte/lib/ClockCounterClockwise'
@@ -73,6 +77,11 @@
       <span class="ic"><it.icon size={17} /></span>{it.label}
     </button>
   {/each}
+  {#if spotify.user}
+    <button class="item press" class:sel={section === 'spotify'} onclick={() => nav.root({ name: 'spotify' })}>
+      <span class="ic"><SpotifyLogo size={17} /></span>Spotify
+    </button>
+  {/if}
 
   <div class="head row">Playlists <button class="add" aria-label="New playlist" onclick={newMenu}><Plus size={12} weight="bold" /></button></div>
   {#each mine as it (it.label)}
@@ -80,6 +89,12 @@
       <span class="ic"><it.icon size={17} /></span>{it.label}
     </button>
   {/each}
+  <!-- appears once a word is saved from Learn mode in the lyrics -->
+  {#if vocab.items.length}
+    <button class="item press" class:sel={section === 'vocabulary'} onclick={() => nav.root({ name: 'vocabulary' })}>
+      <span class="ic"><Cards size={17} /></span>Vocabulary
+    </button>
+  {/if}
   <div class="lists">
     {#each lib.playlists as p (p.id)}
       <button class="item press" class:sel={nav.route.name === 'playlist' && nav.route.id === p.id} onclick={() => nav.root({ name: 'playlist', id: p.id })}>

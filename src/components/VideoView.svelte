@@ -24,7 +24,7 @@
   import { cmd, mpv, seek, set, togglePause, type MpvTrack } from '../lib/player.svelte'
   import { queue } from '../lib/queue.svelte'
   import { menu, openMenu, type MenuItem } from '../lib/menu.svelte'
-  import { setVolume, volume } from '../lib/settings.svelte'
+  import { nudgeVolume, setVolume, volume } from '../lib/settings.svelte'
   import { time } from '../lib/format'
 
   const win = getCurrentWindow()
@@ -128,8 +128,8 @@
     const k = e.key
     if (k === 'ArrowRight' && !e.ctrlKey) seek(mpv.time + (e.shiftKey ? 30 : 5))
     else if (k === 'ArrowLeft' && !e.ctrlKey) seek(Math.max(0, mpv.time - (e.shiftKey ? 30 : 5)))
-    else if (k === 'ArrowUp') setVolume(Math.min(100, volume() + 5))
-    else if (k === 'ArrowDown') setVolume(Math.max(0, volume() - 5))
+    else if (k === 'ArrowUp') nudgeVolume(5)
+    else if (k === 'ArrowDown') nudgeVolume(-5)
     else if (k === 'f' || k === 'F11') toggleFullscreen()
     else if (k === 'Escape' && fullscreen) toggleFullscreen()
     else if (k === 'm') set('mute', !mpv.mute)
@@ -153,7 +153,14 @@
 
 <div class="video" class:idle role="application" aria-label="Video player" onpointermove={wake}>
   <!-- click pauses, double-click toggles full screen (two pauses cancel out) -->
-  <div class="surface" role="presentation" onclick={togglePause} ondblclick={toggleFullscreen}></div>
+  <!-- scrolling over the picture changes the volume, like VLC -->
+  <div
+    class="surface"
+    role="presentation"
+    onclick={togglePause}
+    ondblclick={toggleFullscreen}
+    onwheel={(e) => { e.preventDefault(); wake(); nudgeVolume((-e.deltaY / 100) * 5) }}
+  ></div>
 
   <header class="top" data-tauri-drag-region>
     <button class="icon-btn press" aria-label="Close video" onclick={close}><CaretLeft size={20} weight="bold" /></button>
@@ -204,7 +211,7 @@
         </button>
         <button class="icon-btn press" aria-label="Forward 10 seconds" onclick={() => seek(mpv.time + 10)}><ClockClockwise size={20} /></button>
         <button class="icon-btn press" aria-label="Next" onclick={() => queue.next()}><SkipForward size={18} weight="fill" /></button>
-        <div class="vol"><SpeakerHigh size={16} /><Slider label="Volume" value={volume()} max={100} live onchange={setVolume} /></div>
+        <div class="vol"><SpeakerHigh size={16} /><Slider label="Volume" value={volume()} max={100} live wheel={5} onchange={setVolume} /></div>
       </div>
       <div class="group">
         {#if mpv.chapters.length}<button class="icon-btn press" aria-label="Chapters" onclick={chapterMenu}><ListNumbers size={19} /></button>{/if}

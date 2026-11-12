@@ -20,6 +20,8 @@
   import Top from './views/Top.svelte'
   import EqView from './views/EqView.svelte'
   import RadioView from './views/Radio.svelte'
+  import SpotifyView from './views/Spotify.svelte'
+  import Vocabulary from './views/Vocabulary.svelte'
   import Composers from './views/Composers.svelte'
   import Duplicates from './views/Duplicates.svelte'
   import SmartEditor from './components/SmartEditor.svelte'
@@ -125,10 +127,14 @@
         <EqView />
       {:else if r.name === 'radio'}
         <RadioView />
+      {:else if r.name === 'spotify'}
+        <SpotifyView />
       {:else if r.name === 'composers'}
         <Composers composer={r.composer} />
       {:else if r.name === 'duplicates'}
         <Duplicates />
+      {:else if r.name === 'vocabulary'}
+        <Vocabulary />
       {/if}
     </div>
     {#if !ui.nowPlaying}<QueuePanel />{/if}

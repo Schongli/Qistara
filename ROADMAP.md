@@ -18,10 +18,16 @@
 - [x] MiniPlayer (Ctrl+Shift+M), Autoplay ∞, sleep timer (minutes or end of song)
 - [x] Radio Browser directory search, M3U/M3U8 import + export
 - [x] AutoEQ / Equalizer APO preset import (in the EQ), Composers view, duplicate finder
+- [x] Lyrics translation (Google Translate, cached), scroll-wheel volume on sliders and video
+- [x] Learn mode in lyrics: tap any word for its meaning; Japanese gets furigana, romaji, dictionary forms and
+  grammar notes (offline IPADIC via Lindera); saved words → Vocabulary page with line replay and flashcard review
+  (not yet checked in the running app)
+- [ ] Learn mode next: romanization for Korean/Chinese/other scripts, a furigana on/off switch
 - [ ] Video thumbnails + Movies/TV grouping, crossfade, CUE-sheet tracks, file organiser, Discord presence
 
 ## Phase 3
-Spotify (playlist import + local matching, Connect remote; needs your Spotify developer app + Premium),
-DLNA/UPnP, device sync, macOS/Linux.
+- [x] Spotify: PKCE sign-in with your own developer app (owner needs Premium), playlist + Liked Songs import
+  matched to local files, Connect remote (sign-in and remote not yet tried with a real account)
+- [ ] DLNA/UPnP, device sync, macOS/Linux
 
 Not planned: fake-lossless checker, native DSD/DoP (mpv converts DSD to PCM).

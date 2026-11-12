@@ -1,18 +1,23 @@
 <script lang="ts">
   // Pointer-driven slider: tracks the pointer 1:1 from pointer-down, keeps tracking outside
   // its bounds (pointer capture) and only commits on release unless `live` is set.
-  let { value, max = 1, label, live = false, onchange, class: cls = '' }: {
+  // `wheel` (step per mouse-wheel notch) turns on scrolling over the slider to change it.
+  let { value, max = 1, label, live = false, wheel = 0, onchange, class: cls = '' }: {
     value: number
     max?: number
     label: string
     live?: boolean
+    wheel?: number
     onchange: (v: number) => void
     class?: string
   } = $props()
 
   let el: HTMLDivElement
   let drag = $state<number | null>(null)
-  const shown = $derived(drag ?? value)
+  // the owner reports the new value asynchronously (mpv), so quick notches build on this, not on a stale `value`
+  let pending = $state<number | null>(null)
+  let settle: ReturnType<typeof setTimeout>
+  const shown = $derived(drag ?? pending ?? value)
   const pct = $derived(max > 0 ? Math.min(100, Math.max(0, (shown / max) * 100)) : 0)
 
   const at = (e: PointerEvent) => {
@@ -43,6 +48,15 @@
     e.preventDefault()
     e.stopPropagation()
   }
+  function scroll(e: WheelEvent) {
+    if (!wheel || drag !== null) return
+    e.preventDefault()
+    // one notch is ~100 px; a touchpad sends fractions of that
+    pending = Math.min(max, Math.max(0, (pending ?? value) - (e.deltaY / 100) * wheel))
+    onchange(pending)
+    clearTimeout(settle)
+    settle = setTimeout(() => (pending = null), 400)
+  }
 </script>
 
 <div
@@ -60,6 +74,7 @@
   onpointerup={up}
   onpointercancel={() => (drag = null)}
   onkeydown={key}
+  onwheel={scroll}
 >
   <div class="track"><div class="fill" style:width="{pct}%"></div></div>
   <div class="knob" style:left="{pct}%"></div>

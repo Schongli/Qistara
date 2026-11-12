@@ -81,7 +81,7 @@
   <div class="right" data-tauri-drag-region>
     <div class="vol">
       {#if vol === 0}<SpeakerNone size={16} />{:else}<SpeakerHigh size={16} />{/if}
-      <Slider label="Volume" value={vol} max={100} live onchange={setVolume} />
+      <Slider label="Volume" value={vol} max={100} live wheel={5} onchange={setVolume} />
     </div>
     <button class="icon-btn press" aria-label="MiniPlayer" title="MiniPlayer (Ctrl+Shift+M)" onclick={enterMini}><PictureInPicture size={17} /></button>
     <button class="icon-btn press" class:on={eq.enabled} aria-label="Equalizer" title="Equalizer" onclick={() => nav.root({ name: 'eq' })}><SlidersHorizontal size={17} weight="bold" /></button>

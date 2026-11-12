@@ -1,9 +1,13 @@
 mod db;
+mod japanese;
+mod keys;
 mod lastfm;
 mod lyrics;
 mod media_keys;
 mod scan;
+mod spotify;
 mod tags;
+mod translate;
 mod user;
 
 use notify_debouncer_mini::{new_debouncer, notify::RecommendedWatcher, notify::RecursiveMode, Debouncer};
@@ -413,6 +417,7 @@ pub fn run() {
     .plugin(tauri_plugin_opener::init())
     .manage(LastfmPending::default())
     .manage(ScrobbleLock::default())
+    .manage(spotify::Token::default())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -424,7 +429,15 @@ pub fn run() {
       let dir = app.path().app_local_data_dir()?;
       std::fs::create_dir_all(&dir)?;
       // the webview may load artwork from the cache only (the $APPLOCALDATA glob didn't match on Windows)
-      app.asset_protocol_scope().allow_directory(dir.join("art"), true)?;
+      let art = dir.join("art");
+      std::fs::create_dir_all(&art)?;
+      app.asset_protocol_scope().allow_directory(&art, true)?;
+      // Tauri checks canonical paths, and under folder redirection (MSIX app containers) the files we
+      // write can resolve somewhere other than the folder itself: also allow where a written file lands
+      let probe = art.join(".scope");
+      if let Some(real) = std::fs::write(&probe, b"").ok().and_then(|_| std::fs::canonicalize(&probe).ok()).and_then(|p| p.parent().map(Path::to_path_buf)) {
+        app.asset_protocol_scope().allow_directory(real, true)?;
+      }
       app.manage(Lib {
         db: Mutex::new(db::open(&dir.join("library.db"))?),
         art: scan::Art::new(dir.join("art")),
@@ -442,7 +455,9 @@ pub fn run() {
       library, add_folder, remove_folder, cover, rescan, extensions, screenshot_dir, lyrics, lyrics_store,
       playlist_create, playlist_update, playlist_items, playlist_delete, rate, love, played, skipped, top,
       tag_write, fetch_cover, stage_image, read_text, write_playlist, kv_get, kv_set,
-      lastfm_status, lastfm_set_keys, lastfm_begin, lastfm_finish, lastfm_logout, lastfm_now_playing, lastfm_scrobble, media_keys::media_track, media_keys::media_state
+      lastfm_status, lastfm_set_keys, lastfm_begin, lastfm_finish, lastfm_logout, lastfm_now_playing, lastfm_scrobble, media_keys::media_track, media_keys::media_state,
+      spotify::spotify_status, spotify::spotify_set_client, spotify::spotify_begin, spotify::spotify_logout, spotify::spotify_playlists,
+      spotify::spotify_tracks, spotify::spotify_player, spotify::spotify_control, japanese::japanese_words, translate::google_translate
     ])
     .run(tauri::generate_context!())
     .expect("error while building tauri application");

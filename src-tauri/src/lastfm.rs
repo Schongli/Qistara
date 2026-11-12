@@ -14,23 +14,16 @@ pub struct Creds {
     pub user: Option<String>,
 }
 
-fn entry() -> Result<keyring::Entry, String> {
-    keyring::Entry::new(SERVICE, "default").map_err(|e| e.to_string())
-}
-
 pub fn load() -> Option<Creds> {
-    entry().ok()?.get_password().ok().and_then(|s| serde_json::from_str(&s).ok())
+    crate::keys::load(SERVICE)
 }
 
 pub fn store(c: &Creds) -> Result<(), String> {
-    entry()?.set_password(&serde_json::to_string(c).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+    crate::keys::store(SERVICE, c)
 }
 
 pub fn forget() -> Result<(), String> {
-    match entry()?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(e.to_string()),
-    }
+    crate::keys::forget(SERVICE)
 }
 
 /// api_sig: every parameter except `format`, sorted by name, as name+value, then the secret, md5.

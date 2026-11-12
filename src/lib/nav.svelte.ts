@@ -19,6 +19,8 @@ export type Route =
   | { name: 'radio' }
   | { name: 'composers'; composer?: string }
   | { name: 'duplicates' }
+  | { name: 'spotify' }
+  | { name: 'vocabulary' }
 
 class Nav {
   route = $state<Route>({ name: 'albums' })

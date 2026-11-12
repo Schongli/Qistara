@@ -11,7 +11,7 @@ export const songKey = (s: string) =>
     .trim()
 
 /** Higher is better: lossless, then sample rate, bit depth and bitrate. */
-const rank = (t: Dupeable) => (t.lossless ? 1e9 : 0) + (t.sampleRate ?? 0) * 100 + (t.bitDepth ?? 0) * 10 + (t.bitrate ?? 0) / 1000
+export const rank = (t: Pick<Dupeable, 'lossless' | 'sampleRate' | 'bitDepth' | 'bitrate'>) => (t.lossless ? 1e9 : 0) + (t.sampleRate ?? 0) * 100 + (t.bitDepth ?? 0) * 10 + (t.bitrate ?? 0) / 1000
 
 export function findDuplicates<T extends Dupeable>(tracks: T[]): T[][] {
   const groups = new Map<string, T[]>()
