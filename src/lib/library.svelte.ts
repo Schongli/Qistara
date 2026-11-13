@@ -142,8 +142,9 @@ listen<string>('scan-error', (e) => {
   lib.error = e.payload
 })
 
+/** A cached cover by name, or a remote track's https picture (YouTube) as it is. */
 export const artUrl = (art: string | null | undefined) =>
-  art && lib.artDir ? convertFileSrc(`${lib.artDir}\\${art}`) : null
+  art?.startsWith('https://') ? art : art && lib.artDir ? convertFileSrc(`${lib.artDir}\\${art}`) : null
 
 export const addFolder = (path: string) => invoke('add_folder', { path })
 export const removeFolder = (path: string) => invoke('remove_folder', { path })

@@ -24,7 +24,7 @@
   <div class="body" data-tauri-drag-region>
     <div class="txt" data-tauri-drag-region>
       <div class="title ellipsis">{icy || t?.title || 'Not Playing'}</div>
-      <div class="sub ellipsis">{t ? [t.artist, t.album].filter(Boolean).join(' — ') : 'Sonora'}</div>
+      <div class="sub ellipsis">{t ? [t.artist, t.album].filter(Boolean).join(' — ') : 'Confluence Player'}</div>
     </div>
     <div class="row">
       <button class="icon-btn press" aria-label="Previous" onclick={() => queue.prev()} disabled={!t}><SkipBack size={16} weight="fill" /></button>
@@ -34,7 +34,7 @@
       <button class="icon-btn press" aria-label="Next" onclick={() => queue.next()} disabled={!t}><SkipForward size={16} weight="fill" /></button>
       <span class="sp" data-tauri-drag-region></span>
       <button class="icon-btn press" aria-label="Back to the full player" title="Full player" onclick={exitMini}><ArrowsOut size={15} /></button>
-      <button class="icon-btn press" aria-label="Close Sonora" onclick={() => getCurrentWindow().close()}><X size={14} weight="bold" /></button>
+      <button class="icon-btn press" aria-label="Close Confluence Player" onclick={() => getCurrentWindow().close()}><X size={14} weight="bold" /></button>
     </div>
   </div>
   {#if t && duration}<div class="scrub"><Slider label="Seek" value={mpv.time} max={duration} onchange={seek} /></div>{/if}

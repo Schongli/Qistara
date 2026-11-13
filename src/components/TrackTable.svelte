@@ -11,11 +11,12 @@
   import { openMenu, trackMenu } from '../lib/menu.svelte'
   import { plural, time } from '../lib/format'
 
-  let { tracks, counts, onreorder, onremove }: {
+  let { tracks, counts, onreorder, onremove, remote = false }: {
     tracks: Track[]
     counts?: Map<number, number> // play counts for "Your Top"
     onreorder?: (from: number, to: number) => void
     onremove?: (i: number) => void
+    remote?: boolean // YouTube or server songs: no ratings or Love, they aren't in the library
   } = $props()
 
   let dragFrom = $state<number | null>(null)
@@ -43,10 +44,14 @@
       <span class="txt"><span class="ellipsis">{t.title}</span><span class="t-sub ellipsis">{t.artist}</span></span>
       <span class="album t-sub ellipsis">{t.album}</span>
       {#if counts}<span class="plays t-sub">{plural(counts.get(t.id) ?? 0, "play")}</span>{/if}
-      <span class="rate"><Stars value={t.rating} onchange={(v) => rate(t, v)} /></span>
-      <button class="heart" class:loved={t.loved} aria-label={t.loved ? 'Unlove' : 'Love'} aria-pressed={t.loved} onclick={() => love(t)}>
-        <Heart size={14} weight={t.loved ? 'fill' : 'regular'} />
-      </button>
+      {#if remote}
+        <span></span><span></span>
+      {:else}
+        <span class="rate"><Stars value={t.rating} onchange={(v) => rate(t, v)} /></span>
+        <button class="heart" class:loved={t.loved} aria-label={t.loved ? 'Unlove' : 'Love'} aria-pressed={t.loved} onclick={() => love(t)}>
+          <Heart size={14} weight={t.loved ? 'fill' : 'regular'} />
+        </button>
+      {/if}
       <span class="tm t-sub">{time(t.duration)}</span>
       {#if onremove}
         <button class="rm" aria-label="Remove {t.title} from playlist" onclick={() => onremove(i)}><X size={12} weight="bold" /></button>
@@ -61,7 +66,7 @@
   .table { border-top: 1px solid var(--sep); }
   .row {
     display: grid; grid-template-columns: 28px 34px minmax(160px, 2fr) minmax(100px, 1.4fr) auto auto 24px 48px auto;
-    align-items: center; gap: 12px; height: 50px; padding: 0 8px; border-radius: 8px; border-top: 2px solid transparent;
+    align-items: center; gap: 12px; height: calc(50px * var(--density)); padding: 0 8px; border-radius: 8px; border-top: 2px solid transparent;
   }
   .row:hover { background: var(--fill); }
   .row.on .txt > :first-child { color: var(--accent); }

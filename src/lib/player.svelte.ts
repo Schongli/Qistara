@@ -138,6 +138,7 @@ export async function startMpv() {
     // A page reload leaves the old instance running and init would skip, so start fresh.
     // (Re-reading props with get_property instead crashed libmpv-wrapper 0.3.2.)
     await destroy().catch(() => {})
+    const ytdlp = await join(await appLocalDataDir(), 'bin', 'yt-dlp.exe')
     await init({
       initialOptions: {
         ...BIT_PERFECT,
@@ -145,9 +146,13 @@ export async function startMpv() {
         idle: 'yes', 'force-window': 'no', 'keep-open': 'yes',
         'gapless-audio': 'weak', 'prefetch-playlist': 'yes', 'audio-display': 'no', 'cover-art-auto': 'no',
         'input-default-bindings': 'no', 'input-vo-keyboard': 'no', osc: 'no', 'osd-level': 0,
-        'sub-auto': 'fuzzy', ytdl: 'no', 'msg-level': 'all=warn',
+        'sub-auto': 'fuzzy', 'msg-level': 'all=warn',
+        // YouTube tracks are ytdl://… (youtube.svelte.ts): the hook runs our own yt-dlp (ytdlp.rs). Other URLs,
+        // radio included, are opened by mpv itself; length-quoted so a comma in the path can't split the list.
+        ytdl: 'yes', 'ytdl-format': 'bestaudio/best', 'ytdl-raw-options': 'js-runtimes=node',
+        'script-opts': `ytdl_hook-ytdl_path=%${new TextEncoder().encode(ytdlp).length}%${ytdlp},ytdl_hook-all_formats=no`,
         'watch-later-options': 'start,aid,sid,sub-delay,audio-delay,sub-scale',
-        'screenshot-format': 'png', 'screenshot-template': 'Sonora %F %wH.%wM.%wS',
+        'screenshot-format': 'png', 'screenshot-template': 'Confluence Player %F %wH.%wM.%wS',
       },
       observedProperties: PROPS,
     })

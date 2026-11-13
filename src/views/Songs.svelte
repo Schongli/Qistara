@@ -7,6 +7,7 @@
   import { lib, type Track } from '../lib/library.svelte'
   import { queue } from '../lib/queue.svelte'
   import { mpv } from '../lib/player.svelte'
+  import { settings } from '../lib/settings.svelte'
   import { openMenu, trackMenu } from '../lib/menu.svelte'
   import { byName, collator, plural, quality, time } from '../lib/format'
 
@@ -29,7 +30,7 @@
 </script>
 
 <div class="songs">
-  <VirtualList items={songs} rowHeight={36} padTop={84}>
+  <VirtualList items={songs} rowHeight={settings.density === 'compact' ? 28 : 36} padTop={76}>
     {#snippet header()}
       <h1 class="t-title">Songs <span class="t-sub count">{plural(songs.length, 'song')}</span></h1>
       <div class="cols" role="row">
@@ -82,7 +83,7 @@
   .col { display: flex; }
   .col button { display: flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; color: var(--text-2); }
   .col.duration, .duration { justify-content: flex-end; text-align: right; }
-  .row { height: 36px; border-radius: 6px; }
+  .row { height: calc(36px * var(--density)); border-radius: 6px; }
   .row.odd { background: var(--fill); }
   .row:hover { background: var(--fill-2); }
   .row.sel { background: var(--accent); color: var(--on-accent); }

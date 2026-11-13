@@ -111,7 +111,7 @@
   }
   async function shot() {
     await cmd('screenshot', 'video')
-    say('Screenshot saved to Pictures\\Sonora')
+    say('Screenshot saved to Pictures\\Confluence Player')
   }
   async function abLoop() {
     await cmd('ab-loop')
@@ -249,7 +249,7 @@
   .bar :global(.track) { background: rgba(255, 255, 255, 0.25); }
   .bar :global(.fill) { background: #fff; }
   .tick { position: absolute; top: 6px; width: 2px; height: 4px; margin-left: -1px; background: rgba(0, 0, 0, 0.55); pointer-events: none; }
-  .loop { position: absolute; top: 3px; height: 10px; border-radius: 3px; background: rgba(255, 79, 109, 0.45); pointer-events: none; }
+  .loop { position: absolute; top: 3px; height: 10px; border-radius: 3px; background: color-mix(in srgb, var(--accent) 50%, transparent); pointer-events: none; }
   .row { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
   .group { display: flex; align-items: center; gap: 4px; }
   .icon-btn { color: rgba(255, 255, 255, 0.86); width: 36px; height: 36px; }

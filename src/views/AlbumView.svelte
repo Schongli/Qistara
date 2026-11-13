@@ -21,17 +21,18 @@
 
 {#if a}
   <header class="head">
-    <Artwork art={a.art} size="236px" />
+    <Artwork art={a.art} size="220px" />
     <div class="info">
+      <div class="kicker">Album{#if q?.badge}<span class="badge">{q.badge}</span>{/if}</div>
       <h1 class="t-title">{a.title}</h1>
-      <button class="artist" onclick={() => nav.go({ name: 'artists', artist: a.artist })}>{a.artist}</button>
-      <div class="t-sub meta">
-        {[a.genre, a.year].filter(Boolean).join(' · ')}
-        {#if q?.badge}<span class="badge">{q.badge}</span>{/if}
+      <div class="meta">
+        <button class="artist" onclick={() => nav.go({ name: 'artists', artist: a.artist })}>{a.artist}</button>
+        {#each [a.genre, a.year, plural(a.tracks.length, 'song'), totalTime(a.duration)].filter(Boolean) as m, i (i)}<span class="dot">{m}</span>{/each}
       </div>
       <div class="actions">
         <button class="btn primary press" onclick={() => queue.play(a.tracks)}><Play size={14} weight="fill" />Play</button>
         <button class="btn press" onclick={() => queue.play(a.tracks, Math.floor(Math.random() * a.tracks.length), true)}><Shuffle size={14} weight="bold" />Shuffle</button>
+        <button class="icon-btn press" aria-label="More for {a.title}" onclick={(e) => openMenu(e, trackMenu(a.tracks, a))}><DotsThree size={20} weight="bold" /></button>
       </div>
     </div>
   </header>
@@ -54,7 +55,7 @@
       </div>
     {/each}
   </div>
-  <p class="t-sub foot">{plural(a.tracks.length, 'song')}, {totalTime(a.duration)}{#if q?.detail} · {q.detail}{/if}</p>
+  {#if q?.detail}<p class="t-sub foot">{q.detail}</p>{/if}
 {:else}
   <p class="t-sub">This album is no longer in your library.</p>
 {/if}
@@ -62,18 +63,20 @@
 <style>
   .head { display: flex; gap: 28px; align-items: flex-end; margin-bottom: 26px; }
   .info { min-width: 0; padding-bottom: 4px; }
-  h1 { margin: 0; }
-  .artist { color: var(--accent); font-size: 20px; font-weight: 550; letter-spacing: -0.014em; margin-top: 4px; }
+  .kicker { display: flex; gap: 8px; align-items: center; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); }
+  .kicker .badge { letter-spacing: 0.02em; }
+  h1 { margin: 6px 0 0; font-size: clamp(28px, 4vw, 44px); }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; margin: 8px 0 18px; font-size: 13px; color: var(--text-2); }
+  .artist { color: var(--text); font-weight: 650; }
   .artist:hover { text-decoration: underline; text-underline-offset: 3px; }
-  .meta { display: flex; gap: 8px; align-items: center; margin: 6px 0 16px; text-transform: uppercase; font-size: 11px; font-weight: 600; letter-spacing: 0.03em; }
-  .meta .badge { text-transform: none; }
-  .actions { display: flex; gap: 10px; }
+  .dot::before { content: '·'; margin: 0 7px; color: var(--text-3); }
+  .actions { display: flex; gap: 10px; align-items: center; }
   .actions .btn { min-width: 110px; justify-content: center; }
 
   .list { border-top: 1px solid var(--sep); }
   .disc { padding: 16px 12px 6px; font-weight: 600; }
   .row {
-    display: grid; grid-template-columns: 34px 1fr auto 32px; align-items: center; height: 40px;
+    display: grid; grid-template-columns: 34px 1fr auto 32px; align-items: center; height: calc(40px * var(--density));
     padding: 0 4px 0 12px; border-radius: 6px; border-bottom: 1px solid var(--sep);
   }
   .row:hover { background: var(--fill); }

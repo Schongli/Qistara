@@ -13,21 +13,13 @@
   import Quotes from 'phosphor-svelte/lib/Quotes'
   import ListBullets from 'phosphor-svelte/lib/ListBullets'
   import Moon from 'phosphor-svelte/lib/Moon'
-  import Translate from 'phosphor-svelte/lib/Translate'
-  import GraduationCap from 'phosphor-svelte/lib/GraduationCap'
-  import WordCard from './WordCard.svelte'
-  import { card, learn } from '../lib/learn.svelte'
-  import { lyr } from '../lib/lyrics.svelte'
-  import { targetLanguage, tr } from '../lib/translate.svelte'
-  import { languageName } from '../lib/translate'
   import { openMenu } from '../lib/menu.svelte'
   import { setSleep, sleep, sleepLabel } from '../lib/sleep.svelte'
   import Artwork from './Artwork.svelte'
   import Slider from './Slider.svelte'
-  import QueueList from './QueueList.svelte'
-  import LyricsView from './LyricsView.svelte'
+  import PanelContent from './PanelContent.svelte'
   import { mpv, seek, togglePause } from '../lib/player.svelte'
-  import { settings, setVolume, volume } from '../lib/settings.svelte'
+  import { setVolume, volume } from '../lib/settings.svelte'
   import { queue } from '../lib/queue.svelte'
   import { ui } from '../lib/nav.svelte'
   import { largeCover } from '../lib/library.svelte'
@@ -159,38 +151,8 @@
           <button class="icon-btn press" class:on={ui.queue} aria-label="Up Next" onclick={() => { ui.queue = !ui.queue; ui.lyrics = false }}><ListBullets size={19} weight="bold" /></button>
         </div>
       </div>
-      {#if ui.queue}
-        <div class="side-pane"><QueueList dark /></div>
-      {:else if ui.lyrics}
-        <div class="side-pane lyrics">
-          <LyricsView />
-          {#if lyr.data}
-            {@const lang = languageName(targetLanguage())}
-            <!-- outside LyricsView so its top fade never dims the buttons -->
-            <div class="tools">
-              <button
-                class="icon-btn press"
-                class:on={settings.learnLyrics}
-                aria-pressed={settings.learnLyrics}
-                aria-label="Learn mode"
-                title={settings.learnLyrics ? learn.error || 'Learn mode: tap any word for its meaning' : 'Learn: readings, romaji and word meanings'}
-                onclick={() => (settings.learnLyrics = !settings.learnLyrics)}
-              ><GraduationCap size={18} weight={settings.learnLyrics ? 'bold' : 'regular'} /></button>
-              {#if !settings.learnLyrics}
-                <button
-                  class="icon-btn press"
-                  class:on={settings.translateLyrics}
-                  class:busy={tr.busy}
-                  aria-pressed={settings.translateLyrics}
-                  aria-label="Translate lyrics to {lang}"
-                  title={!settings.translateLyrics ? `Translate to ${lang}` : tr.error || (tr.same ? `These lyrics are already in ${lang}` : `Translated to ${lang} by Google`)}
-                  onclick={() => (settings.translateLyrics = !settings.translateLyrics)}
-                ><Translate size={18} weight={settings.translateLyrics ? 'bold' : 'regular'} /></button>
-              {/if}
-            </div>
-          {/if}
-          {#if card.open}<WordCard />{/if}
-        </div>
+      {#if ui.queue || ui.lyrics}
+        <div class="side-pane" class:lyrics={!ui.queue}><PanelContent mode={ui.queue ? 'queue' : 'lyrics'} /></div>
       {/if}
     </div>
   </div>
@@ -240,14 +202,8 @@
   .vol :global(.track) { background: rgba(255, 255, 255, 0.22); }
   .vol :global(.fill) { background: rgba(255, 255, 255, 0.86); }
 
-  .side-pane { align-self: stretch; width: 100%; max-width: 620px; overflow-y: auto; padding: 8px; border-radius: 14px; }
-  .side-pane.lyrics { position: relative; overflow: hidden; height: min(78vh, 720px); align-self: center; padding: 0; }
-  .tools { position: absolute; top: 6px; right: 6px; z-index: 2; display: flex; gap: 2px; }
-  .tools .icon-btn { color: rgba(255, 255, 255, 0.72); }
-  .tools .icon-btn.on { color: #fff; background: rgba(255, 255, 255, 0.16); }
-  .tools .busy { animation: pulse 1.2s ease-in-out infinite; }
-  @keyframes pulse { 50% { opacity: 0.45; } }
-  @media (prefers-reduced-motion: reduce) { .tools .busy { animation: none; } }
+  .side-pane { align-self: stretch; width: 100%; max-width: 620px; min-height: 0; border-radius: 14px; }
+  .side-pane.lyrics { height: min(78vh, 720px); align-self: center; padding: 0; }
 
   @media (prefers-reduced-motion: reduce) { .backdrop img { animation: none; } }
 </style>

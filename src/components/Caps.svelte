@@ -16,7 +16,7 @@
 </div>
 
 <style>
-  .caps { position: absolute; top: 0; right: 0; display: flex; z-index: 3; }
+  .caps { position: absolute; top: 0; right: 0; display: flex; z-index: 30; }
   button { width: 46px; height: 32px; font: 10px 'Segoe Fluent Icons', 'Segoe MDL2 Assets'; color: var(--text); }
   button:hover { background: var(--fill-2); }
   .light button { color: #fff; }

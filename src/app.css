@@ -1,47 +1,39 @@
 @import '@fontsource-variable/inter';
+@import '@fontsource/amiri-quran/arabic.css';
 
+/* One set of tokens for both themes: light-dark() follows color-scheme, which follows Windows unless
+   Settings › Appearance forces light or dark (appearance.svelte.ts sets it on the root). */
 :root {
   color-scheme: light dark;
   --font: 'Inter Variable', system-ui, sans-serif;
-  --bg: #ffffff;
-  --bg-2: #f5f5f7;
-  --fill: rgba(0, 0, 0, 0.045);
-  --fill-2: rgba(0, 0, 0, 0.085);
-  --text: #1d1d1f;
-  --text-2: #6e6e73;
-  --text-3: #a1a1a6;
-  --sep: rgba(0, 0, 0, 0.085);
-  --accent: #f2385a;
-  --on-accent: #ffffff;
-  --bar: rgba(255, 255, 255, 0.72);
-  --sidebar: rgba(246, 246, 248, 0.42);
-  --sheet-dim: rgba(0, 0, 0, 0.35);
-  --shadow-art: 0 1px 2px rgba(0, 0, 0, 0.08), 0 6px 20px rgba(0, 0, 0, 0.1);
-  --shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.1), 0 18px 48px rgba(0, 0, 0, 0.18);
+  /* Qur'anic Arabic: Amiri Quran carries the Uthmani marks; the system fonts are fallbacks */
+  --font-quran: 'Amiri Quran', 'Traditional Arabic', 'Segoe UI', serif;
+  --bg: light-dark(#ffffff, #1e1e1f);
+  --bg-2: light-dark(#f5f5f7, #2a2a2c);
+  --fill: light-dark(rgba(0, 0, 0, 0.045), rgba(255, 255, 255, 0.06));
+  --fill-2: light-dark(rgba(0, 0, 0, 0.085), rgba(255, 255, 255, 0.1));
+  --text: light-dark(#1d1d1f, #f5f5f7);
+  --text-2: light-dark(#6e6e73, #a1a1a6);
+  --text-3: light-dark(#a1a1a6, #6e6e73);
+  --sep: light-dark(rgba(0, 0, 0, 0.085), rgba(255, 255, 255, 0.08));
+  /* river teal; a custom accent is set inline, made readable for the theme in use */
+  --accent: light-dark(#0a7f6f, #2cc4a9);
+  --on-accent: light-dark(#ffffff, #04231e);
+  --bar: light-dark(rgba(255, 255, 255, 0.72), rgba(30, 30, 31, 0.72));
+  --sidebar: light-dark(rgba(246, 246, 248, 0.42), rgba(20, 20, 22, 0.28));
+  --sheet-dim: light-dark(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.5));
+  --shadow-art: 0 1px 2px light-dark(rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.3)), 0 6px 20px light-dark(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.35));
+  --shadow-pop: 0 2px 6px light-dark(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.3)), 0 18px 48px light-dark(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.5));
   --r-art: 8px;
   --r: 8px;
-  --bar-h: 56px;
+  --bar-h: 48px;
+  --player-h: 76px;
+  --density: 1;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1e1e1f;
-    --bg-2: #2a2a2c;
-    --fill: rgba(255, 255, 255, 0.06);
-    --fill-2: rgba(255, 255, 255, 0.1);
-    --text: #f5f5f7;
-    --text-2: #a1a1a6;
-    --text-3: #6e6e73;
-    --sep: rgba(255, 255, 255, 0.08);
-    --accent: #ff4f6d;
-    --bar: rgba(30, 30, 31, 0.72);
-    --sidebar: rgba(20, 20, 22, 0.28);
-    --sheet-dim: rgba(0, 0, 0, 0.5);
-    --shadow-art: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.35);
-    --shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.3), 0 18px 48px rgba(0, 0, 0, 0.5);
-  }
-}
+/* Appearance › Window: solid instead of Mica; Density: compact rows */
+:root.solid { --bar: var(--bg); --sidebar: var(--bg-2); }
+:root.compact { --density: 0.7778; } /* 28 px Songs rows, matching its virtual list */
 
 @media (prefers-reduced-transparency: reduce) {
   :root { --bar: var(--bg); --sidebar: var(--bg-2); }
@@ -101,3 +93,6 @@ img { display: block; }
   *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }
   .press:active { transform: none; }
 }
+
+/* Arabic (the Qur'an view, saved Arabic words): the Qur'anic font, kept in its own direction inside other text */
+:lang(ar) { font-family: var(--font-quran); unicode-bidi: isolate; }

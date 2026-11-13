@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 const API: &str = "https://ws.audioscrobbler.com/2.0/";
-const SERVICE: &str = "Sonora Last.fm";
+const SERVICE: &str = "Confluence Player Last.fm";
 
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct Creds {
@@ -48,7 +48,7 @@ pub async fn call(creds: &Creds, method: &str, mut params: BTreeMap<&str, String
         .map_err(|e| e.to_string())?;
     let r = client
         .post(API)
-        .header("User-Agent", "Sonora/0.1.0")
+        .header("User-Agent", "ConfluencePlayer/0.2.0")
         .form(&params)
         .send()
         .await

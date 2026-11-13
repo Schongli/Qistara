@@ -1,4 +1,5 @@
-<script lang="ts">
+<script lang="ts" module>
+  import House from 'phosphor-svelte/lib/House'
   import Clock from 'phosphor-svelte/lib/Clock'
   import MicrophoneStage from 'phosphor-svelte/lib/MicrophoneStage'
   import SquaresFour from 'phosphor-svelte/lib/SquaresFour'
@@ -9,10 +10,16 @@
   import MagnifyingGlass from 'phosphor-svelte/lib/MagnifyingGlass'
   import FolderOpen from 'phosphor-svelte/lib/FolderOpen'
   import Radio from 'phosphor-svelte/lib/Radio'
+  import DownloadSimple from 'phosphor-svelte/lib/DownloadSimple'
+  import YoutubeLogo from 'phosphor-svelte/lib/YoutubeLogo'
+  import PlugsConnected from 'phosphor-svelte/lib/PlugsConnected'
+  import HardDrives from 'phosphor-svelte/lib/HardDrives'
+  import { server } from '../lib/subsonic.svelte'
+  import AppleLogo from 'phosphor-svelte/lib/AppleLogo'
+  import Waves from 'phosphor-svelte/lib/Waves'
+  import { apple, tidal } from '../lib/services.svelte'
   import SpotifyLogo from 'phosphor-svelte/lib/SpotifyLogo'
-  import { spotify } from '../lib/spotify.svelte'
   import Cards from 'phosphor-svelte/lib/Cards'
-  import { vocab } from '../lib/learn.svelte'
   import MusicNotesSimple from 'phosphor-svelte/lib/MusicNotesSimple'
   import Heart from 'phosphor-svelte/lib/Heart'
   import ClockCounterClockwise from 'phosphor-svelte/lib/ClockCounterClockwise'
@@ -20,29 +27,57 @@
   import Playlist from 'phosphor-svelte/lib/Playlist'
   import Sparkle from 'phosphor-svelte/lib/Sparkle'
   import Plus from 'phosphor-svelte/lib/Plus'
-  import { createPlaylist } from '../lib/library.svelte'
-  import { ui } from '../lib/nav.svelte'
+  import CaretDown from 'phosphor-svelte/lib/CaretDown'
+  import Artwork from './Artwork.svelte'
+  import { spotify } from '../lib/spotify.svelte'
+  import { vocab } from '../lib/learn.svelte'
+  import { createPlaylist, lib } from '../lib/library.svelte'
+  import { nav, ui, type Route } from '../lib/nav.svelte'
   import { openMenu } from '../lib/menu.svelte'
   import { importPlaylist } from '../lib/playlistio'
   import { openFiles } from '../lib/open'
-  import { lib } from '../lib/library.svelte'
-  import { nav, type Route } from '../lib/nav.svelte'
+  import { pins, togglePin } from '../lib/pins.svelte'
+  import { settings } from '../lib/settings.svelte'
 
-  const items: { label: string; route: Route; icon: typeof Clock }[] = [
-    { label: 'Recently Added', route: { name: 'recent' }, icon: Clock },
-    { label: 'Artists', route: { name: 'artists' }, icon: MicrophoneStage },
-    { label: 'Albums', route: { name: 'albums' }, icon: SquaresFour },
-    { label: 'Songs', route: { name: 'songs' }, icon: MusicNote },
-    { label: 'Genres', route: { name: 'genres' }, icon: Guitar },
-    { label: 'Composers', route: { name: 'composers' }, icon: MusicNotesSimple },
-    { label: 'Videos', route: { name: 'videos' }, icon: FilmStrip },
-    { label: 'Radio & Streams', route: { name: 'radio' }, icon: Radio },
+  type Item = { id: string; label: string; route: Route; icon: typeof Clock; when?: () => boolean }
+  /** Every destination that Settings › Appearance can hide (by id). */
+  export const NAV: { group: string; items: Item[] }[] = [
+    { group: '', items: [
+      { id: 'home', label: 'Home', route: { name: 'home' }, icon: House },
+      { id: 'search', label: 'Search', route: { name: 'search' }, icon: MagnifyingGlass },
+    ] },
+    { group: 'Library', items: [
+      { id: 'loved', label: 'Favorites', route: { name: 'loved' }, icon: Heart },
+      { id: 'albums', label: 'Albums', route: { name: 'albums' }, icon: SquaresFour },
+      { id: 'artists', label: 'Artists', route: { name: 'artists' }, icon: MicrophoneStage },
+      { id: 'songs', label: 'Songs', route: { name: 'songs' }, icon: MusicNote },
+      { id: 'recent', label: 'Recently Added', route: { name: 'recent' }, icon: Clock },
+      { id: 'genres', label: 'Genres', route: { name: 'genres' }, icon: Guitar },
+      { id: 'composers', label: 'Composers', route: { name: 'composers' }, icon: MusicNotesSimple },
+      { id: 'videos', label: 'Videos', route: { name: 'videos' }, icon: FilmStrip },
+    ] },
+    { group: 'Sources', items: [
+      { id: 'youtube', label: 'YouTube', route: { name: 'youtube' }, icon: YoutubeLogo },
+      { id: 'server', label: 'Server', route: { name: 'server' }, icon: HardDrives, when: () => !!server.account },
+      { id: 'spotify', label: 'Spotify', route: { name: 'spotify' }, icon: SpotifyLogo, when: () => !!spotify.user },
+      { id: 'apple', label: 'Apple Music', route: { name: 'apple' }, icon: AppleLogo, when: () => !!apple.s.user },
+      { id: 'tidal', label: 'Tidal', route: { name: 'tidal' }, icon: Waves, when: () => !!tidal.s.user },
+      { id: 'radio', label: 'Radio & Streams', route: { name: 'radio' }, icon: Radio },
+      { id: 'downloads', label: 'Downloads', route: { name: 'downloads' }, icon: DownloadSimple },
+      { id: 'providers', label: 'Providers', route: { name: 'providers' }, icon: PlugsConnected },
+    ] },
+    { group: 'You', items: [
+      { id: 'history', label: 'History', route: { name: 'recentPlayed' }, icon: ClockCounterClockwise },
+      { id: 'top', label: 'Your Top', route: { name: 'top' }, icon: ChartBar },
+      // appears once a word is saved from Learn mode
+      { id: 'vocabulary', label: 'Vocabulary', route: { name: 'vocabulary' }, icon: Cards, when: () => vocab.items.length > 0 },
+    ] },
   ]
-  const mine: { label: string; route: Route; icon: typeof Clock }[] = [
-    { label: 'Loved', route: { name: 'loved' }, icon: Heart },
-    { label: 'Recently Played', route: { name: 'recentPlayed' }, icon: ClockCounterClockwise },
-    { label: 'Your Top', route: { name: 'top' }, icon: ChartBar },
-  ]
+</script>
+
+<script lang="ts">
+  const shown = (it: Item) => !settings.hiddenNav.includes(it.id) && (!it.when || it.when())
+
   const newMenu = (e: MouseEvent) =>
     openMenu(e, [
       { label: 'New Playlist', action: async () => nav.root({ name: 'playlist', id: await createPlaylist('Untitled Playlist') }) },
@@ -52,97 +87,105 @@
     ])
   // album pages belong to the Albums destination, etc.
   const section = $derived(nav.route.name === 'album' ? 'albums' : nav.route.name)
-
-  let input: HTMLInputElement
-  export const focusSearch = () => input.focus()
+  const selected = (r: Route) => section === r.name
+  let closed = $state<Record<string, boolean>>({})
 </script>
 
 <nav class="side" aria-label="Library">
-  <div class="drag" data-tauri-drag-region></div>
-  <label class="search">
-    <MagnifyingGlass size={14} weight="bold" />
-    <input
-      bind:this={input}
-      bind:value={nav.query}
-      placeholder="Search"
-      spellcheck="false"
-      oninput={() => nav.route.name !== 'search' && nav.go({ name: 'search' })}
-      onkeydown={(e) => e.key === 'Escape' && ((nav.query = ''), input.blur(), nav.route.name === 'search' && nav.back())}
-    />
-  </label>
-
-  <div class="head">Library</div>
-  {#each items as it (it.label)}
-    <button class="item press" class:sel={section === it.route.name} onclick={() => nav.root(it.route)}>
-      <span class="ic"><it.icon size={17} /></span>{it.label}
-    </button>
-  {/each}
-  {#if spotify.user}
-    <button class="item press" class:sel={section === 'spotify'} onclick={() => nav.root({ name: 'spotify' })}>
-      <span class="ic"><SpotifyLogo size={17} /></span>Spotify
-    </button>
-  {/if}
-
-  <div class="head row">Playlists <button class="add" aria-label="New playlist" onclick={newMenu}><Plus size={12} weight="bold" /></button></div>
-  {#each mine as it (it.label)}
-    <button class="item press" class:sel={section === it.route.name} onclick={() => nav.root(it.route)}>
-      <span class="ic"><it.icon size={17} /></span>{it.label}
-    </button>
-  {/each}
-  <!-- appears once a word is saved from Learn mode in the lyrics -->
-  {#if vocab.items.length}
-    <button class="item press" class:sel={section === 'vocabulary'} onclick={() => nav.root({ name: 'vocabulary' })}>
-      <span class="ic"><Cards size={17} /></span>Vocabulary
-    </button>
-  {/if}
-  <div class="lists">
-    {#each lib.playlists as p (p.id)}
-      <button class="item press" class:sel={nav.route.name === 'playlist' && nav.route.id === p.id} onclick={() => nav.root({ name: 'playlist', id: p.id })}>
-        <span class="ic">{#if p.rules}<Sparkle size={16} />{:else}<Playlist size={17} />{/if}</span><span class="ellipsis">{p.name}</span>
-      </button>
-    {/each}
+  <div class="brand" data-tauri-drag-region>
+    <img src="/favicon.svg" alt="" width="22" height="22" />
+    <span data-tauri-drag-region>Confluence</span>
   </div>
 
-  <div class="spacer"></div>
+  <div class="scroll">
+    {#each NAV as g (g.group)}
+      {@const items = g.items.filter(shown)}
+      {#if items.length}
+        {#if g.group}
+          <button class="head press" aria-expanded={!closed[g.group]} onclick={() => (closed[g.group] = !closed[g.group])}>
+            {g.group}<span class="caret" class:shut={closed[g.group]}><CaretDown size={10} weight="bold" /></span>
+          </button>
+        {/if}
+        {#if !closed[g.group]}
+          {#each items as it (it.id)}
+            <button class="item press" class:sel={selected(it.route)} onclick={() => (nav.root(it.route), it.id === 'search' && ui.search++)}>
+              <span class="ic"><it.icon size={17} /></span>{it.label}
+            </button>
+          {/each}
+        {/if}
+      {/if}
+    {/each}
+
+    <div class="head row">
+      <button class="press grow" aria-expanded={!closed.Playlists} onclick={() => (closed.Playlists = !closed.Playlists)}>
+        Playlists<span class="caret" class:shut={closed.Playlists}><CaretDown size={10} weight="bold" /></span>
+      </button>
+      <button class="add" aria-label="New playlist" onclick={newMenu}><Plus size={12} weight="bold" /></button>
+    </div>
+    {#if !closed.Playlists}
+      {#each lib.playlists as p (p.id)}
+        <button class="item press" class:sel={nav.route.name === 'playlist' && nav.route.id === p.id} onclick={() => nav.root({ name: 'playlist', id: p.id })}>
+          <span class="ic">{#if p.rules}<Sparkle size={16} />{:else}<Playlist size={17} />{/if}</span><span class="ellipsis">{p.name}</span>
+        </button>
+      {/each}
+    {/if}
+
+    {#if pins.items.length}
+      <div class="head">Pinned</div>
+      {#each pins.items as p (p.key)}
+        <button
+          class="pin press"
+          class:sel={nav.route.name === 'album' && nav.route.key === p.key}
+          onclick={() => nav.root({ name: 'album', key: p.key })}
+          oncontextmenu={(e) => openMenu(e, [{ label: 'Unpin from Sidebar', action: () => togglePin(p) }])}
+        >
+          <Artwork art={p.art} size="34px" radius="5px" shadow={false} />
+          <span class="pt"><span class="ellipsis">{p.title}</span><span class="t-sub">Album</span></span>
+        </button>
+      {/each}
+    {/if}
+  </div>
+
   {#if lib.scan}
     <div class="scan" aria-live="polite">
       <div class="t-sub">Scanning {lib.scan.done.toLocaleString()} of {lib.scan.total.toLocaleString()}</div>
       <div class="bar"><div style:width="{(lib.scan.done / Math.max(1, lib.scan.total)) * 100}%"></div></div>
     </div>
   {/if}
-  <button class="item press" onclick={openFiles} title="Ctrl+O">
-    <span class="ic"><FolderOpen size={17} /></span>Open File…
-  </button>
-  <button class="item press" class:sel={section === 'settings'} onclick={() => nav.root({ name: 'settings' })}>
-    <span class="ic"><Gear size={17} /></span>Settings
-  </button>
+  <div class="foot">
+    <button class="item press" onclick={openFiles} title="Ctrl+O"><span class="ic"><FolderOpen size={17} /></span>Open File…</button>
+    <button class="item press" class:sel={section === 'settings'} onclick={() => nav.root({ name: 'settings' })}><span class="ic"><Gear size={17} /></span>Settings</button>
+  </div>
 </nav>
 
 <style>
   .side {
-    width: 232px; flex: none; display: flex; flex-direction: column; gap: 1px;
-    padding: 0 10px 12px; background: var(--sidebar); border-right: 1px solid var(--sep);
+    width: 236px; flex: none; display: flex; flex-direction: column; min-height: 0;
+    padding: 0 10px 10px; background: var(--sidebar); border-right: 1px solid var(--sep);
   }
-  .drag { height: 18px; flex: none; }
-  .search {
-    display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 9px; margin: 22px 2px 14px;
-    border-radius: 7px; background: var(--fill-2); color: var(--text-2);
+  .brand { display: flex; align-items: center; gap: 9px; height: var(--bar-h); padding: 0 8px; flex: none; }
+  .brand img { border-radius: 6px; }
+  .brand span { font-weight: 700; font-size: 15px; letter-spacing: -0.02em; }
+  .scroll { flex: 1; min-height: 0; overflow-y: auto; display: grid; align-content: start; gap: 1px; margin: 0 -4px; padding: 0 4px; }
+  .head {
+    display: flex; align-items: center; gap: 4px; width: 100%; font-size: 11px; font-weight: 650; color: var(--text-3);
+    padding: 14px 10px 5px; text-align: left;
   }
-  .search:focus-within { box-shadow: 0 0 0 2px var(--accent); }
-  input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--text); }
-  input::placeholder { color: var(--text-2); }
-  .head { font-size: 11px; font-weight: 650; color: var(--text-3); padding: 10px 10px 5px; }
-  .item { display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 10px; border-radius: 7px; text-align: left; }
-  .item:hover { background: var(--fill); }
-  .item.sel { background: var(--fill-2); font-weight: 550; }
+  .head:hover { color: var(--text-2); }
+  .caret { display: grid; transition: transform 160ms var(--ease-out); }
+  .caret.shut { transform: rotate(-90deg); }
+  .head.row { justify-content: space-between; padding-right: 4px; }
+  .grow { display: flex; align-items: center; gap: 4px; }
+  .item { display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 10px; border-radius: 7px; text-align: left; min-width: 0; }
+  .item:hover, .pin:hover { background: var(--fill); }
+  .item.sel, .pin.sel { background: var(--fill-2); font-weight: 550; }
   .ic { display: grid; color: var(--accent); }
-  .spacer { flex: 1; }
-  .head.row { display: flex; justify-content: space-between; align-items: center; padding-top: 16px; }
   .add { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; color: var(--text-2); }
   .add:hover { background: var(--fill-2); color: var(--text); }
-  .lists { display: grid; gap: 1px; overflow-y: auto; min-height: 0; }
-  .item { flex: none; min-width: 0; }
-  .scan { padding: 8px 10px 10px; }
+  .pin { display: flex; align-items: center; gap: 10px; padding: 4px 8px; border-radius: 8px; text-align: left; min-width: 0; }
+  .pt { display: grid; min-width: 0; line-height: 1.3; }
+  .foot { display: grid; gap: 1px; padding-top: 6px; border-top: 1px solid var(--sep); margin-top: 6px; }
+  .scan { padding: 8px 10px 6px; }
   .bar { height: 3px; margin-top: 6px; border-radius: 2px; background: var(--fill-2); overflow: hidden; }
   .bar div { height: 100%; background: var(--accent); transition: width 200ms; }
 </style>

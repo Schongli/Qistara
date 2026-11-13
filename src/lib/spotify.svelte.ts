@@ -2,18 +2,18 @@
 // Sign-in, tokens and every request live in Rust (spotify.rs); this side only shows and decides.
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { createPlaylist, lib, setPlaylistItems } from './library.svelte'
 import { mpv, togglePause } from './player.svelte'
 import { queue } from './queue.svelte'
-import { kvGet, kvSet } from './persist'
-import { matchTracks, type SpotifyTrack } from './spotify'
+import { kvSet } from './persist'
+import type { RemoteTrack } from './spotify'
+import { importInto, type ImportResult } from './imports.svelte'
 
 export interface SpPlaylist { id: string; name: string; tracks: number; image: string | null }
 export interface SpPlayer {
   device: string; playing: boolean; progress: number; volume: number | null
   title: string; artists: string; album: string; image: string | null; duration: number; url: string | null
 }
-export interface ImportResult { found: number; total: number; missing: SpotifyTrack[]; playlist?: number; error?: string }
+export type { ImportResult }
 export type Control =
   | { kind: 'play' | 'pause' | 'next' | 'previous' }
   | { kind: 'seek'; ms: number }
@@ -21,7 +21,7 @@ export type Control =
 
 /** Liked Songs has no playlist id; this stands in for it. */
 export const LIKED = 'liked'
-const IMPORTS = 'spotifyImports' // Spotify playlist id → Sonora playlist id, so importing again updates
+const IMPORTS = 'spotifyImports' // Spotify playlist id → Confluence Player playlist id, so importing again updates
 
 export const spotify = $state({
   configured: false,
@@ -96,19 +96,12 @@ export async function loadPlaylists() {
   }
 }
 
-/** Copies one playlist (or Liked Songs) into Sonora as a playlist of your matching files. */
+/** Copies one playlist (or Liked Songs) into Confluence Player as a playlist of your matching files. */
 export async function importPlaylist(id: string, name: string) {
   spotify.importing = id
   try {
-    const songs = await invoke<SpotifyTrack[]>('spotify_tracks', { playlist: id === LIKED ? null : id })
-    const { ids, missing } = matchTracks(songs, lib.tracks)
-    const map = (await kvGet<Record<string, number>>(IMPORTS)) ?? {}
-    // update the earlier import unless it was deleted (or turned into something else)
-    const earlier = lib.playlists.find((p) => p.id === map[id] && !p.rules)
-    if (earlier) await setPlaylistItems(earlier.id, ids)
-    else map[id] = await createPlaylist(name, null, ids)
-    await kvSet(IMPORTS, map)
-    spotify.results = { ...spotify.results, [id]: { found: ids.length, total: songs.length, missing, playlist: map[id] } }
+    const songs = await invoke<RemoteTrack[]>('spotify_tracks', { playlist: id === LIKED ? null : id })
+    spotify.results = { ...spotify.results, [id]: await importInto(IMPORTS, id, name, songs) }
   } catch (e) {
     spotify.results = { ...spotify.results, [id]: { found: 0, total: 0, missing: [], error: message(e) } }
   } finally {
@@ -135,7 +128,7 @@ export function watchPlayer() {
 }
 
 export async function control(action: Control) {
-  // in Bit-Perfect mode Sonora holds the audio device alone, so Spotify on this PC couldn't play over it
+  // in Bit-Perfect mode Confluence Player holds the audio device alone, so Spotify on this PC couldn't play over it
   if (action.kind === 'play' && queue.current && !mpv.pause) await togglePause()
   const p = spotify.player
   if (p && (action.kind === 'play' || action.kind === 'pause')) p.playing = action.kind === 'play' // answer the click at once

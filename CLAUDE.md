@@ -1,6 +1,6 @@
-# Sonora
+# Confluence Player
 
-Apple-style lossless music + media player. Tauri 2 (Rust) + Svelte 5 + libmpv. Windows-first.
+Lossless music + media player (formerly Sonora). Tauri 2 (Rust) + Svelte 5 + libmpv. Windows-first.
 Phases and status: `ROADMAP.md`.
 
 ## Commands
@@ -14,9 +14,11 @@ Phases and status: `ROADMAP.md`.
 
 ## Debugging
 - Webview `console.*` and unhandled rejections are forwarded into the `tauri dev` output.
-- Dev builds write mpv's own log to `%LOCALAPPDATA%\com.sonora.player\mpv.log` (WASAPI format negotiation, filter chain).
+- Dev builds write mpv's own log to `%LOCALAPPDATA%\com.confluenceplayer.app\mpv.log` (WASAPI format negotiation, filter chain).
 - Don't call `getProperty` from tauri-plugin-libmpv-api: it crashes libmpv-wrapper. State comes from observed properties.
 - Integer mpv properties (sid, aid, chapter, sub-margin-y) must be set as text via `cmd('set', name, String(v))`.
+- Tests from Claude's shell run inside an MSIX container: `%LOCALAPPDATA%` writes are redirected, Pictures and Music
+  aren't writable (screenshots, the default Downloads folder fail there, not in the installed app).
 
 ## Invariants
 - Bit-perfect mode is the default: `BIT_PERFECT` in `src/lib/player.svelte.ts`. Never set `audio-samplerate`,
@@ -25,13 +27,26 @@ Phases and status: `ROADMAP.md`.
 - Queue lives in TS; mpv's playlist only ever holds [current, next] (gapless).
 - Tag writes: copy → write → re-read → atomic rename. Never write tags in place.
 - SQL: column names from fixed enums, values always bound.
-- No personal data in HTTP requests (User-Agent is `Sonora/<version>`). Lyrics translation sends only the lyric lines;
+- No personal data in HTTP requests (User-Agent is `ConfluencePlayer/<version>`). Lyrics translation sends only the lyric lines;
   Learn-mode lookups send only the one word. Japanese analysis (`japanese.rs`) is offline.
-- Spotify (`spotify.rs`): tokens stay in Rust (refresh token in Credential Manager), commands map to fixed
-  endpoints, IDs are validated before they reach a URL. Disconnect must also clear kv `spotifyImports`.
+- Providers (`spotify.rs`, `tidal.rs`, `apple.rs`, `subsonic.rs`): secrets stay in Rust (Credential Manager), commands
+  map to fixed endpoints, IDs are validated before they reach a URL, and followed `next` links must stay on the
+  service's own API path. Sign-out clears that service's kv import map (`spotifyImports`, `appleImports`,
+  `tidalImports`). Apple's loopback page answers only `Host: 127.0.0.1:<port>`. Spotify, Apple Music and Tidal are
+  import-only: never play, record or download their DRM streams.
+- yt-dlp (`ytdlp.rs`): fixed presets only, always `--ignore-config` and `--` before URLs, URLs must be http(s).
+  A cookies file reaches yt-dlp (and mpv's ytdl hook) only as a checked copy in app data: yt-dlp writes back to it.
+  yt-dlp/ffmpeg are fetched only from their GitHub releases and must match the release's SHA-256 list.
+- YouTube tracks are `ytdl://<watch url>` played by mpv's ytdl hook (`ytdl_hook-all_formats=no`, bestaudio); remote
+  tracks (YouTube, server, radio) have negative ids, so they never reach stats, playlists or the restored queue.
+- Rename: the data folder was `com.sonora.player`; `migrate()` in lib.rs copies it once and never deletes it, and
+  `keys.rs` carries "Sonora …" Credential Manager entries over (and forgets both on sign-out).
 - App state (settings, EQ, queue, radio) lives in the SQLite `kv` table via `src/lib/persist.ts`, never localStorage
   (WebView2 loses recent localStorage writes when the process is killed). Load before saving.
 - Switching exclusive mode reopens the current file (`queue.reload()`): mpv may not reopen the device on its own.
+- Theme tokens use `light-dark()` in `app.css`; Appearance sets `color-scheme`/inline `--accent` (`appearance.svelte.ts`).
+  A custom or artwork accent always goes through `readableAccent` (`color.ts`). Lyrics/Qur'an views are white on the
+  dark blurred-cover backdrop in both Now Playing and the docked pane (`PanelContent.svelte`).
 
 ## Skills (IWNOTS map)
 - Always: `/ponytail`. Big feature: `/feature-dev`. Logic: `/test-driven-development`.

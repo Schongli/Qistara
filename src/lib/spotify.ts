@@ -1,7 +1,7 @@
-// Matches Spotify songs to files in your library, so an imported playlist plays your own lossless copies.
+// Matches songs from Spotify, Apple Music or Tidal to files in your library, so an imported playlist plays your own lossless copies.
 import { rank, songKey } from './dupes'
 
-export interface SpotifyTrack { title: string; artists: string[]; album: string; duration: number; isrc: string | null }
+export interface RemoteTrack { title: string; artists: string[]; album: string; duration: number; isrc: string | null }
 
 type Local = {
   id: number; kind: string; title: string; artist: string; albumArtist: string; album: string; duration: number
@@ -20,7 +20,7 @@ const hasArtist = (artists: string[], t: Local) => {
   })
 }
 
-function pick<T extends Local>(s: SpotifyTrack, byTitle: Map<string, T[]>): T | null {
+function pick<T extends Local>(s: RemoteTrack, byTitle: Map<string, T[]>): T | null {
   const found = (byTitle.get(titleKey(s.title)) ?? []).filter((t) => hasArtist(s.artists, t))
   const within = (secs: number) => found.filter((t) => !t.duration || !s.duration || Math.abs(t.duration - s.duration) <= secs)
   // a different master can run a few seconds longer; allow 10 s only when there's no other choice
@@ -31,7 +31,7 @@ function pick<T extends Local>(s: SpotifyTrack, byTitle: Map<string, T[]>): T | 
 }
 
 /** Library ids for the Spotify songs (in order) and the songs that aren't in the library. */
-export function matchTracks<T extends Local>(songs: SpotifyTrack[], library: T[]) {
+export function matchTracks<T extends Local>(songs: RemoteTrack[], library: T[]) {
   const byTitle = new Map<string, T[]>()
   for (const t of library) {
     if (t.kind !== 'audio' || !t.title) continue
@@ -39,7 +39,7 @@ export function matchTracks<T extends Local>(songs: SpotifyTrack[], library: T[]
     byTitle.set(k, [...(byTitle.get(k) ?? []), t])
   }
   const ids: number[] = []
-  const missing: SpotifyTrack[] = []
+  const missing: RemoteTrack[] = []
   for (const s of songs) {
     const t = pick(s, byTitle)
     if (t) ids.push(t.id)

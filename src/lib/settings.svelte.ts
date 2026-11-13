@@ -5,7 +5,17 @@ import { queue } from './queue.svelte'
 import { kvGet, kvSet } from './persist'
 
 // lyricsLanguage '' = the Windows display language
-const defaults = { bitPerfect: true, soundCheck: false, passthrough: false, hwdec: true, onlineLyrics: true, translateLyrics: false, lyricsLanguage: '', learnLyrics: false }
+// quranTranslations: ids from quran.svelte.ts TRANSLATIONS, shown under each ayah
+const defaults = {
+  bitPerfect: true, soundCheck: false, passthrough: false, hwdec: true, onlineLyrics: true, translateLyrics: false, lyricsLanguage: '', learnLyrics: false,
+  quranTranslations: ['kemenag'] as string[], quranTranslit: true,
+  // Appearance (appearance.svelte.ts): accent '' = the default teal; zoom scales the whole UI
+  theme: 'auto' as 'auto' | 'light' | 'dark', accent: '', matchArtwork: false, zoom: 1,
+  density: 'comfortable' as 'comfortable' | 'compact', solidChrome: false, font: 'inter' as 'inter' | 'system',
+  hiddenNav: [] as string[],
+  // YouTube sign-in for yt-dlp: '' guest, 'firefox' (its cookies), or the path of a cookies.txt file
+  ytCookies: '',
+}
 type Settings = typeof defaults
 
 export const settings = $state<Settings>({ ...defaults })

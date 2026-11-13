@@ -159,6 +159,14 @@ export function toggleSaveCard() {
   saveVocab()
 }
 
+/** Saves a word picked somewhere other than the lyrics card (the Qur'an view); a saved word is left as is. */
+export function saveWord(item: Omit<VocabItem, 'added' | 'box' | 'due'>) {
+  if (!vocab.loaded || isSaved(item.id)) return
+  const now = Date.now()
+  vocab.items = [{ ...item, added: now, box: 0, due: now }, ...vocab.items]
+  saveVocab()
+}
+
 export function removeWord(id: string) {
   vocab.items = vocab.items.filter((i) => i.id !== id)
   saveVocab()

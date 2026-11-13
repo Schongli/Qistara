@@ -27,11 +27,13 @@
     return t?.bitDepth && n > t.bitDepth && !f!.startsWith('float') ? `${t.bitDepth}-bit in ${n}-bit int` : fmt(f)
   }
 
-  let pos = $state({ left: 0, top: 0 })
+  // below its button, or above it when the button sits low (the player bar)
+  let pos = $state<{ left: number; top?: number; bottom?: number }>({ left: 0, top: 0 })
   $effect(() => {
     if (!open || !anchor) return
     const r = anchor.getBoundingClientRect()
-    pos = { left: Math.min(innerWidth - 336, Math.max(8, r.left + r.width / 2 - 160)), top: r.bottom + 8 }
+    const left = Math.min(innerWidth - 336, Math.max(8, r.left + r.width / 2 - 160))
+    pos = r.top > innerHeight / 2 ? { left, bottom: innerHeight - r.top + 8 } : { left, top: r.bottom + 8 }
   })
 </script>
 
@@ -41,7 +43,7 @@
 />
 
 {#if open && t}
-  <div bind:this={el} class="pop" role="dialog" aria-label="Signal path" style:left="{pos.left}px" style:top="{pos.top}px">
+  <div bind:this={el} class="pop" role="dialog" aria-label="Signal path" style:left="{pos.left}px" style:top={pos.top === undefined ? null : `${pos.top}px`} style:bottom={pos.bottom === undefined ? null : `${pos.bottom}px`}>
     <div class="verdict" class:ok={v.bitPerfect}>
       {#if v.bitPerfect}<CheckCircle size={20} weight="fill" />{:else}<WarningCircle size={20} weight="fill" />{/if}
       <div>

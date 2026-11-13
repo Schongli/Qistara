@@ -15,7 +15,7 @@
 <p class="t-sub">
   {#if groups.length}
     {groups.length === 1 ? '1 song exists' : `${groups.length} songs exist`} in more than one file ({extra} extra {extra === 1 ? 'copy' : 'copies'}). The
-    best-quality copy is listed first. Sonora never deletes files; use Show in File Explorer to tidy up.
+    best-quality copy is listed first. Confluence Player never deletes files; use Show in File Explorer to tidy up.
   {:else}
     No duplicate songs found. Songs match when artist, title and length agree (remaster and version tags are ignored).
   {/if}

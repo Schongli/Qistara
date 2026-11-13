@@ -6,13 +6,14 @@
   import { queue } from '../lib/queue.svelte'
   import { openMenu, trackMenu } from '../lib/menu.svelte'
 
-  let { albums, title = '', showArtist = true }: { albums: Album[]; title?: string; showArtist?: boolean } = $props()
+  // row: one line that scrolls sideways (Home)
+  let { albums, title = '', showArtist = true, row = false }: { albums: Album[]; title?: string; showArtist?: boolean; row?: boolean } = $props()
 </script>
 
 {#if title}<h1 class="t-title">{title}</h1>{/if}
-<div class="grid">
+<div class="grid" class:row>
   {#each albums as a (a.key)}
-    <div class="tile" oncontextmenu={(e) => openMenu(e, trackMenu(a.tracks))} role="listitem">
+    <div class="tile" oncontextmenu={(e) => openMenu(e, trackMenu(a.tracks, a))} role="listitem">
       <div class="cover">
         <button class="open press" aria-label="Open {a.title}" onclick={() => nav.go({ name: 'album', key: a.key })}>
           <Artwork art={a.art} />
@@ -32,6 +33,8 @@
 <style>
   h1 { margin: 0 0 20px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(164px, 1fr)); gap: 26px 22px; }
+  .grid.row { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 164px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x proximity; }
+  .row .tile { scroll-snap-align: start; content-visibility: visible; }
   .tile { min-width: 0; content-visibility: auto; contain-intrinsic-size: auto 230px; }
   .cover { position: relative; margin-bottom: 8px; }
   .open { display: block; width: 100%; border-radius: var(--r-art); }

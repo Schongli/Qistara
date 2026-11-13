@@ -89,7 +89,7 @@ pub fn write(path: &Path, edit: &Edit) -> Result<(), String> {
     // same folder (so the rename is atomic) and same extension (lofty picks the format by it)
     let stem = path.file_stem().ok_or("not a file")?.to_string_lossy();
     let ext = path.extension().map(|e| e.to_string_lossy()).unwrap_or_default();
-    let tmp: PathBuf = path.with_file_name(format!(".{stem}.sonora-tmp.{ext}"));
+    let tmp: PathBuf = path.with_file_name(format!(".{stem}.confluence-tmp.{ext}"));
     let result = (|| {
         let before = lofty::read_from_path(path).map_err(|e| format!("cannot read tags: {e}"))?;
         std::fs::copy(path, &tmp).map_err(|e| format!("cannot copy file: {e}"))?;
@@ -184,6 +184,6 @@ mod tests {
         let original = std::fs::read(&p).unwrap();
         assert!(write(&p, &Edit { track: Some("seven".into()), ..Default::default() }).is_err());
         assert_eq!(std::fs::read(&p).unwrap(), original, "invalid input must not touch the file");
-        assert!(!d.path().join(".a.sonora-tmp.flac").exists());
+        assert!(!d.path().join(".a.confluence-tmp.flac").exists());
     }
 }

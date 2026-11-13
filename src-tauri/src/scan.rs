@@ -40,6 +40,11 @@ pub fn kind_of(p: &Path) -> Option<&'static str> {
     }
 }
 
+/// The tag editor's in-flight copies (tags.rs); ".sonora-tmp." is what the app wrote under its old name.
+fn is_tag_tmp(name: &str) -> bool {
+    name.contains(".confluence-tmp.") || name.contains(".sonora-tmp.")
+}
+
 pub fn now() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64)
 }
@@ -56,7 +61,7 @@ impl Art {
         Art { dir, folders: Mutex::new(HashMap::new()) }
     }
 
-    fn thumb(&self, bytes: &[u8]) -> Option<String> {
+    pub fn thumb(&self, bytes: &[u8]) -> Option<String> {
         // shortcut: std hasher is stable within a Rust release; a change only re-creates thumbnails.
         let mut h = std::hash::DefaultHasher::new();
         bytes.hash(&mut h);
@@ -227,7 +232,7 @@ pub fn scan(db: &Mutex<Connection>, art: &Art, progress: &(dyn Fn(usize, usize) 
                 continue;
             };
             // skip non-media files and the tag editor's in-flight copies
-            if !e.file_type().is_file() || kind_of(e.path()).is_none() || e.file_name().to_string_lossy().contains(".sonora-tmp.") {
+            if !e.file_type().is_file() || kind_of(e.path()).is_none() || is_tag_tmp(&e.file_name().to_string_lossy()) {
                 continue;
             }
             let p = e.path().to_string_lossy().into_owned();

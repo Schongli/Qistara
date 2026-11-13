@@ -12,10 +12,10 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_http::reqwest;
 
-const SERVICE: &str = "Sonora Spotify";
+const SERVICE: &str = "Confluence Player Spotify";
 const API: &str = "https://api.spotify.com/v1";
 const ACCOUNTS: &str = "https://accounts.spotify.com";
-const UA: &str = "Sonora/0.1.0"; // identifies the app only; no personal data
+const UA: &str = "ConfluencePlayer/0.2.0"; // identifies the app only; no personal data
 pub const SCOPES: &str =
     "playlist-read-private playlist-read-collaborative user-library-read user-read-playback-state user-modify-playback-state";
 
@@ -48,7 +48,7 @@ pub fn challenge(verifier: &str) -> String {
     URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()))
 }
 
-fn random(bytes: usize) -> Result<String, String> {
+pub fn random(bytes: usize) -> Result<String, String> {
     let mut b = vec![0u8; bytes];
     getrandom::fill(&mut b).map_err(err)?;
     Ok(URL_SAFE_NO_PAD.encode(b))
@@ -73,24 +73,25 @@ pub fn authorize_url(client_id: &str, port: u16, challenge: &str, state: &str) -
 }
 
 /// The authorization code from the browser's "GET /callback?…" request, if its state matches ours.
-pub fn parse_callback(request: &str, state: &str) -> Result<String, String> {
+/// `name`: the service, for the messages (shared with Tidal).
+pub fn parse_callback(request: &str, state: &str, name: &str) -> Result<String, String> {
     let target = request.split_whitespace().nth(1).unwrap_or("");
-    let u = url::Url::parse(&format!("http://127.0.0.1{target}")).map_err(|_| "Spotify sent an unreadable reply.")?;
+    let u = url::Url::parse(&format!("http://127.0.0.1{target}")).map_err(|_| format!("{name} sent an unreadable reply."))?;
     let q = |k: &str| u.query_pairs().find(|(n, _)| n == k).map(|(_, v)| v.into_owned());
     if let Some(e) = q("error") {
-        return Err(if e == "access_denied" { "Spotify sign-in was cancelled.".into() } else { format!("Spotify sign-in failed: {e}") });
+        return Err(if e == "access_denied" { format!("{name} sign-in was cancelled.") } else { format!("{name} sign-in failed: {e}") });
     }
     if q("state").as_deref() != Some(state) {
-        return Err("The sign-in reply didn't match this request. Try Connect again.".into());
+        return Err("The sign-in reply didn't match this request. Try signing in again.".into());
     }
-    q("code").filter(|c| !c.is_empty()).ok_or_else(|| "Spotify sent no sign-in code.".into())
+    q("code").filter(|c| !c.is_empty()).ok_or_else(|| format!("{name} sent no sign-in code."))
 }
 
-const PAGE: &str = "<!doctype html><meta charset=utf-8><title>Sonora</title>\
+const PAGE: &str = "<!doctype html><meta charset=utf-8><title>Confluence Player</title>\
 <body style=\"font:16px system-ui;display:grid;place-items:center;height:90vh;margin:0\"><p>";
 
 /// Waits for the browser to come back to our loopback port; other requests (favicon, preconnects) are ignored.
-fn wait_for_code(listener: &TcpListener, state: &str, limit: Duration) -> Result<String, String> {
+pub fn wait_for_code(listener: &TcpListener, state: &str, limit: Duration, name: &str) -> Result<String, String> {
     listener.set_nonblocking(true).map_err(err)?;
     let end = Instant::now() + limit;
     while Instant::now() < end {
@@ -105,9 +106,9 @@ fn wait_for_code(listener: &TcpListener, state: &str, limit: Duration) -> Result
                     let _ = s.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
                     continue;
                 }
-                let result = parse_callback(&req, state);
+                let result = parse_callback(&req, state, name);
                 // fixed text only: nothing from the request is echoed into the page
-                let text = if result.is_ok() { "Sonora is connected to Spotify. You can close this tab." } else { "Sign-in didn't finish. Go back to Sonora for details." };
+                let text = if result.is_ok() { format!("Confluence Player is connected to {name}. You can close this tab.") } else { "Sign-in didn't finish. Go back to Confluence Player for details.".to_string() };
                 let body = format!("{PAGE}{text}</p>");
                 let head = format!("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
                 let _ = s.write_all(head.as_bytes()).and_then(|_| s.write_all(body.as_bytes()));
@@ -117,7 +118,7 @@ fn wait_for_code(listener: &TcpListener, state: &str, limit: Duration) -> Result
             Err(e) => return Err(err(e)),
         }
     }
-    Err("Spotify sign-in timed out. Click Connect to try again.".into())
+    Err(format!("{name} sign-in timed out. Try signing in again."))
 }
 
 fn client() -> Result<reqwest::Client, String> {
@@ -273,7 +274,7 @@ pub fn spotify_begin(app: AppHandle) -> Result<(), String> {
     let state = random(16)?;
     app.opener().open_url(authorize_url(&c.client_id, port, &challenge(&verifier), &state), None::<&str>).map_err(err)?;
     std::thread::spawn(move || {
-        let done = wait_for_code(&listener, &state, Duration::from_secs(300))
+        let done = wait_for_code(&listener, &state, Duration::from_secs(300), "Spotify")
             .and_then(|code| tauri::async_runtime::block_on(finish(&app, c, &code, port, &verifier)));
         let _ = app.emit("spotify-changed", done.err());
     });
@@ -292,16 +293,16 @@ pub async fn spotify_logout(token: State<'_, Token>, all: bool) -> Result<(), St
 
 #[derive(Serialize)]
 pub struct Playlist {
-    id: String,
-    name: String,
-    tracks: u64,
-    image: Option<String>,
+    pub id: String,
+    pub name: String,
+    pub tracks: u64,
+    pub image: Option<String>,
 }
 
 #[derive(Serialize)]
 pub struct Playlists {
-    liked: u64,
-    playlists: Vec<Playlist>,
+    pub liked: u64,
+    pub playlists: Vec<Playlist>,
 }
 
 /// Your own and collaborative playlists (Spotify refuses to list the items of anyone else's), plus Liked Songs.
@@ -328,11 +329,11 @@ pub async fn spotify_playlists(app: AppHandle) -> Result<Playlists, String> {
 
 #[derive(Serialize)]
 pub struct Track {
-    title: String,
-    artists: Vec<String>,
-    album: String,
-    duration: f64,
-    isrc: Option<String>,
+    pub title: String,
+    pub artists: Vec<String>,
+    pub album: String,
+    pub duration: f64,
+    pub isrc: Option<String>,
 }
 
 fn track_of(t: &Value) -> Option<Track> {
@@ -446,10 +447,10 @@ mod tests {
 
     #[test]
     fn reads_the_callback() {
-        assert_eq!(parse_callback("GET /callback?code=abc&state=xyz HTTP/1.1\r\nHost: x\r\n", "xyz"), Ok("abc".into()));
-        assert!(parse_callback("GET /callback?code=abc&state=evil HTTP/1.1", "xyz").unwrap_err().contains("didn't match"));
-        assert!(parse_callback("GET /callback?error=access_denied&state=xyz HTTP/1.1", "xyz").unwrap_err().contains("cancelled"));
-        assert!(parse_callback("GET /callback?state=xyz HTTP/1.1", "xyz").is_err());
+        assert_eq!(parse_callback("GET /callback?code=abc&state=xyz HTTP/1.1\r\nHost: x\r\n", "xyz", "Spotify"), Ok("abc".into()));
+        assert!(parse_callback("GET /callback?code=abc&state=evil HTTP/1.1", "xyz", "Spotify").unwrap_err().contains("didn't match"));
+        assert!(parse_callback("GET /callback?error=access_denied&state=xyz HTTP/1.1", "xyz", "Spotify").unwrap_err().contains("cancelled"));
+        assert!(parse_callback("GET /callback?state=xyz HTTP/1.1", "xyz", "Spotify").is_err());
     }
 
     #[test]

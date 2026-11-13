@@ -1,4 +1,4 @@
-# Sonora roadmap
+# Confluence Player roadmap
 
 ## Phase 1: first build
 - [x] M0 Setup: toolchain, Tauri + Svelte scaffold, libmpv
@@ -22,6 +22,10 @@
 - [x] Learn mode in lyrics: tap any word for its meaning; Japanese gets furigana, romaji, dictionary forms and
   grammar notes (offline IPADIC via Lindera); saved words → Vocabulary page with line replay and flashcard review
   (not yet checked in the running app)
+- [x] Qur'an Learn mode: recitations are recognised by title/album (surah, Juz 'Amma/Tabarak, Hafs or Shu'bah,
+  partial selections; "Choose Surah…" to override). Uthmani text with word meanings, transliteration, Kemenag,
+  Saheeh and Clear Quran; ayahs synced from the pauses in the recording (quran.com timings for its own Alafasy
+  murattal), Fix sync by tapping; words save to Vocabulary
 - [ ] Learn mode next: romanization for Korean/Chinese/other scripts, a furigana on/off switch
 - [ ] Video thumbnails + Movies/TV grouping, crossfade, CUE-sheet tracks, file organiser, Discord presence
 
@@ -30,4 +34,16 @@
   matched to local files, Connect remote (sign-in and remote not yet tried with a real account)
 - [ ] DLNA/UPnP, device sync, macOS/Linux
 
-Not planned: fake-lossless checker, native DSD/DoP (mpv converts DSD to PCM).
+## Phase 4: Confluence Player
+- [x] Rename from Sonora (name, icon, data folder and Credential Manager migration)
+- [x] Streaming-client shell: Home, sidebar groups and Pinned albums, bottom player bar, docked lyrics/Up Next pane,
+  back/forward, album header
+- [x] Appearance: theme, accent (presets, custom, match artwork), text size, density, font, solid window, sidebar items
+- [x] Downloads with yt-dlp (checksum-verified install, presets, playlists, progress, cancel, into the library)
+- [x] YouTube: search, links and Liked Music, played through mpv's ytdl hook, guest or cookies sign-in
+- [x] Navidrome / Subsonic: browse, search and stream (FLAC as stored)
+- [x] Providers page; Apple Music (own MusicKit key) and Tidal (own developer app) playlist import
+  (Apple and Tidal not yet tried with real accounts)
+- [ ] Offline copies of server songs, Deezer, Discord presence, UI translations
+
+Not planned: fake-lossless checker, native DSD/DoP (mpv converts DSD to PCM), playing or downloading DRM streams.

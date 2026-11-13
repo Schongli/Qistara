@@ -28,6 +28,11 @@ pub fn query(from: &str, to: &str, dictionary: bool) -> Vec<(&'static str, Strin
     q
 }
 
+/// A client that speaks HTTP/1.1 only, with a 20 s timeout; Google and others turn reqwest's HTTP/2 away.
+pub fn http1_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder().http1_only().timeout(Duration::from_secs(20)).build().map_err(|e| e.to_string())
+}
+
 /// Google's raw JSON reply; the TypeScript side parses it (translate.ts, learn).
 #[tauri::command]
 pub async fn google_translate(text: String, from: String, to: String, dictionary: bool) -> Result<String, String> {
@@ -37,11 +42,10 @@ pub async fn google_translate(text: String, from: String, to: String, dictionary
     if text.len() > 20_000 {
         return Err("Too much text to translate at once.".into());
     }
-    let client = reqwest::Client::builder().http1_only().timeout(Duration::from_secs(20)).build().map_err(|e| e.to_string())?;
-    let r = client
+    let r = http1_client()?
         .post(ENDPOINT)
         .query(&query(&from, &to, dictionary))
-        .header("User-Agent", "Sonora/0.1.0") // identifies the app only; no personal data
+        .header("User-Agent", "ConfluencePlayer/0.2.0") // identifies the app only; no personal data
         .form(&[("q", text.as_str())])
         .send()
         .await

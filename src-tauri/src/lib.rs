@@ -1,14 +1,19 @@
+mod apple;
 mod db;
 mod japanese;
 mod keys;
 mod lastfm;
 mod lyrics;
 mod media_keys;
+mod quran;
 mod scan;
 mod spotify;
+mod subsonic;
 mod tags;
+mod tidal;
 mod translate;
 mod user;
+mod ytdlp;
 
 use notify_debouncer_mini::{new_debouncer, notify::RecommendedWatcher, notify::RecursiveMode, Debouncer};
 use std::path::Path;
@@ -77,10 +82,10 @@ fn extensions() -> Extensions {
   Extensions { audio: scan::AUDIO, video: scan::VIDEO }
 }
 
-/// Pictures\Sonora, created on first use (mpv won't create a missing screenshot folder).
+/// Pictures\Confluence Player, created on first use (mpv won't create a missing screenshot folder).
 #[tauri::command]
 fn screenshot_dir(app: AppHandle) -> Res<String> {
-  let d = app.path().picture_dir().map_err(err)?.join("Sonora");
+  let d = app.path().picture_dir().map_err(err)?.join("Confluence Player");
   std::fs::create_dir_all(&d).map_err(|e| format!("{}: {e}", d.display()))?;
   Ok(d.to_string_lossy().into_owned())
 }
@@ -332,7 +337,7 @@ async fn fetch_cover(lib: State<'_, Lib>, url: String) -> Res<String> {
     return Err("only Cover Art Archive images can be downloaded".into());
   }
   let client = tauri_plugin_http::reqwest::Client::builder()
-    .user_agent("Sonora/0.1.0")
+    .user_agent("ConfluencePlayer/0.2.0")
     .redirect(tauri_plugin_http::reqwest::redirect::Policy::custom(|a| {
       // CAA redirects to archive.org; nothing else
       if a.url().host_str().is_some_and(|h| h == "archive.org" || h.ends_with(".archive.org")) { a.follow() } else { a.stop() }
@@ -345,6 +350,39 @@ async fn fetch_cover(lib: State<'_, Lib>, url: String) -> Res<String> {
     return Err("image is too large".into());
   }
   stage(&lib, &bytes)
+}
+
+/// Appearance › Match artwork: the vivid colour of a cached cover. `art` is a cache file name only.
+#[tauri::command]
+fn art_color(lib: State<Lib>, art: String) -> Option<String> {
+  if art.is_empty() || art.contains(['/', '\\']) || art.contains("..") {
+    return None;
+  }
+  vivid(&image::open(lib.art.dir.join(&art)).ok()?)
+}
+
+/// The cover's main colour: its colourful, mid-bright pixels are sorted into 12 hue bands and the
+/// strongest band is averaged (averaging every hue would turn navy and gold into grey). None for grey art.
+fn vivid(img: &image::DynamicImage) -> Option<String> {
+  let small = img.thumbnail(32, 32).to_rgb8();
+  let mut bands = [([0f64; 3], 0f64); 12];
+  for p in small.pixels() {
+    let [r, g, b] = p.0.map(f64::from);
+    let (hi, lo) = (r.max(g).max(b), r.min(g).min(b));
+    let (s, v) = (if hi > 0.0 { (hi - lo) / hi } else { 0.0 }, hi / 255.0);
+    if s <= 0.25 || !(0.2..=0.97).contains(&v) {
+      continue;
+    }
+    let d = hi - lo;
+    let hue = if hi == r { ((g - b) / d).rem_euclid(6.0) } else if hi == g { (b - r) / d + 2.0 } else { (r - g) / d + 4.0 };
+    let band = &mut bands[((hue * 2.0) as usize).min(11)];
+    band.0 = [band.0[0] + r * s, band.0[1] + g * s, band.0[2] + b * s];
+    band.1 += s;
+  }
+  let (sum, w) = bands.into_iter().max_by(|a, b| a.1.total_cmp(&b.1))?;
+  // a few coloured pixels in a grey cover are noise, not its colour
+  (w > 0.05 * (small.width() * small.height()) as f64)
+    .then(|| format!("#{:02x}{:02x}{:02x}", (sum[0] / w) as u8, (sum[1] / w) as u8, (sum[2] / w) as u8))
 }
 
 #[tauri::command]
@@ -408,6 +446,81 @@ fn watch(app: &AppHandle) {
   }
 }
 
+/// The app was called Sonora, with its data in com.sonora.player: copy the library, settings (kv) and caches
+/// over once. Copies, never moves, so the old install keeps working. The database goes last: once it is
+/// there, the copy is done.
+fn migrate(old: &Path, new: &Path) -> std::io::Result<bool> {
+  if new.join("library.db").exists() || !old.join("library.db").exists() {
+    return Ok(false);
+  }
+  for d in ["art", "lyrics", "resume", "quran-sync"] {
+    copy_dir(&old.join(d), &new.join(d))?;
+  }
+  for f in ["library.db-wal", "library.db-shm", "library.db"] {
+    if old.join(f).exists() {
+      std::fs::copy(old.join(f), new.join(f))?;
+    }
+  }
+  Ok(true)
+}
+
+fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
+  if !from.is_dir() {
+    return Ok(());
+  }
+  std::fs::create_dir_all(to)?;
+  for e in std::fs::read_dir(from)? {
+    let e = e?;
+    if e.file_type()?.is_dir() {
+      copy_dir(&e.path(), &to.join(e.file_name()))?;
+    } else {
+      std::fs::copy(e.path(), to.join(e.file_name()))?;
+    }
+  }
+  Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn copies_the_old_library_once_and_leaves_it_in_place() {
+    let d = tempfile::tempdir().unwrap();
+    let (old, new) = (d.path().join("com.sonora.player"), d.path().join("com.confluenceplayer.app"));
+    std::fs::create_dir_all(old.join("art/sub")).unwrap();
+    std::fs::create_dir_all(old.join("EBWebView")).unwrap();
+    std::fs::write(old.join("library.db"), b"db").unwrap();
+    std::fs::write(old.join("art/sub/a.jpg"), b"jpg").unwrap();
+    assert!(migrate(&old, &new).unwrap());
+    assert_eq!(std::fs::read(new.join("library.db")).unwrap(), b"db");
+    assert_eq!(std::fs::read(new.join("art/sub/a.jpg")).unwrap(), b"jpg");
+    assert!(!new.join("EBWebView").exists());
+    assert!(old.join("library.db").exists());
+    // a library of its own is never overwritten
+    std::fs::write(new.join("library.db"), b"mine").unwrap();
+    assert!(!migrate(&old, &new).unwrap());
+    assert_eq!(std::fs::read(new.join("library.db")).unwrap(), b"mine");
+    // nothing to copy: a fresh install
+    assert!(!migrate(&d.path().join("none"), &d.path().join("fresh")).unwrap());
+  }
+
+  #[test]
+  fn finds_a_covers_colour_and_none_in_grey_art() {
+    let half = image::RgbImage::from_fn(64, 64, |x, _| if x < 32 { image::Rgb([200, 30, 40]) } else { image::Rgb([128, 128, 128]) });
+    let c = vivid(&image::DynamicImage::ImageRgb8(half)).unwrap();
+    let [r, g, b] = [1, 3, 5].map(|i| u8::from_str_radix(&c[i..i + 2], 16).unwrap());
+    assert!(r > 170 && g < 70 && b < 80, "{c}");
+    // two strong hues: one of them, never the grey between them
+    let split = image::RgbImage::from_fn(64, 64, |x, _| if x < 40 { image::Rgb([20, 40, 120]) } else { image::Rgb([220, 170, 40]) });
+    let c = vivid(&image::DynamicImage::ImageRgb8(split)).unwrap();
+    let [r, g, b] = [1, 3, 5].map(|i| u8::from_str_radix(&c[i..i + 2], 16).unwrap());
+    assert!(b > 90 && r < 60 && g < 70, "{c}");
+    let grey = image::RgbImage::from_pixel(64, 64, image::Rgb([90, 90, 90]));
+    assert_eq!(vivid(&image::DynamicImage::ImageRgb8(grey)), None);
+  }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -418,6 +531,8 @@ pub fn run() {
     .manage(LastfmPending::default())
     .manage(ScrobbleLock::default())
     .manage(spotify::Token::default())
+    .manage(ytdlp::Downloads::default())
+    .manage(tidal::TidalToken::default())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -427,6 +542,13 @@ pub fn run() {
         )?;
       }
       let dir = app.path().app_local_data_dir()?;
+      if let Some(old) = dir.parent().map(|p| p.join("com.sonora.player")) {
+        match migrate(&old, &dir) {
+          Ok(true) => log::info!("copied the library from {}", old.display()),
+          Ok(false) => {}
+          Err(e) => log::warn!("couldn't copy the library from {}: {e}", old.display()),
+        }
+      }
       std::fs::create_dir_all(&dir)?;
       // the webview may load artwork from the cache only (the $APPLOCALDATA glob didn't match on Windows)
       let art = dir.join("art");
@@ -452,12 +574,18 @@ pub fn run() {
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
-      library, add_folder, remove_folder, cover, rescan, extensions, screenshot_dir, lyrics, lyrics_store,
+      library, add_folder, remove_folder, cover, art_color, rescan, extensions, screenshot_dir, lyrics, lyrics_store,
       playlist_create, playlist_update, playlist_items, playlist_delete, rate, love, played, skipped, top,
       tag_write, fetch_cover, stage_image, read_text, write_playlist, kv_get, kv_set,
       lastfm_status, lastfm_set_keys, lastfm_begin, lastfm_finish, lastfm_logout, lastfm_now_playing, lastfm_scrobble, media_keys::media_track, media_keys::media_state,
       spotify::spotify_status, spotify::spotify_set_client, spotify::spotify_begin, spotify::spotify_logout, spotify::spotify_playlists,
-      spotify::spotify_tracks, spotify::spotify_player, spotify::spotify_control, japanese::japanese_words, translate::google_translate
+      spotify::spotify_tracks, spotify::spotify_player, spotify::spotify_control, japanese::japanese_words, translate::google_translate,
+      quran::quran_fetch, quran::quran_pauses, ytdlp::tools_status, ytdlp::tool_install, ytdlp::ytdlp_update,
+      ytdlp::download_add, ytdlp::download_cancel, ytdlp::youtube_search, ytdlp::youtube_list, ytdlp::youtube_cookies,
+      subsonic::subsonic_status, subsonic::subsonic_connect, subsonic::subsonic_logout, subsonic::subsonic_call,
+      subsonic::subsonic_stream, subsonic::subsonic_cover, tidal::tidal_status, tidal::tidal_set_client, tidal::tidal_begin,
+      tidal::tidal_logout, tidal::tidal_playlists, tidal::tidal_tracks, apple::apple_status, apple::apple_setup, apple::apple_begin,
+      apple::apple_logout, apple::apple_playlists, apple::apple_tracks
     ])
     .run(tauri::generate_context!())
     .expect("error while building tauri application");

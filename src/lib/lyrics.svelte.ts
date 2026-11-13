@@ -9,7 +9,7 @@ import type { Track } from './library.svelte'
 
 export const lyr = $state({ data: null as Lyrics | null, source: '', loading: false })
 
-const UA = 'Sonora/0.1.0' // LRCLIB asks clients to identify themselves; no personal data
+const UA = 'ConfluencePlayer/0.2.0' // LRCLIB asks clients to identify themselves; no personal data
 
 async function online(t: Track): Promise<string | null> {
   const q = new URLSearchParams({ track_name: t.title, artist_name: t.artist, album_name: t.album })

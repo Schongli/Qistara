@@ -1,9 +1,17 @@
 <script lang="ts">
   import Sidebar from './components/Sidebar.svelte'
   import TopBar from './components/TopBar.svelte'
+  import PlayerBar from './components/PlayerBar.svelte'
+  import RightPanel from './components/RightPanel.svelte'
+  import Caps from './components/Caps.svelte'
+  import Home from './views/Home.svelte'
+  import Downloads from './views/Downloads.svelte'
+  import YouTube from './views/YouTube.svelte'
+  import Providers from './views/Providers.svelte'
+  import Server from './views/Server.svelte'
+  import ServiceView from './views/ServiceView.svelte'
   import ContextMenu from './components/ContextMenu.svelte'
   import NowPlaying from './components/NowPlaying.svelte'
-  import QueuePanel from './components/QueuePanel.svelte'
   import VideoView from './components/VideoView.svelte'
   import MiniPlayer from './components/MiniPlayer.svelte'
   import { enterMini, exitMini } from './lib/mini'
@@ -25,6 +33,7 @@
   import Composers from './views/Composers.svelte'
   import Duplicates from './views/Duplicates.svelte'
   import SmartEditor from './components/SmartEditor.svelte'
+  import SurahPicker from './components/SurahPicker.svelte'
   import TagEditor from './components/TagEditor.svelte'
   import { createPlaylist, updatePlaylist } from './lib/library.svelte'
   import type { Rules } from './lib/smart'
@@ -40,10 +49,10 @@
   import './lib/eq.svelte'
   import './lib/lastfm.svelte'
   import './lib/sleep.svelte'
+  import './lib/appearance.svelte'
 
   startMpv().then(() => lib.load()).then(() => queue.restore(lib.byId))
 
-  let sidebar: Sidebar
   let content = $state<HTMLDivElement>()
   const r = $derived(nav.route)
   // full-height views manage their own scrolling (virtual lists, split panes)
@@ -59,7 +68,8 @@
   }
 
   const video = $derived(
-    !mpv.idle && !!queue.current && (queue.current.kind === 'video' || mpv.tracks.some((x) => x.type === 'video' && !x.image)),
+    // a stream (YouTube) may list video tracks it isn't playing: only a selected one counts
+    !mpv.idle && !!queue.current && (queue.current.kind === 'video' || mpv.tracks.some((x) => x.type === 'video' && !x.image && x.selected)),
   )
 
   $effect(() => {
@@ -70,7 +80,7 @@
   function keys(e: KeyboardEvent) {
     // sliders keep arrows for themselves, but Space still plays/pauses
     const typing = (e.target as HTMLElement).closest('input, select, textarea')
-    if (e.ctrlKey && e.key === 'f') return e.preventDefault(), sidebar.focusSearch()
+    if (e.ctrlKey && e.key === 'f') return e.preventDefault(), ui.search++
     if (e.ctrlKey && e.key === 'o') return e.preventDefault(), openFiles()
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'm') return e.preventDefault(), ui.mini ? exitMini() : enterMini()
     if (e.ctrlKey && e.key === 'i' && queue.current && queue.current.id > 0 && !video) return e.preventDefault(), (ui.tagEditor = [queue.current])
@@ -80,7 +90,7 @@
       if (queue.current) togglePause()
     } else if (e.ctrlKey && e.key === 'ArrowRight') queue.next()
     else if (e.ctrlKey && e.key === 'ArrowLeft') queue.prev()
-    else if (e.key === 'Escape') ui.nowPlaying ? (ui.nowPlaying = false) : (ui.queue = false)
+    else if (e.key === 'Escape') ui.nowPlaying ? (ui.nowPlaying = false) : (ui.panel = '')
     else if (e.altKey && e.key === 'ArrowLeft') nav.back()
   }
 </script>
@@ -89,14 +99,17 @@
 
 {#if ui.mini}<MiniPlayer />{/if}
 <div class="app" class:video class:hidden={ui.mini}>
-  <Sidebar bind:this={sidebar} />
+  <div class="row">
+  <Sidebar />
   <main class="main">
-    <TopBar />
+    <TopBar caps={!ui.panel} />
     <div class="content" class:fixed bind:this={content}>
       {#if !lib.loaded}
         <!-- library loads in a few ms; avoid a flash of the welcome screen -->
-      {:else if !lib.folders.length}
+      {:else if !lib.folders.length && r.name === 'home'}
         <Welcome />
+      {:else if r.name === 'home'}
+        <Home />
       {:else if r.name === 'recent'}
         <AlbumGrid albums={lib.recent} title="Recently Added" />
       {:else if r.name === 'albums'}
@@ -120,7 +133,7 @@
       {:else if r.name === 'loved'}
         <PlaylistView title="Loved" builtin={LOVED} subtitle="Songs you've loved, newest first." />
       {:else if r.name === 'recentPlayed'}
-        <PlaylistView title="Recently Played" builtin={RECENT} subtitle="The last 100 songs you played." />
+        <PlaylistView title="History" builtin={RECENT} subtitle="The last 100 songs you played." />
       {:else if r.name === 'top'}
         <Top />
       {:else if r.name === 'eq'}
@@ -135,10 +148,24 @@
         <Duplicates />
       {:else if r.name === 'vocabulary'}
         <Vocabulary />
+      {:else if r.name === 'downloads'}
+        <Downloads />
+      {:else if r.name === 'youtube'}
+        <YouTube />
+      {:else if r.name === 'providers'}
+        <Providers />
+      {:else if r.name === 'server'}
+        <Server />
+      {:else if r.name === 'apple' || r.name === 'tidal'}
+        {#key r.name}<ServiceView kind={r.name} />{/key}
       {/if}
     </div>
-    {#if !ui.nowPlaying}<QueuePanel />{/if}
   </main>
+  {#if ui.panel}<RightPanel />{/if}
+  </div>
+  <PlayerBar />
+  <!-- over the docked pane's dark backdrop the caption glyphs turn white -->
+  <Caps light={!!ui.panel} />
 </div>
 {#if ui.mini}{:else if video}<VideoView />{:else}<NowPlaying />{/if}
 {#if ui.editor}
@@ -147,14 +174,18 @@
 {#if ui.tagEditor}
   <TagEditor tracks={ui.tagEditor} onclose={() => (ui.tagEditor = null)} />
 {/if}
+{#if ui.quranPick}
+  <SurahPicker track={ui.quranPick} onclose={() => (ui.quranPick = null)} />
+{/if}
 <ContextMenu />
 {#if ui.toast}<div class="toast" role="status">{ui.toast}</div>{/if}
 
 <style>
-  .app { height: 100vh; display: flex; }
+  .app { position: relative; height: 100vh; display: flex; flex-direction: column; }
+  .row { flex: 1; min-height: 0; display: flex; }
   .app.hidden { display: none; }
   .toast {
-    position: fixed; z-index: 90; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: 70vw;
+    position: fixed; z-index: 90; left: 50%; bottom: calc(var(--player-h) + 16px); transform: translateX(-50%); max-width: 70vw;
     padding: 9px 16px; border-radius: 10px; background: var(--bar); backdrop-filter: blur(30px) saturate(180%);
     border: 1px solid var(--sep); box-shadow: var(--shadow-pop); animation: rise 220ms var(--ease-out);
   }

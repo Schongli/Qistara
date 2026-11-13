@@ -8,12 +8,12 @@
   import { settings } from '../lib/settings.svelte'
   import { nav } from '../lib/nav.svelte'
   import Toggle from '../components/Toggle.svelte'
+  import { NAV } from '../components/Sidebar.svelte'
+  import { ACCENTS } from '../lib/appearance.svelte'
   import { invoke } from '@tauri-apps/api/core'
   import { openUrl } from '@tauri-apps/plugin-opener'
   import { connect, finish, lastfm, refresh } from '../lib/lastfm.svelte'
-  import { connect as connectSpotify, disconnect, setClient, spotify } from '../lib/spotify.svelte'
 
-  let clientId = $state('')
   let key = $state('')
   let secret = $state('')
   async function saveKeys() {
@@ -34,6 +34,14 @@
   import { plural } from '../lib/format'
   import { LANGUAGES, languageName, targetFor } from '../lib/translate'
 
+  const THEMES = [['auto', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']] as const
+  const DENSITY = [['comfortable', 'Comfortable'], ['compact', 'Compact']] as const
+  const accent = $derived(settings.accent || ACCENTS[0][1])
+  // live while the picker is dragged; saved (and made readable) when it closes
+  const preview = (hex: string) => document.documentElement.style.setProperty('--accent', hex)
+  const toggleNav = (id: string) =>
+    (settings.hiddenNav = settings.hiddenNav.includes(id) ? settings.hiddenNav.filter((x) => x !== id) : [...settings.hiddenNav, id])
+
   export async function pickFolder() {
     const dir = await open({ directory: true, multiple: false, title: 'Add a music or video folder' })
     if (typeof dir === 'string') await addFolder(dir)
@@ -43,8 +51,62 @@
 <h1 class="t-title">Settings</h1>
 
 <section>
+  <h2 class="t-h2">Appearance</h2>
+  <div class="group">
+    <div class="line">
+      <span>Theme</span>
+      <div class="seg" role="radiogroup" aria-label="Theme">
+        {#each THEMES as [v, label] (v)}
+          <button role="radio" aria-checked={settings.theme === v} class:on={settings.theme === v} onclick={() => (settings.theme = v)}>{label}</button>
+        {/each}
+      </div>
+    </div>
+    <div class="line">
+      <span>Accent colour</span>
+      <div class="swatches" role="radiogroup" aria-label="Accent colour">
+        {#each ACCENTS as [name, hex], i (hex)}
+          <button class="sw press" role="radio" style:--c={hex} aria-label={name} title={name} aria-checked={accent === hex} onclick={() => (settings.accent = i ? hex : '')}></button>
+        {/each}
+        <label class="sw custom" title="Custom colour" class:on={!ACCENTS.some(([, h]) => h === accent)}>
+          <input type="color" value={accent} aria-label="Custom accent colour" oninput={(e) => preview(e.currentTarget.value)} onchange={(e) => (settings.accent = e.currentTarget.value)} />
+        </label>
+      </div>
+    </div>
+    <Toggle bind:checked={settings.matchArtwork} label="Match the artwork" hint="The accent takes its colour from the cover of what's playing; grey covers keep your accent." />
+    <label class="line">
+      <span>Text size</span>
+      <select bind:value={settings.zoom}>
+        {#each [0.9, 1, 1.1, 1.25] as z (z)}<option value={z}>{Math.round(z * 100)}%</option>{/each}
+      </select>
+    </label>
+    <div class="line">
+      <span>Rows</span>
+      <div class="seg" role="radiogroup" aria-label="Row density">
+        {#each DENSITY as [v, label] (v)}
+          <button role="radio" aria-checked={settings.density === v} class:on={settings.density === v} onclick={() => (settings.density = v)}>{label}</button>
+        {/each}
+      </div>
+    </div>
+    <label class="line">
+      <span>Font</span>
+      <select bind:value={settings.font}>
+        <option value="inter">Inter</option>
+        <option value="system">Segoe UI (Windows)</option>
+      </select>
+    </label>
+    <Toggle bind:checked={settings.solidChrome} label="Solid window" hint="Turns off the Mica translucency behind the sidebar and bars." />
+  </div>
+  <p class="t-sub sub2">Sidebar items</p>
+  <div class="group checks">
+    {#each NAV.flatMap((g) => g.items) as it (it.id)}
+      <label class="check"><input type="checkbox" checked={!settings.hiddenNav.includes(it.id)} onchange={() => toggleNav(it.id)} />{it.label}</label>
+    {/each}
+  </div>
+</section>
+
+<section>
   <h2 class="t-h2">Library</h2>
-  <p class="t-sub">Sonora watches these folders and picks up new or changed files automatically. {plural(lib.tracks.length, 'file')} in your library.</p>
+  <p class="t-sub">Confluence Player watches these folders and picks up new or changed files automatically. {plural(lib.tracks.length, 'file')} in your library.</p>
   <div class="group">
     {#each lib.folders as f (f)}
       <div class="line">
@@ -67,7 +129,7 @@
   <h2 class="t-h2">Audio</h2>
   <p class="t-sub">Bit-perfect mode sends every sample to your DAC untouched: WASAPI exclusive output at the file's own sample rate and bit depth, with nothing in between. Volume then controls your device directly.</p>
   <div class="group">
-    <Toggle bind:checked={settings.bitPerfect} label="Bit-Perfect mode" hint="Exclusive access to the output device. Other apps can't play sound while Sonora plays." />
+    <Toggle bind:checked={settings.bitPerfect} label="Bit-Perfect mode" hint="Exclusive access to the output device. Other apps can't play sound while Confluence Player plays." />
     <Toggle bind:checked={settings.soundCheck} disabled={settings.bitPerfect} label="Sound Check" hint={settings.bitPerfect ? 'Changes levels, so it is off in Bit-Perfect mode.' : 'Plays songs at a similar loudness using ReplayGain tags.'} />
     <Toggle bind:checked={settings.passthrough} label="Bitstream to AV receiver" hint="Sends Dolby TrueHD, Atmos, DTS-HD MA, AC-3 and DTS untouched over HDMI or S/PDIF. Only turn on if a receiver decodes them." />
   </div>
@@ -93,7 +155,7 @@
   {#if lastfm.user}
     <div class="line group"><span>Scrobbling as <b>{lastfm.user}</b>{#if lastfm.pending} · {lastfm.pending} waiting to send{/if}</span><button class="btn press" onclick={logout}>Disconnect</button></div>
   {:else if lastfm.configured}
-    <p class="t-sub">Approve Sonora on Last.fm in your browser, then come back and finish.</p>
+    <p class="t-sub">Approve Confluence Player on Last.fm in your browser, then come back and finish.</p>
     <div class="actions">
       <button class="btn primary press" onclick={connect}>Connect to Last.fm…</button>
       {#if lastfm.waiting}<button class="btn press" onclick={finish}>I've Approved It</button>{/if}
@@ -112,36 +174,9 @@
 </section>
 
 <section>
-  <h2 class="t-h2">Spotify</h2>
-  {#if spotify.user}
-    <div class="line group">
-      <span>Connected as <b>{spotify.user}</b></span>
-      <span class="actions tight">
-        <button class="btn press" onclick={() => nav.root({ name: 'spotify' })}>Open Spotify</button>
-        <button class="btn press" onclick={() => disconnect()}>Disconnect</button>
-      </span>
-    </div>
-    <p class="t-sub hint">Disconnecting deletes Sonora's access. To remove it on Spotify's side too, use
-      <button class="link" onclick={() => openUrl('https://www.spotify.com/account/apps/')}>spotify.com/account/apps</button>.</p>
-  {:else if spotify.configured}
-    <p class="t-sub">Approve Sonora in the browser window that opens. Sonora never sees your Spotify password.</p>
-    <div class="actions">
-      <button class="btn primary press" onclick={connectSpotify} disabled={spotify.waiting}>{spotify.waiting ? 'Waiting for your browser…' : 'Connect to Spotify…'}</button>
-      <button class="btn press" onclick={() => disconnect(true)}>Use a Different Client ID</button>
-    </div>
-  {:else}
-    <p class="t-sub">Import your Spotify playlists as playlists of your own files, and control the Spotify app from Sonora. Spotify needs your own free developer app (your account must have Premium):</p>
-    <ol class="steps t-sub">
-      <li>Open the <button class="link" onclick={() => openUrl('https://developer.spotify.com/dashboard')}>Spotify Developer Dashboard</button> and choose <b>Create app</b>.</li>
-      <li>Name it Sonora, add the Redirect URI <code>http://127.0.0.1/callback</code> and tick <b>Web API</b>.</li>
-      <li>Copy the app's <b>Client ID</b> and paste it below. No client secret is needed.</li>
-    </ol>
-    <div class="keys one">
-      <input bind:value={clientId} placeholder="Client ID" aria-label="Spotify Client ID" spellcheck="false" />
-      <button class="btn press" onclick={() => setClient(clientId.trim())} disabled={!clientId.trim()}>Save</button>
-    </div>
-  {/if}
-  {#if spotify.error}<p class="err">{spotify.error}</p>{/if}
+  <h2 class="t-h2">Providers</h2>
+  <p class="t-sub">YouTube, your music server, and Spotify, Apple Music and Tidal sign-in moved to their own page.</p>
+  <button class="btn press" onclick={() => nav.root({ name: 'providers' })}>Open Providers</button>
 </section>
 
 <section>
@@ -179,9 +214,16 @@
   .keys { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; }
   .keys input { height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--sep); background: var(--bg-2); color: var(--text); min-width: 0; }
   .link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
-  .keys.one { grid-template-columns: 1fr auto; max-width: 480px; }
-  .actions.tight { margin-top: 0; }
-  .hint { margin-top: 8px; }
-  .steps { margin: 0 0 12px; padding-left: 20px; line-height: 1.7; }
-  code { font-size: 12px; padding: 1px 5px; border-radius: 4px; background: var(--fill-2); user-select: text; }
+  .seg { display: flex; padding: 2px; border-radius: 8px; background: var(--fill-2); }
+  .seg button { height: 26px; padding: 0 12px; border-radius: 6px; font-size: 12px; font-weight: 550; color: var(--text-2); }
+  .seg button.on { background: var(--bg); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 0; }
+  .sw { width: 22px; height: 22px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
+  .sw[aria-checked='true'], .sw.custom.on { outline: 2px solid var(--c, var(--accent)); outline-offset: 2px; }
+  .sw.custom { position: relative; overflow: hidden; background: conic-gradient(#ff4d4d, #ffd60a, #30d158, #0a84ff, #bf5af2, #ff4d4d); }
+  .sw.custom input { position: absolute; inset: -6px; width: 34px; height: 34px; opacity: 0; cursor: default; }
+  .sub2 { margin: 14px 0 6px; }
+  .checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 2px 12px; padding: 10px 14px; }
+  .check { display: flex; align-items: center; gap: 8px; height: 26px; }
+  .check input { accent-color: var(--accent); }
 </style>

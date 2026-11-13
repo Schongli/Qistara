@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { matchTracks, titleKey, type SpotifyTrack } from './spotify'
+import { matchTracks, titleKey, type RemoteTrack } from './spotify'
 
 let id = 0
 const local = (title: string, artist: string, o: Partial<{ album: string; duration: number; lossless: boolean; sampleRate: number; kind: string; albumArtist: string }> = {}) => ({
   id: ++id, kind: 'audio', title, artist, albumArtist: '', album: '', duration: 200, lossless: true, sampleRate: 44100, bitDepth: 16, bitrate: null, ...o,
 })
-const sp = (title: string, artists: string[], o: Partial<SpotifyTrack> = {}): SpotifyTrack => ({ title, artists, album: '', duration: 200, isrc: null, ...o })
+const sp = (title: string, artists: string[], o: Partial<RemoteTrack> = {}): RemoteTrack => ({ title, artists, album: '', duration: 200, isrc: null, ...o })
 
 describe('spotify matching', () => {
   it('ignores remaster and featuring notes in titles', () => {
