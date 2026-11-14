@@ -1,3 +1,8 @@
+<script lang="ts" module>
+  type Period = 'month' | 'year' | 'all'
+  let period = $state<Period>('month') // kept across visits
+</script>
+
 <script lang="ts">
   // "Your Top": most played songs, artists and albums for a period, from the play history.
   import { invoke } from '@tauri-apps/api/core'
@@ -7,8 +12,6 @@
   import { nav } from '../lib/nav.svelte'
   import { plural } from '../lib/format'
 
-  type Period = 'month' | 'year' | 'all'
-  let period = $state<Period>('month')
   let rows = $state<[number, number][]>([])
 
   const since = (p: Period) => {
@@ -75,14 +78,14 @@
 
 <style>
   h1 { margin: 0 0 14px; }
-  .seg { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--fill-2); margin-bottom: 16px; }
-  .seg button { height: 26px; padding: 0 14px; border-radius: 6px; font-weight: 550; color: var(--text-2); }
+  .seg { display: inline-flex; padding: 2px; border-radius: var(--r); background: var(--fill-2); margin-bottom: 16px; }
+  .seg button { height: 26px; padding: 0 14px; border-radius: var(--r-sm); font-weight: 550; color: var(--text-2); }
   .seg button.sel { background: var(--bg); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin: 16px 0 28px; }
-  section { padding: 14px; border-radius: 12px; background: var(--fill); }
+  section { padding: 14px; border-radius: var(--r-lg); background: var(--fill); }
   h2 { margin: 0 0 8px; }
   .songs { margin-bottom: 12px; }
-  .line { display: flex; align-items: center; gap: 12px; width: 100%; padding: 6px; border-radius: 8px; text-align: left; }
+  .line { display: flex; align-items: center; gap: 12px; width: 100%; padding: 6px; border-radius: var(--r); text-align: left; }
   .line:hover { background: var(--fill-2); }
   .rank { width: 18px; text-align: right; color: var(--text-2); font-variant-numeric: tabular-nums; font-weight: 600; }
   .grow { flex: 1; min-width: 0; }

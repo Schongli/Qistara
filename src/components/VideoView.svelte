@@ -1,24 +1,7 @@
 <script lang="ts">
   import { getCurrentWindow } from '@tauri-apps/api/window'
   import { open } from '@tauri-apps/plugin-dialog'
-  import CaretLeft from 'phosphor-svelte/lib/CaretLeft'
-  import Play from 'phosphor-svelte/lib/Play'
-  import Pause from 'phosphor-svelte/lib/Pause'
-  import ClockCounterClockwise from 'phosphor-svelte/lib/ClockCounterClockwise'
-  import ClockClockwise from 'phosphor-svelte/lib/ClockClockwise'
-  import SkipBack from 'phosphor-svelte/lib/SkipBack'
-  import SkipForward from 'phosphor-svelte/lib/SkipForward'
-  import Subtitles from 'phosphor-svelte/lib/Subtitles'
-  import Waveform from 'phosphor-svelte/lib/Waveform'
-  import Gauge from 'phosphor-svelte/lib/Gauge'
-  import Repeat from 'phosphor-svelte/lib/Repeat'
-  import Camera from 'phosphor-svelte/lib/Camera'
-  import Crop from 'phosphor-svelte/lib/Crop'
-  import Info from 'phosphor-svelte/lib/Info'
-  import ListNumbers from 'phosphor-svelte/lib/ListNumbers'
-  import CornersOut from 'phosphor-svelte/lib/CornersOut'
-  import CornersIn from 'phosphor-svelte/lib/CornersIn'
-  import SpeakerHigh from 'phosphor-svelte/lib/SpeakerHigh'
+  import Icon from './Icon.svelte'
   import Slider from './Slider.svelte'
   import Caps from './Caps.svelte'
   import { cmd, mpv, seek, set, togglePause, type MpvTrack } from '../lib/player.svelte'
@@ -111,7 +94,7 @@
   }
   async function shot() {
     await cmd('screenshot', 'video')
-    say('Screenshot saved to Pictures\\Confluence Player')
+    say('Screenshot saved to Pictures\\Qistara')
   }
   async function abLoop() {
     await cmd('ab-loop')
@@ -163,7 +146,7 @@
   ></div>
 
   <header class="top" data-tauri-drag-region>
-    <button class="icon-btn press" aria-label="Close video" onclick={close}><CaretLeft size={20} weight="bold" /></button>
+    <button class="icon-btn press" aria-label="Close video" onclick={close}><Icon name="CaretLeft" size={20} weight="bold" /></button>
     <div class="title ellipsis" data-tauri-drag-region>{mpv.title ?? t?.title}</div>
     {#if !fullscreen}<Caps light />{/if}
   </header>
@@ -204,26 +187,26 @@
     </div>
     <div class="row">
       <div class="group">
-        <button class="icon-btn press" aria-label="Previous" onclick={() => queue.prev()}><SkipBack size={18} weight="fill" /></button>
-        <button class="icon-btn press" aria-label="Back 10 seconds" onclick={() => seek(Math.max(0, mpv.time - 10))}><ClockCounterClockwise size={20} /></button>
+        <button class="icon-btn press" aria-label="Previous" onclick={() => queue.prev()}><Icon name="SkipBack" size={18} weight="fill" /></button>
+        <button class="icon-btn press" aria-label="Back 10 seconds" onclick={() => seek(Math.max(0, mpv.time - 10))}><Icon name="ClockCounterClockwise" size={20} /></button>
         <button class="icon-btn press play" aria-label={mpv.pause ? 'Play' : 'Pause'} onclick={togglePause}>
-          {#if mpv.pause}<Play size={26} weight="fill" />{:else}<Pause size={26} weight="fill" />{/if}
+          {#if mpv.pause}<Icon name="Play" size={26} weight="fill" />{:else}<Icon name="Pause" size={26} weight="fill" />{/if}
         </button>
-        <button class="icon-btn press" aria-label="Forward 10 seconds" onclick={() => seek(mpv.time + 10)}><ClockClockwise size={20} /></button>
-        <button class="icon-btn press" aria-label="Next" onclick={() => queue.next()}><SkipForward size={18} weight="fill" /></button>
-        <div class="vol"><SpeakerHigh size={16} /><Slider label="Volume" value={volume()} max={100} live wheel={5} onchange={setVolume} /></div>
+        <button class="icon-btn press" aria-label="Forward 10 seconds" onclick={() => seek(mpv.time + 10)}><Icon name="ClockClockwise" size={20} /></button>
+        <button class="icon-btn press" aria-label="Next" onclick={() => queue.next()}><Icon name="SkipForward" size={18} weight="fill" /></button>
+        <div class="vol"><Icon name="SpeakerHigh" size={16} /><Slider label="Volume" value={volume()} max={100} live wheel={5} onchange={setVolume} /></div>
       </div>
       <div class="group">
-        {#if mpv.chapters.length}<button class="icon-btn press" aria-label="Chapters" onclick={chapterMenu}><ListNumbers size={19} /></button>{/if}
-        <button class="icon-btn press" aria-label="Audio track" onclick={audioMenu} disabled={audio.length < 2}><Waveform size={19} /></button>
-        <button class="icon-btn press" class:on={subs.some((x) => x.selected)} aria-label="Subtitles" onclick={subMenu}><Subtitles size={19} /></button>
-        <button class="icon-btn press" class:on={mpv.speed !== 1} aria-label="Playback speed" onclick={speedMenu}><Gauge size={19} />{#if mpv.speed !== 1}<span class="spd">{mpv.speed}×</span>{/if}</button>
-        <button class="icon-btn press" class:on={loopA !== null} aria-label="A-B loop" onclick={abLoop}><Repeat size={18} /></button>
-        <button class="icon-btn press" class:on={aspectSet || mpv.panscan > 0} aria-label="Aspect ratio" onclick={aspectMenu}><Crop size={19} /></button>
-        <button class="icon-btn press" aria-label="Screenshot" onclick={shot}><Camera size={19} /></button>
-        <button class="icon-btn press" class:on={info} aria-label="Media info" onclick={() => (info = !info)}><Info size={19} /></button>
+        {#if mpv.chapters.length}<button class="icon-btn press" aria-label="Chapters" onclick={chapterMenu}><Icon name="ListNumbers" size={19} /></button>{/if}
+        <button class="icon-btn press" aria-label="Audio track" onclick={audioMenu} disabled={audio.length < 2}><Icon name="Waveform" size={19} /></button>
+        <button class="icon-btn press" class:on={subs.some((x) => x.selected)} aria-label="Subtitles" onclick={subMenu}><Icon name="Subtitles" size={19} /></button>
+        <button class="icon-btn press" class:on={mpv.speed !== 1} aria-label="Playback speed" onclick={speedMenu}><Icon name="Gauge" size={19} />{#if mpv.speed !== 1}<span class="spd">{mpv.speed}×</span>{/if}</button>
+        <button class="icon-btn press" class:on={loopA !== null} aria-label="A-B loop" onclick={abLoop}><Icon name="Repeat" size={18} /></button>
+        <button class="icon-btn press" class:on={aspectSet || mpv.panscan > 0} aria-label="Aspect ratio" onclick={aspectMenu}><Icon name="Crop" size={19} /></button>
+        <button class="icon-btn press" aria-label="Screenshot" onclick={shot}><Icon name="Camera" size={19} /></button>
+        <button class="icon-btn press" class:on={info} aria-label="Media info" onclick={() => (info = !info)}><Icon name="Info" size={19} /></button>
         <button class="icon-btn press" aria-label={fullscreen ? 'Exit full screen' : 'Full screen'} onclick={toggleFullscreen}>
-          {#if fullscreen}<CornersIn size={19} />{:else}<CornersOut size={19} />{/if}
+          {#if fullscreen}<Icon name="CornersIn" size={19} />{:else}<Icon name="CornersOut" size={19} />{/if}
         </button>
       </div>
     </div>
@@ -263,12 +246,12 @@
   .vol :global(.track) { background: rgba(255, 255, 255, 0.25); }
   .vol :global(.fill) { background: #fff; }
   .toast {
-    position: absolute; top: 72px; left: 50%; transform: translateX(-50%); padding: 7px 14px; border-radius: 9px;
+    position: absolute; top: 72px; left: 50%; transform: translateX(-50%); padding: 7px 14px; border-radius: var(--r);
     background: rgba(20, 20, 22, 0.86); font-size: 12.5px; animation: pop 160ms var(--ease-out);
   }
   @keyframes pop { from { opacity: 0; transform: translate(-50%, -4px); } }
   .info {
-    position: absolute; top: 70px; right: 20px; width: 340px; padding: 14px 16px; border-radius: 12px;
+    position: absolute; top: 70px; right: 20px; width: 340px; padding: 14px 16px; border-radius: var(--r-lg);
     background: rgba(20, 20, 22, 0.9); box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5); font-size: 12px;
   }
   h3 { margin: 0 0 8px; font-size: 13px; }

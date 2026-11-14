@@ -1,7 +1,5 @@
 <script lang="ts">
-  import Play from 'phosphor-svelte/lib/Play'
-  import Shuffle from 'phosphor-svelte/lib/Shuffle'
-  import DotsThree from 'phosphor-svelte/lib/DotsThree'
+  import Icon from '../components/Icon.svelte'
   import Artwork from '../components/Artwork.svelte'
   import Playing from '../components/Playing.svelte'
   import { lib } from '../lib/library.svelte'
@@ -30,9 +28,9 @@
         {#each [a.genre, a.year, plural(a.tracks.length, 'song'), totalTime(a.duration)].filter(Boolean) as m, i (i)}<span class="dot">{m}</span>{/each}
       </div>
       <div class="actions">
-        <button class="btn primary press" onclick={() => queue.play(a.tracks)}><Play size={14} weight="fill" />Play</button>
-        <button class="btn press" onclick={() => queue.play(a.tracks, Math.floor(Math.random() * a.tracks.length), true)}><Shuffle size={14} weight="bold" />Shuffle</button>
-        <button class="icon-btn press" aria-label="More for {a.title}" onclick={(e) => openMenu(e, trackMenu(a.tracks, a))}><DotsThree size={20} weight="bold" /></button>
+        <button class="btn primary press" onclick={() => queue.play(a.tracks)}><Icon name="Play" size={14} weight="fill" />Play</button>
+        <button class="btn press" onclick={() => queue.play(a.tracks, Math.floor(Math.random() * a.tracks.length), true)}><Icon name="Shuffle" size={14} weight="bold" />Shuffle</button>
+        <button class="icon-btn press" aria-label="More for {a.title}" onclick={(e) => openMenu(e, trackMenu(a.tracks, a))}><Icon name="DotsThree" size={20} weight="bold" /></button>
       </div>
     </div>
   </header>
@@ -51,7 +49,7 @@
         <span class="num">{#if on}<Playing paused={mpv.pause} />{:else}{t.track ?? ''}{/if}</span>
         <span class="ttl ellipsis">{t.title}{#if mixed && t.artist !== a.artist}<span class="t-sub"> — {t.artist}</span>{/if}</span>
         <span class="tm">{time(t.duration)}</span>
-        <button class="more icon-btn" aria-label="More for {t.title}" onclick={(e) => openMenu(e, trackMenu([t]))}><DotsThree size={18} weight="bold" /></button>
+        <button class="more icon-btn" aria-label="More for {t.title}" onclick={(e) => openMenu(e, trackMenu([t]))}><Icon name="DotsThree" size={18} weight="bold" /></button>
       </div>
     {/each}
   </div>
@@ -77,7 +75,7 @@
   .disc { padding: 16px 12px 6px; font-weight: 600; }
   .row {
     display: grid; grid-template-columns: 34px 1fr auto 32px; align-items: center; height: calc(40px * var(--density));
-    padding: 0 4px 0 12px; border-radius: 6px; border-bottom: 1px solid var(--sep);
+    padding: 0 4px 0 12px; border-radius: var(--r-sm); border-bottom: 1px solid var(--sep);
   }
   .row:hover { background: var(--fill); }
   .row.on { color: var(--accent); }

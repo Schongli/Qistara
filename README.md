@@ -1,6 +1,7 @@
-# Confluence Player
+# Qistara
 
-A lossless music and media player for Windows, where your files, your music server and YouTube come together.
+A lossless music and media player for Windows that keeps your music in true balance: what reaches your DAC is
+what is in the file. Your files, your music server and YouTube in one place.
 Built with [Tauri 2](https://tauri.app), [Svelte 5](https://svelte.dev) and [libmpv](https://mpv.io).
 
 ## Features
@@ -14,7 +15,8 @@ Built with [Tauri 2](https://tauri.app), [Svelte 5](https://svelte.dev) and [lib
 - **Playback.** Gapless queue with Up Next, shuffle, repeat and Autoplay. A player bar, a lyrics and Up Next pane
   beside the library, full-screen Now Playing, MiniPlayer, sleep timer, media keys, and scroll-wheel volume.
 - **Lyrics.**
-  - Synced lyrics from TTML, LRC, embedded tags or [LRCLIB](https://lrclib.net), with word-by-word highlight.
+  - Synced lyrics from TTML, LRC, embedded tags, your Navidrome/Subsonic server, [LRCLIB](https://lrclib.net),
+    NetEase or Kugou, asked in the order you set, with word-by-word highlight (and an option to prefer word timing).
   - Translation under each line.
   - Learn mode: tap a word for its meaning. Japanese also gets furigana, romaji and a vocabulary review.
   - Qur'an: recitations are recognised by their titles (surahs, Juz 'Amma, Hafs or Shu'bah). Uthmani text with
@@ -23,8 +25,10 @@ Built with [Tauri 2](https://tauri.app), [Svelte 5](https://svelte.dev) and [lib
 - **Organise.** Smart playlists, ratings, Loved, play stats (Your Top), M3U8 import and export.
 - **Tag editor.** Safe writes (copy, write, verify, then replace), with MusicBrainz and Cover Art Archive lookup.
 - **Parametric EQ.** A live response curve, plus AutoEQ / Equalizer APO preset import.
-- **Appearance.** Light, dark or automatic; nine accent colours or your own, or one taken from the playing cover;
-  text size, compact rows, Inter or Segoe UI, Mica or a solid window, and which sidebar items show.
+- **Appearance.** Light, Qistara Obsidian or automatic, plus Catppuccin Frappé, Rosé Pine, Gruvbox Dark and Solarized
+  Dark; nine accent colours or your own, or one taken from the playing cover; five icon packs; corners from square
+  to round; text size, compact rows, Inter or Segoe UI, Mica and blur on or off, and which sidebar items show.
+  Settings has tabs and a search (Ctrl+F).
 - **Sources (Providers), all optional.**
   - **Navidrome / Subsonic:** browse and stream your own server; FLAC streams as stored, so it stays bit-perfect.
   - **YouTube:** search, play and download through [yt-dlp](https://github.com/yt-dlp/yt-dlp), as a guest or
@@ -33,13 +37,13 @@ Built with [Tauri 2](https://tauri.app), [Svelte 5](https://svelte.dev) and [lib
     remote. Their streams are DRM-protected, so they never play or download here.
   - Last.fm scrobbling and internet radio ([Radio Browser](https://www.radio-browser.info)).
 - **Downloads.** Paste links (videos, songs, playlists, channels) and save them as audio (as published, or MP3) or
-  video (1080p or best) into a folder that joins your library. yt-dlp comes from its official GitHub release and is
+  video (1080p or best) into a folder that joins your library (the folder and format are remembered). yt-dlp comes from its official GitHub release and is
   checked against the release's SHA-256 list; an ffmpeg on your PATH is used, or fetched the same way.
   Download only what you have the right to keep.
 
 ## Install
 
-Download `Confluence Player_x.y.z_x64-setup.exe` from [Releases](../../releases) and run it.
+Download `Qistara_x.y.z_x64-setup.exe` from [Releases](../../releases) and run it.
 - **Requirements:** 64-bit Windows 10 or 11.
 - **Windows warning:** the installer isn't signed yet, so Windows shows "Windows protected your PC". Choose **More info → Run anyway**.
 
@@ -66,27 +70,29 @@ and a small tagged library.
 
 ## Privacy
 
-Confluence Player has no account, no telemetry and no servers of its own. It only contacts these services, and only for the features that need them:
+Qistara has no account, no telemetry and no servers of its own. It only contacts these services, and only for the features that need them:
 
 | Service | When | What is sent |
 |---|---|---|
 | LRCLIB | a song has no local lyrics | title, artist, album, length |
+| NetEase Cloud Music, Kugou | you turn them on in Settings › Lyrics and a song has no lyrics higher in the list | title, artist, length |
 | MusicBrainz, Cover Art Archive | you look up tags or artwork | album and artist |
 | Google Translate | you turn on translation or Learn mode | the lyric lines, or the one word you tap |
 | Radio Browser | you search for stations | your search text |
 | quran.com, GitHub (fawazahmed0 quran-api) | a Qur'an recitation plays | the surah number |
 | YouTube (through yt-dlp) | you search, play or download | your search text or link; your cookies only if you sign in |
 | GitHub releases | you install or update yt-dlp or ffmpeg | nothing but the download |
-| Your Subsonic server | you sign in to it | your user name and a salted password hash, only to that server |
+| Your Subsonic server | you sign in to it | your user name and a salted password hash, only to that server; a song's id when its lyrics are looked up |
 | Last.fm, Spotify, Apple Music, Tidal | you connect your own account | what that feature needs |
 
-Requests identify themselves only as `ConfluencePlayer/<version>`. Last.fm keys, your server password and the
+Requests identify themselves only as `Qistara/<version>`. Last.fm keys, your server password and the
 Spotify, Apple Music and Tidal sign-ins are kept in Windows Credential Manager.
 
-### Coming from Sonora
+### Coming from Confluence Player or Sonora
 
-This app was called Sonora. On first start, Confluence Player copies the old library, settings and caches
-(`%LOCALAPPDATA%\com.sonora.player`) and the saved sign-ins; the old folder is left as it was.
+This app was called Confluence Player, and before that Sonora. On first start, Qistara copies the newest old library,
+settings and caches (`%LOCALAPPDATA%\com.confluenceplayer.app` or `com.sonora.player`) and the saved sign-ins; the old
+folders are left as they were, and the old app can be uninstalled.
 
 ## Credits
 
@@ -96,6 +102,16 @@ This app was called Sonora. On first start, Confluence Player copies the old lib
 - Japanese analysis by [Lindera](https://github.com/lindera/lindera) with the IPADIC dictionary.
 - Downloads and YouTube by [yt-dlp](https://github.com/yt-dlp/yt-dlp); Qur'an text from [quran.com](https://quran.com)
   and [fawazahmed0/quran-api](https://github.com/fawazahmed0/quran-api); Arabic font: [Amiri Quran](https://www.amirifont.org).
-- Icons by [Phosphor](https://phosphoricons.com); font: [Inter](https://rsms.me/inter/).
+- Icons by [Phosphor](https://phosphoricons.com) (MIT), [Lucide](https://lucide.dev) (ISC), [Iconoir](https://iconoir.com) (MIT),
+  [Remix Icon](https://remixicon.com) (Apache 2.0) and [Solar](https://www.figma.com/community/file/1166831539721848736) by 480 Design (CC BY 4.0),
+  through [Iconify](https://iconify.design); font: [Inter](https://rsms.me/inter/).
+- Theme palettes: [Catppuccin](https://catppuccin.com), [Rosé Pine](https://rosepinetheme.com), [Gruvbox](https://github.com/morhetz/gruvbox)
+  and [Solarized](https://ethanschoonover.com/solarized/).
 
-Confluence Player is not affiliated with Apple, Spotify, Tidal, Google or YouTube.
+Qistara is not affiliated with Apple, Spotify, Tidal, Google, YouTube, NetEase or Kugou.
+
+## License
+
+[MIT](LICENSE) © 2026 Schongli.
+The installer also ships libmpv and FFmpeg from [zhongfly/mpv-winbuild](https://github.com/zhongfly/mpv-winbuild), which are
+licensed under the GPL; their source is at [mpv-player/mpv](https://github.com/mpv-player/mpv) and [ffmpeg.org](https://ffmpeg.org/download.html).

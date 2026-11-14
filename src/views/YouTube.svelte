@@ -1,8 +1,5 @@
 <script lang="ts">
-  import MagnifyingGlass from 'phosphor-svelte/lib/MagnifyingGlass'
-  import Play from 'phosphor-svelte/lib/Play'
-  import DownloadSimple from 'phosphor-svelte/lib/DownloadSimple'
-  import Heart from 'phosphor-svelte/lib/Heart'
+  import Icon from '../components/Icon.svelte'
   import TrackTable from '../components/TrackTable.svelte'
   import { likedMusic, lookUp, yt } from '../lib/youtube.svelte'
   import { dl, quickDownload, refreshTools } from '../lib/downloads.svelte'
@@ -31,12 +28,12 @@
   </div>
 {:else}
   <form class="search" onsubmit={(e) => (e.preventDefault(), text.trim() && lookUp(text))}>
-    <MagnifyingGlass size={15} weight="bold" />
+    <Icon name="MagnifyingGlass" size={15} weight="bold" />
     <input bind:value={text} placeholder="Search YouTube, or paste a video, playlist or album link" aria-label="Search YouTube" spellcheck="false" />
     <button class="btn primary press" disabled={!text.trim() || yt.loading}>{yt.loading ? 'Searching…' : 'Search'}</button>
   </form>
   {#if signedIn}
-    <button class="btn press liked" onclick={likedMusic} disabled={yt.loading}><Heart size={14} weight="fill" />Liked Music</button>
+    <button class="btn press liked" onclick={likedMusic} disabled={yt.loading}><Icon name="Heart" size={14} weight="fill" />Liked Music</button>
   {/if}
 
   {#if yt.error}<p class="err">{yt.error}</p>{/if}
@@ -44,8 +41,8 @@
     <div class="bar">
       <h2 class="t-h2">{yt.title}</h2>
       <div class="actions">
-        <button class="btn primary press" onclick={() => queue.play(yt.tracks)}><Play size={14} weight="fill" />Play</button>
-        <button class="btn press" onclick={() => quickDownload(urls())}><DownloadSimple size={14} weight="bold" />Download All</button>
+        <button class="btn primary press" onclick={() => queue.play(yt.tracks)}><Icon name="Play" size={14} weight="fill" />Play</button>
+        <button class="btn press" onclick={() => quickDownload(urls())}><Icon name="DownloadSimple" size={14} weight="bold" />Download All</button>
       </div>
     </div>
     <TrackTable tracks={yt.tracks} remote />
@@ -58,7 +55,7 @@
   .head h1 { margin: 0 0 4px; }
   .head p { margin: 0 0 18px; }
   .link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
-  .card { display: grid; gap: 10px; justify-items: start; max-width: 560px; padding: 16px; border-radius: 12px; background: var(--fill); }
+  .card { display: grid; gap: 10px; justify-items: start; max-width: 560px; padding: 16px; border-radius: var(--r-lg); background: var(--fill); }
   .card p { margin: 0; }
   .search { display: flex; align-items: center; gap: 8px; max-width: 760px; height: 40px; padding: 0 4px 0 14px; border-radius: 20px; background: var(--fill-2); color: var(--text-2); }
   .search:focus-within { box-shadow: 0 0 0 2px var(--accent); }

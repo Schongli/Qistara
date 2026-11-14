@@ -4,7 +4,7 @@
   import { untrack } from 'svelte'
   import { convertFileSrc, invoke } from '@tauri-apps/api/core'
   import { open } from '@tauri-apps/plugin-dialog'
-  import MagnifyingGlass from 'phosphor-svelte/lib/MagnifyingGlass'
+  import Icon from './Icon.svelte'
   import Artwork from './Artwork.svelte'
   import { lib, type Track } from '../lib/library.svelte'
   import { coverUrl, matchTracks, release, searchReleases, type Release } from '../lib/musicbrainz'
@@ -137,7 +137,7 @@
       </div>
     {:else if tab === 'lookup'}
       <div class="lookup">
-        <button class="btn press" onclick={lookup}><MagnifyingGlass size={14} />Search “{values.album || files[0].album}”</button>
+        <button class="btn press" onclick={lookup}><Icon name="MagnifyingGlass" size={14} />Search “{values.album || files[0].album}”</button>
         {#if looking}<p class="t-sub">{looking}</p>{/if}
         <div class="results">
           {#each results as r (r.id)}
@@ -175,22 +175,22 @@
   .scrim { position: fixed; inset: 0; z-index: 80; background: var(--sheet-dim); animation: fade 200ms; }
   .sheet {
     position: fixed; z-index: 81; top: 0; left: 50%; width: min(640px, 92vw); transform: translateX(-50%);
-    padding: 18px 20px 16px; border-radius: 0 0 14px 14px; background: var(--bg-2); border: 1px solid var(--sep); border-top: 0;
+    padding: 18px 20px 16px; border-radius: 0 0 var(--r-xl) var(--r-xl); background: var(--bg-2); border: 1px solid var(--sep); border-top: 0;
     box-shadow: var(--shadow-pop); animation: drop 280ms var(--ease-out);
   }
   @keyframes drop { from { transform: translate(-50%, -100%); } }
   @keyframes fade { from { opacity: 0; } }
   header { display: flex; gap: 14px; align-items: center; }
   .ttl { min-width: 0; }
-  .tabs { display: flex; gap: 2px; margin: 14px 0 12px; padding: 2px; border-radius: 8px; background: var(--fill-2); width: fit-content; }
-  .tabs button { height: 26px; padding: 0 14px; border-radius: 6px; color: var(--text-2); font-weight: 550; }
+  .tabs { display: flex; gap: 2px; margin: 14px 0 12px; padding: 2px; border-radius: var(--r); background: var(--fill-2); width: fit-content; }
+  .tabs button { height: 26px; padding: 0 14px; border-radius: var(--r-sm); color: var(--text-2); font-weight: 550; }
   .tabs button.sel { background: var(--bg); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
   .body { min-height: 260px; }
   .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px 12px; }
   .grid label { grid-column: span 6; display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 10px; }
   .grid label.short { grid-column: span 2; grid-template-columns: auto 1fr; }
   .grid span { color: var(--text-2); text-align: right; }
-  input { height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--sep); background: var(--bg); color: var(--text); min-width: 0; }
+  input { height: 28px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--sep); background: var(--bg); color: var(--text); min-width: 0; }
   input:focus { border-color: var(--accent); }
   input::placeholder { color: var(--text-3); font-style: italic; }
   .art { display: flex; gap: 20px; align-items: flex-start; }
@@ -198,14 +198,14 @@
   .lookup { display: grid; gap: 10px; }
   .lookup .btn { width: fit-content; }
   .results { display: grid; gap: 2px; max-height: 220px; overflow-y: auto; }
-  .result { display: grid; text-align: left; padding: 7px 10px; border-radius: 8px; }
+  .result { display: grid; text-align: left; padding: 7px 10px; border-radius: var(--r); }
   .result:hover { background: var(--fill-2); }
   .credit { font-size: 11px; }
   dl { display: grid; grid-template-columns: 80px 1fr; gap: 6px 12px; margin: 0; }
   dt { color: var(--text-2); }
   dd { margin: 0; }
   .path { word-break: break-all; user-select: text; }
-  .errors { margin-top: 10px; padding: 8px 10px; border-radius: 8px; background: rgba(229, 72, 77, 0.12); color: #e5484d; font-size: 12px; }
+  .errors { margin-top: 10px; padding: 8px 10px; border-radius: var(--r); background: rgba(229, 72, 77, 0.12); color: #e5484d; font-size: 12px; }
   footer { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
   footer .t-sub { flex: 1; font-size: 11px; }
   .btn:disabled { opacity: 0.5; }

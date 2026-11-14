@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import Sidebar from './components/Sidebar.svelte'
   import TopBar from './components/TopBar.svelte'
   import PlayerBar from './components/PlayerBar.svelte'
@@ -50,6 +51,7 @@
   import './lib/lastfm.svelte'
   import './lib/sleep.svelte'
   import './lib/appearance.svelte'
+  import { capture, restore } from './lib/scrollmemo'
 
   startMpv().then(() => lib.load()).then(() => queue.restore(lib.byId))
 
@@ -72,15 +74,18 @@
     !mpv.idle && !!queue.current && (queue.current.kind === 'video' || mpv.tracks.some((x) => x.type === 'video' && !x.image && x.selected)),
   )
 
+  // Back/Forward return to where the page was; a new page starts at the top
+  nav.capture = () => (content ? capture(content) : undefined)
   $effect(() => {
     r
-    content?.scrollTo({ top: 0 })
+    const to = nav.restore
+    tick().then(() => content && restore(content, to))
   })
 
   function keys(e: KeyboardEvent) {
     // sliders keep arrows for themselves, but Space still plays/pauses
     const typing = (e.target as HTMLElement).closest('input, select, textarea')
-    if (e.ctrlKey && e.key === 'f') return e.preventDefault(), ui.search++
+    if (e.ctrlKey && e.key === 'f') return e.preventDefault(), nav.route.name === 'settings' ? ui.settingsSearch++ : ui.search++
     if (e.ctrlKey && e.key === 'o') return e.preventDefault(), openFiles()
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'm') return e.preventDefault(), ui.mini ? exitMini() : enterMini()
     if (e.ctrlKey && e.key === 'i' && queue.current && queue.current.id > 0 && !video) return e.preventDefault(), (ui.tagEditor = [queue.current])
@@ -127,7 +132,7 @@
       {:else if r.name === 'search'}
         <Search />
       {:else if r.name === 'settings'}
-        <Settings />
+        <Settings tab={r.tab} />
       {:else if r.name === 'playlist'}
         {#key r.id}<PlaylistView id={r.id} />{/key}
       {:else if r.name === 'loved'}
@@ -186,7 +191,7 @@
   .app.hidden { display: none; }
   .toast {
     position: fixed; z-index: 90; left: 50%; bottom: calc(var(--player-h) + 16px); transform: translateX(-50%); max-width: 70vw;
-    padding: 9px 16px; border-radius: 10px; background: var(--bar); backdrop-filter: blur(30px) saturate(180%);
+    padding: 9px 16px; border-radius: var(--r-lg); background: var(--bar); backdrop-filter: var(--blur);
     border: 1px solid var(--sep); box-shadow: var(--shadow-pop); animation: rise 220ms var(--ease-out);
   }
   @keyframes rise { from { opacity: 0; transform: translate(-50%, 8px); } }

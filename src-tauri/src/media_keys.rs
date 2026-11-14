@@ -10,7 +10,7 @@ pub struct Media(pub Mutex<Option<MediaControls>>);
 
 pub fn init(window: &WebviewWindow) -> Option<MediaControls> {
     let hwnd = window.hwnd().ok()?.0 as *mut c_void;
-    let mut c = MediaControls::new(PlatformConfig { display_name: "Confluence Player", dbus_name: "confluence_player", hwnd: Some(hwnd) })
+    let mut c = MediaControls::new(PlatformConfig { display_name: "Qistara", dbus_name: "qistara", hwnd: Some(hwnd) })
         .map_err(|e| log::warn!("media controls unavailable: {e:?}"))
         .ok()?;
     let app = window.app_handle().clone();

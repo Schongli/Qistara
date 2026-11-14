@@ -1,10 +1,5 @@
 <script lang="ts">
-  import Play from 'phosphor-svelte/lib/Play'
-  import Shuffle from 'phosphor-svelte/lib/Shuffle'
-  import Gear from 'phosphor-svelte/lib/Gear'
-  import Trash from 'phosphor-svelte/lib/Trash'
-  import Sparkle from 'phosphor-svelte/lib/Sparkle'
-  import Export from 'phosphor-svelte/lib/Export'
+  import Icon from '../components/Icon.svelte'
   import { exportPlaylist } from '../lib/playlistio'
   import Artwork from '../components/Artwork.svelte'
   import TrackTable from '../components/TrackTable.svelte'
@@ -48,7 +43,7 @@
     {/if}
   </div>
   <div class="info">
-    {#if rules}<div class="kind"><Sparkle size={12} weight="fill" /> Smart Playlist</div>{:else}<div class="kind">Playlist</div>{/if}
+    {#if rules}<div class="kind"><Icon name="Sparkle" size={12} weight="fill" /> Smart Playlist</div>{:else}<div class="kind">Playlist</div>{/if}
     {#if renaming}
       <input class="t-title rename" bind:value={draft} onblur={rename} onkeydown={(e) => (e.key === 'Enter' ? rename() : e.key === 'Escape' && (renaming = false))} aria-label="Playlist name" />
     {:else}
@@ -57,14 +52,14 @@
     <p class="t-sub">{subtitle || (rules ? describe(rules) : '')}</p>
     <p class="t-sub">{plural(tracks.length, 'song')}{tracks.length ? `, ${totalTime(duration)}` : ''}</p>
     <div class="actions">
-      <button class="btn primary press" onclick={() => queue.play(tracks)} disabled={!tracks.length}><Play size={14} weight="fill" />Play</button>
-      <button class="btn press" onclick={() => queue.play(tracks, Math.floor(Math.random() * tracks.length), true)} disabled={!tracks.length}><Shuffle size={14} weight="bold" />Shuffle</button>
+      <button class="btn primary press" onclick={() => queue.play(tracks)} disabled={!tracks.length}><Icon name="Play" size={14} weight="fill" />Play</button>
+      <button class="btn press" onclick={() => queue.play(tracks, Math.floor(Math.random() * tracks.length), true)} disabled={!tracks.length}><Icon name="Shuffle" size={14} weight="bold" />Shuffle</button>
       {#if p && rules}
-        <button class="btn press" onclick={() => (ui.editor = { id: p.id, name: p.name, rules })}><Gear size={14} />Edit Rules</button>
+        <button class="btn press" onclick={() => (ui.editor = { id: p.id, name: p.name, rules })}><Icon name="Gear" size={14} />Edit Rules</button>
       {/if}
-      <button class="icon-btn press" aria-label="Export playlist as M3U8" title="Export as M3U8" onclick={() => exportPlaylist(p?.name ?? title, tracks)} disabled={!tracks.length}><Export size={16} /></button>
+      <button class="icon-btn press" aria-label="Export playlist as M3U8" title="Export as M3U8" onclick={() => exportPlaylist(p?.name ?? title, tracks)} disabled={!tracks.length}><Icon name="Export" size={16} /></button>
       {#if p}
-        <button class="icon-btn press" aria-label="Delete playlist" title="Delete playlist" onclick={remove}><Trash size={16} /></button>
+        <button class="icon-btn press" aria-label="Delete playlist" title="Delete playlist" onclick={remove}><Icon name="Trash" size={16} /></button>
       {/if}
     </div>
   </div>
@@ -83,7 +78,7 @@
   .info { min-width: 0; padding-bottom: 4px; }
   .kind { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); margin-bottom: 4px; }
   h1 { margin: 0; }
-  .rename { border: 0; outline: none; background: var(--fill); border-radius: 6px; padding: 0 6px; width: 100%; }
+  .rename { border: 0; outline: none; background: var(--fill); border-radius: var(--r-sm); padding: 0 6px; width: 100%; }
   p { margin: 4px 0 0; }
   .actions { display: flex; gap: 10px; align-items: center; margin-top: 16px; }
   .btn:disabled { opacity: 0.5; }

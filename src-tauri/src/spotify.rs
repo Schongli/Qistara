@@ -12,10 +12,10 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_http::reqwest;
 
-const SERVICE: &str = "Confluence Player Spotify";
+const SERVICE: &str = "Qistara Spotify";
 const API: &str = "https://api.spotify.com/v1";
 const ACCOUNTS: &str = "https://accounts.spotify.com";
-const UA: &str = "ConfluencePlayer/0.2.0"; // identifies the app only; no personal data
+use crate::UA;
 pub const SCOPES: &str =
     "playlist-read-private playlist-read-collaborative user-library-read user-read-playback-state user-modify-playback-state";
 
@@ -87,7 +87,7 @@ pub fn parse_callback(request: &str, state: &str, name: &str) -> Result<String, 
     q("code").filter(|c| !c.is_empty()).ok_or_else(|| format!("{name} sent no sign-in code."))
 }
 
-const PAGE: &str = "<!doctype html><meta charset=utf-8><title>Confluence Player</title>\
+const PAGE: &str = "<!doctype html><meta charset=utf-8><title>Qistara</title>\
 <body style=\"font:16px system-ui;display:grid;place-items:center;height:90vh;margin:0\"><p>";
 
 /// Waits for the browser to come back to our loopback port; other requests (favicon, preconnects) are ignored.
@@ -108,7 +108,7 @@ pub fn wait_for_code(listener: &TcpListener, state: &str, limit: Duration, name:
                 }
                 let result = parse_callback(&req, state, name);
                 // fixed text only: nothing from the request is echoed into the page
-                let text = if result.is_ok() { format!("Confluence Player is connected to {name}. You can close this tab.") } else { "Sign-in didn't finish. Go back to Confluence Player for details.".to_string() };
+                let text = if result.is_ok() { format!("Qistara is connected to {name}. You can close this tab.") } else { "Sign-in didn't finish. Go back to Qistara for details.".to_string() };
                 let body = format!("{PAGE}{text}</p>");
                 let head = format!("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
                 let _ = s.write_all(head.as_bytes()).and_then(|_| s.write_all(body.as_bytes()));

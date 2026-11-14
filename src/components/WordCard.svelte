@@ -2,9 +2,7 @@
   // The card that slides up over the lyrics when you tap a word in Learn mode.
   import { fly } from 'svelte/transition'
   import { cubicOut } from 'svelte/easing'
-  import X from 'phosphor-svelte/lib/X'
-  import Star from 'phosphor-svelte/lib/Star'
-  import Play from 'phosphor-svelte/lib/Play'
+  import Icon from './Icon.svelte'
   import { card, cardId, closeCard, isSaved, learn, toggleSaveCard, vocab } from '../lib/learn.svelte'
   import { lyr } from '../lib/lyrics.svelte'
   import { tr } from '../lib/translate.svelte'
@@ -34,7 +32,7 @@
 <svelte:window onkeydowncapture={keys} />
 
 <div class="card" role="dialog" aria-label="Word: {card.word}" transition:fly={{ y: 28, duration: reduced ? 0 : 260, easing: cubicOut }}>
-  <button class="icon-btn close" aria-label="Close" onclick={closeCard}><X size={14} weight="bold" /></button>
+  <button class="icon-btn close" aria-label="Close" onclick={closeCard}><Icon name="X" size={14} weight="bold" /></button>
 
   <div class="head">
     <span class="word" {lang}>{#each head as s, k (k)}{#if s.rt}<ruby>{s.text}<rt>{s.rt}</rt></ruby>{:else}{s.text}{/if}{/each}</span>
@@ -71,9 +69,9 @@
   {/if}
 
   <div class="actions">
-    {#if line && lyr.data?.synced}<button class="btn press" onclick={playLine}><Play size={13} weight="fill" />Play Line</button>{/if}
+    {#if line && lyr.data?.synced}<button class="btn press" onclick={playLine}><Icon name="Play" size={13} weight="fill" />Play Line</button>{/if}
     <button class="btn press" class:saved disabled={!vocab.loaded} onclick={toggleSaveCard}>
-      <Star size={14} weight={saved ? 'fill' : 'regular'} />{saved ? 'Saved' : 'Save Word'}
+      <Icon name="Star" size={14} weight={saved ? 'fill' : 'regular'} />{saved ? 'Saved' : 'Save Word'}
     </button>
   </div>
 </div>
@@ -81,7 +79,7 @@
 <style>
   .card {
     position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 3; padding: 16px 18px 14px;
-    border-radius: 16px; color: #fff;
+    border-radius: var(--r-xl); color: #fff;
     background: rgba(28, 28, 30, 0.72); backdrop-filter: blur(30px) saturate(1.6);
     border: 0.5px solid rgba(255, 255, 255, 0.14); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   }

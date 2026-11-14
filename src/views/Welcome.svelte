@@ -1,6 +1,6 @@
 <script lang="ts">
   import { open } from '@tauri-apps/plugin-dialog'
-  import FolderSimplePlus from 'phosphor-svelte/lib/FolderSimplePlus'
+  import Icon from '../components/Icon.svelte'
   import { addFolder } from '../lib/library.svelte'
 
   async function pick() {
@@ -11,9 +11,9 @@
 
 <div class="welcome">
   <img class="mark" src="/favicon.svg" alt="" width="84" height="84" />
-  <h1 class="t-title">Where your music comes together.</h1>
-  <p class="t-sub">Add the folder where your music and videos live. Confluence Player plays FLAC, ALAC, WAV, AIFF, APE, WavPack, MP3, AAC, Opus and nearly every video format, and sends lossless audio to your DAC bit-perfect, in exclusive mode. Your Navidrome server, YouTube Music and playlists from Spotify, Apple Music and Tidal join it from Providers.</p>
-  <button class="btn primary press" onclick={pick}><FolderSimplePlus size={16} />Add Music Folder…</button>
+  <h1 class="t-title">Your music, in true balance.</h1>
+  <p class="t-sub">Add the folder where your music and videos live. Qistara plays FLAC, ALAC, WAV, AIFF, APE, WavPack, MP3, AAC, Opus and nearly every video format, and sends lossless audio to your DAC bit-perfect, in exclusive mode. Your Navidrome server, YouTube Music and playlists from Spotify, Apple Music and Tidal join it from Providers.</p>
+  <button class="btn primary press" onclick={pick}><Icon name="FolderSimplePlus" size={16} />Add Music Folder…</button>
 </div>
 
 <style>

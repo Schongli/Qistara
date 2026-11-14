@@ -1,52 +1,50 @@
-// Finds lyrics for the playing track: local first, then LRCLIB (when online lookup is on).
+// Finds lyrics for the playing track, asking the sources in the order set in Settings › Lyrics.
 import { invoke } from '@tauri-apps/api/core'
-import { fetch } from '@tauri-apps/plugin-http'
 import { untrack } from 'svelte'
 import { parseLyrics, type Lyrics } from './lyrics'
+import { firstLyrics, serverSongId, type LyricsSource } from './lyricsources'
 import { queue } from './queue.svelte'
 import { settings } from './settings.svelte'
 import type { Track } from './library.svelte'
 
-export const lyr = $state({ data: null as Lyrics | null, source: '', loading: false })
+export const lyr = $state({ data: null as Lyrics | null, source: '' as LyricsSource | '', loading: false })
 
-const UA = 'ConfluencePlayer/0.2.0' // LRCLIB asks clients to identify themselves; no personal data
-
-async function online(t: Track): Promise<string | null> {
-  const q = new URLSearchParams({ track_name: t.title, artist_name: t.artist, album_name: t.album })
-  if (t.duration) q.set('duration', String(Math.round(t.duration)))
-  const r = await fetch(`https://lrclib.net/api/get?${q}`, { headers: { 'User-Agent': UA } })
-  if (r.status === 404) return ''
-  if (!r.ok) return null // server trouble: try again next time, don't cache
-  const j = (await r.json()) as { syncedLyrics?: string; plainLyrics?: string; instrumental?: boolean }
-  return j.syncedLyrics || j.plainLyrics || ''
+async function ask(t: Track, id: LyricsSource): Promise<Lyrics | null> {
+  if (id === 'local') {
+    const f = await invoke<{ kind: string; text: string } | null>('lyrics', { path: t.path })
+    return f?.text.trim() ? parseLyrics(f.kind, f.text) : null
+  }
+  const sid = serverSongId(t.path)
+  if (t.kind !== 'audio' || !t.title || (id === 'subsonic' ? !sid : !t.artist)) return null
+  // a server song's address is signed afresh each session, so it is cached by its id instead
+  const key = sid ? `sub:${sid}` : t.path
+  const song = { title: t.title, artist: t.artist, album: t.album, duration: t.duration, id: sid }
+  const text = await invoke<string>('lyrics_fetch', { source: id, key, song })
+  return text.trim() ? parseLyrics('lrc', text) : null
 }
 
+let generation = 0
 async function load(t: Track) {
+  const mine = ++generation
   lyr.loading = true
   lyr.data = null
   lyr.source = ''
   try {
-    const found = await invoke<{ kind: string; text: string; source: string } | null>('lyrics', { path: t.path })
-    let text = found?.text ?? null
-    let kind = found?.kind ?? 'lrc'
-    let source = found?.source ?? ''
-    if (text === null && settings.onlineLyrics && t.kind === 'audio' && t.artist && t.title) {
-      text = await online(t).catch(() => null)
-      if (text !== null) await invoke('lyrics_store', { path: t.path, text })
-      kind = 'lrc'
-      source = 'lrclib'
-    }
-    if (queue.current?.path !== t.path) return // the track changed while we were looking
-    lyr.data = text?.trim() ? parseLyrics(kind, text) : null
-    lyr.source = source
+    const found = await firstLyrics($state.snapshot(settings.lyricsSources), (id) => ask(t, id), settings.preferWordSync)
+    if (mine !== generation) return // the track or the source list changed while we were looking
+    lyr.data = found?.lyrics ?? null
+    lyr.source = found?.source ?? ''
   } finally {
-    if (queue.current?.path === t.path) lyr.loading = false
+    if (mine === generation) lyr.loading = false
   }
 }
 
 $effect.root(() => {
   $effect(() => {
     const t = queue.current
+    // a reordered or switched source list looks again (online results are cached per source)
+    settings.lyricsSources.map((s) => s.on)
+    settings.preferWordSync
     if (t) untrack(() => load(t))
     else lyr.data = null
   })

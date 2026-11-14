@@ -1,8 +1,6 @@
 <script lang="ts">
   // Words saved from Learn mode in the lyrics, with the line each came from and a flashcard review.
-  import Play from 'phosphor-svelte/lib/Play'
-  import X from 'phosphor-svelte/lib/X'
-  import Cards from 'phosphor-svelte/lib/Cards'
+  import Icon from '../components/Icon.svelte'
   import { dueItems, type VocabItem } from '../lib/vocab'
   import { grade, playLine, removeWord, vocab } from '../lib/learn.svelte'
   import { furigana } from '../lib/kana'
@@ -45,7 +43,7 @@
 {#snippet example(i: VocabItem)}
   {#if i.line}
     <div class="ex">
-      <button class="icon-btn press" aria-label="Play this line" title="Play the line in {i.title}" onclick={() => playLine(i.path, i.t)}><Play size={12} weight="fill" /></button>
+      <button class="icon-btn press" aria-label="Play this line" title="Play the line in {i.title}" onclick={() => playLine(i.path, i.t)}><Icon name="Play" size={12} weight="fill" /></button>
       <div class="ex-text">
         <span lang={lang(i)}>{i.line}</span>
         {#if i.translation}<span class="t-sub">{i.translation}</span>{/if}
@@ -90,7 +88,7 @@
     <p class="t-sub">
       {#if vocab.items.length}{plural(vocab.items.length, 'word')} saved · {due.length} to review{:else}No saved words yet.{/if}
     </p>
-    <button class="btn primary press" disabled={!due.length} onclick={start}><Cards size={15} />Review</button>
+    <button class="btn primary press" disabled={!due.length} onclick={start}><Icon name="Cards" size={15} />Review</button>
   </div>
 
   {#if !vocab.items.length}
@@ -106,7 +104,7 @@
         {@render word(i, true)}
         {#if i.romaji}<span class="t-sub">{i.romaji}</span>{/if}
         {#if i.pos}<span class="pos">{i.pos}</span>{/if}
-        <button class="icon-btn press rm" aria-label="Remove {i.word}" title="Remove" onclick={() => removeWord(i.id)}><X size={13} weight="bold" /></button>
+        <button class="icon-btn press rm" aria-label="Remove {i.word}" title="Remove" onclick={() => removeWord(i.id)}><Icon name="X" size={13} weight="bold" /></button>
       </div>
       <p class="mean">{i.meanings.join(', ')}</p>
       {@render example(i)}
@@ -119,7 +117,7 @@
   .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 820px; margin-bottom: 18px; }
   .bar p { margin: 0; }
   .empty { max-width: 560px; line-height: 1.55; }
-  .row { max-width: 820px; padding: 12px 14px; margin-bottom: 10px; border-radius: 12px; background: var(--fill); }
+  .row { max-width: 820px; padding: 12px 14px; margin-bottom: 10px; border-radius: var(--r-lg); background: var(--fill); }
   .head { display: flex; align-items: baseline; gap: 10px; }
   .w { font-size: 22px; font-weight: 700; letter-spacing: -0.015em; line-height: 1.3; }
   rt { font-size: 0.45em; font-weight: 600; letter-spacing: 0; color: var(--text-2); }
@@ -130,7 +128,7 @@
   .ex-text { display: grid; gap: 1px; min-width: 0; font-size: 13.5px; line-height: 1.4; }
   .src { font-size: 12px; }
   .review { max-width: 620px; margin: 40px auto 0; text-align: center; }
-  .flash { padding: 36px 28px; border-radius: 18px; background: var(--fill); }
+  .flash { padding: 36px 28px; border-radius: var(--r-xl); background: var(--fill); }
   .flash .w { font-size: 46px; }
   .flash .ex { text-align: left; margin-top: 18px; }
   .reading { margin: 8px 0 0; font-size: 17px; color: var(--text-2); }
@@ -138,5 +136,5 @@
   .done .w { font-size: 26px; margin: 0 0 6px; }
   .actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; }
   .end { margin-left: 18px; }
-  kbd { margin-left: 6px; padding: 0 5px; border-radius: 4px; font: 600 10.5px/16px inherit; background: rgba(127, 127, 127, 0.2); }
+  kbd { margin-left: 6px; padding: 0 5px; border-radius: var(--r-xs); font: 600 10.5px/16px inherit; background: rgba(127, 127, 127, 0.2); }
 </style>

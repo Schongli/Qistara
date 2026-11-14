@@ -1,7 +1,7 @@
 <script lang="ts">
   // The pane docked beside the library: lyrics (the Qur'an view for a recitation) or Up Next, over the
   // blurred cover like Now Playing, so the same views read well in light and dark mode alike.
-  import X from 'phosphor-svelte/lib/X'
+  import Icon from './Icon.svelte'
   import PanelContent from './PanelContent.svelte'
   import { ui } from '../lib/nav.svelte'
   import { queue } from '../lib/queue.svelte'
@@ -25,7 +25,7 @@
         <button role="tab" class="tab press" class:on={ui.panel === id} aria-selected={ui.panel === id} onclick={() => (ui.panel = id)}>{label}</button>
       {/each}
     </div>
-    <button class="icon-btn press close" aria-label="Close pane" onclick={() => (ui.panel = '')}><X size={14} weight="bold" /></button>
+    <button class="icon-btn press close" aria-label="Close pane" onclick={() => (ui.panel = '')}><Icon name="X" size={14} weight="bold" /></button>
   </header>
   <div class="body">
     {#if queue.current || ui.panel === 'queue'}

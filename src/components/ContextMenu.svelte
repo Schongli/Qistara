@@ -51,13 +51,13 @@
 
 <style>
   .menu {
-    position: fixed; z-index: 100; min-width: 200px; padding: 5px; border-radius: 9px;
-    background: var(--bar); backdrop-filter: blur(30px) saturate(180%);
+    position: fixed; z-index: 100; min-width: 200px; padding: 5px; border-radius: var(--r);
+    background: var(--bar); backdrop-filter: var(--blur);
     border: 1px solid var(--sep); box-shadow: var(--shadow-pop);
     animation: pop 140ms var(--ease-out);
   }
   @keyframes pop { from { opacity: 0; transform: scale(0.96); } }
-  button { display: block; width: 100%; text-align: left; padding: 5px 10px; border-radius: 5px; }
+  button { display: block; width: 100%; text-align: left; padding: 5px 10px; border-radius: var(--r-xs); }
   button:hover, button:focus-visible { background: var(--accent); color: var(--on-accent); outline: none; }
   button:disabled { color: var(--text-3); background: none; }
   .sep { height: 1px; margin: 4px 8px; background: var(--sep); }

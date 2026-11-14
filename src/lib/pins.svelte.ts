@@ -1,11 +1,11 @@
 // Albums pinned to the sidebar, in kv like the rest of the app state; loaded before anything is saved.
-import { kvGet, kvSet } from './persist'
+import { kvLoad, kvSet } from './persist'
 
 export interface Pin { key: string; title: string; art: string | null }
 
 export const pins = $state({ items: [] as Pin[], loaded: false })
 
-kvGet<Pin[]>('pins').then((p) => {
+kvLoad<Pin[]>('pins').then((p) => {
   pins.items = p ?? []
   pins.loaded = true
 })

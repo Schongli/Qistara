@@ -79,7 +79,9 @@ export async function updateYtdlp() {
   }
 }
 
-export const defaultFolder = async () => join(await audioDir(), 'Confluence Player Downloads')
+export const defaultFolder = async () => join(await audioDir(), 'Qistara Downloads')
+/** Where downloads go: the folder picked in Downloads, kept in settings, or the default. */
+export const downloadFolder = async () => settings.downloadFolder || defaultFolder()
 
 const inLibrary = (dir: string) => lib.folders.some((f) => dir.toLowerCase().startsWith(f.toLowerCase().replace(/[\\/]*$/, '\\')) || dir.toLowerCase() === f.toLowerCase())
 
@@ -99,9 +101,9 @@ export async function add(urls: string[], preset: Preset, dest: string, addToLib
 export const cancel = (id: number) => invoke('download_cancel', { id })
 export const clearFinished = () => (dl.jobs = dl.jobs.filter((j) => j.status === 'queued' || j.status === 'running'))
 
-/** "Download" from a track's menu: best audio into the usual folder, added to the library. */
+/** "Download" from a track's menu: best audio into the download folder. */
 export async function quickDownload(urls: string[]) {
-  await add(urls, 'audioOriginal', await defaultFolder(), true)
+  await add(urls, 'audioOriginal', await downloadFolder(), settings.downloadToLibrary)
   toast(dl.error || (urls.length > 1 ? `Downloading ${urls.length} songs…` : 'Downloading…'))
 }
 

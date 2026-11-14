@@ -5,8 +5,8 @@ use crate::Lib;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-const SERVICE: &str = "Confluence Player Subsonic";
-const CLIENT: &str = "ConfluencePlayer";
+const SERVICE: &str = "Qistara Subsonic";
+const CLIENT: &str = "Qistara";
 
 #[derive(Serialize, Deserialize, Clone)]
 struct Creds {
@@ -106,7 +106,7 @@ pub fn endpoint(call: &Call) -> Result<(&'static str, Vec<(&'static str, String)
 
 fn client() -> Result<tauri_plugin_http::reqwest::Client, String> {
     tauri_plugin_http::reqwest::Client::builder()
-        .user_agent(concat!("ConfluencePlayer/", env!("CARGO_PKG_VERSION")))
+        .user_agent(crate::UA)
         .timeout(std::time::Duration::from_secs(20))
         .build()
         .map_err(|e| e.to_string())
@@ -162,6 +162,51 @@ pub fn subsonic_logout() -> Result<(), String> {
 pub async fn subsonic_call(call: Call) -> Result<serde_json::Value, String> {
     let (ep, params) = endpoint(&call)?;
     get(&creds()?, ep, &params).await
+}
+
+/// Lyrics for a song on your server, as LRC: OpenSubsonic's timed lyrics when the server has them, else the
+/// classic getLyrics text ("" when it has none).
+pub async fn lyrics(id: &str, artist: &str, title: &str) -> Result<String, String> {
+    if !valid_id(id) {
+        return Err("bad id".into());
+    }
+    let c = creds()?;
+    match get(&c, "getLyricsBySongId", &[("id", id.to_string())]).await {
+        Ok(r) => {
+            let text = structured_to_lrc(&r["lyricsList"]["structuredLyrics"]);
+            if !text.is_empty() {
+                return Ok(text);
+            }
+        }
+        // can't reach the server: try again later rather than record "none"
+        Err(e) if e.starts_with("Can't reach") => return Err(e),
+        Err(_) => {} // not an OpenSubsonic server: the classic call below
+    }
+    let r = get(&c, "getLyrics", &[("artist", artist.to_string()), ("title", title.to_string())]).await?;
+    Ok(r["lyrics"]["value"].as_str().unwrap_or_default().to_string())
+}
+
+/// OpenSubsonic structuredLyrics → LRC (the timed set if there is one; its offset kept as [offset:]).
+fn structured_to_lrc(list: &serde_json::Value) -> String {
+    let all = list.as_array().map(Vec::as_slice).unwrap_or_default();
+    let Some(l) = all.iter().find(|l| l["synced"] == true).or(all.first()) else { return String::new() };
+    let lines = l["line"].as_array().map(Vec::as_slice).unwrap_or_default();
+    let mut out = String::new();
+    if l["synced"] == true {
+        if let Some(o) = l["offset"].as_i64().filter(|o| *o != 0) {
+            out.push_str(&format!("[offset:{o}]\n"));
+        }
+        for x in lines {
+            let ms = x["start"].as_i64().unwrap_or(0).max(0);
+            out.push_str(&format!("[{:02}:{:02}.{:03}]{}\n", ms / 60000, ms / 1000 % 60, ms % 1000, x["value"].as_str().unwrap_or_default()));
+        }
+    } else {
+        for x in lines {
+            out.push_str(x["value"].as_str().unwrap_or_default());
+            out.push('\n');
+        }
+    }
+    if out.trim().is_empty() { String::new() } else { out }
 }
 
 /// The song as the server stores it (format=raw: a FLAC stays bit-perfect), for mpv to play.
@@ -227,6 +272,17 @@ mod tests {
         assert!(endpoint(&Call::Search { query: "  ".into() }).is_err());
         let c: Call = serde_json::from_str(r#"{"call":"albumList","kind":"newest","offset":0}"#).unwrap();
         assert!(matches!(c, Call::AlbumList { kind: ListKind::Newest, offset: 0 }));
+    }
+
+    #[test]
+    fn turns_structured_lyrics_into_lrc() {
+        let list = serde_json::json!([
+            {"lang": "eng", "synced": false, "line": [{"value": "plain"}]},
+            {"lang": "eng", "synced": true, "offset": -100, "line": [{"start": 1500, "value": "Hello"}, {"start": 62250, "value": "world"}]}
+        ]);
+        assert_eq!(structured_to_lrc(&list), "[offset:-100]\n[00:01.500]Hello\n[01:02.250]world\n");
+        assert_eq!(structured_to_lrc(&serde_json::json!([{"synced": false, "line": [{"value": "a"}, {"value": "b"}]}])), "a\nb\n");
+        assert_eq!(structured_to_lrc(&serde_json::json!(null)), "");
     }
 
     #[test]

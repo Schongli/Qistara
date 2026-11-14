@@ -1,8 +1,6 @@
 <script lang="ts">
   // Pick playlists from a service and import them as playlists of your own files (Spotify, Apple Music, Tidal).
-  import ArrowsClockwise from 'phosphor-svelte/lib/ArrowsClockwise'
-  import Heart from 'phosphor-svelte/lib/Heart'
-  import Playlist from 'phosphor-svelte/lib/Playlist'
+  import Icon from './Icon.svelte'
   import type { ImportResult } from '../lib/imports.svelte'
   import { nav } from '../lib/nav.svelte'
   import { plural } from '../lib/format'
@@ -29,16 +27,16 @@
 <section>
   <div class="title-row">
     <h2 class="t-h2">Import Playlists</h2>
-    <button class="icon-btn press" aria-label="Reload playlists" title="Reload playlists" disabled={loading} onclick={onreload}><ArrowsClockwise size={15} /></button>
+    <button class="icon-btn press" aria-label="Reload playlists" title="Reload playlists" disabled={loading} onclick={onreload}><Icon name="ArrowsClockwise" size={15} /></button>
   </div>
-  <p class="t-sub">Makes a Confluence Player playlist of your own files for each {service} playlist, so it plays in full quality. Songs you don't have are listed, never downloaded. Importing again updates it.</p>
+  <p class="t-sub">Makes a Qistara playlist of your own files for each {service} playlist, so it plays in full quality. Songs you don't have are listed, never downloaded. Importing again updates it.</p>
   <div class="list">
     {#each rows as r (r.id)}
       {@const res = results[r.id]}
       <div class="row">
         <input type="checkbox" checked={picked.includes(r.id)} onchange={() => toggle(r.id)} aria-label="Import {r.name}" />
         <span class="thumb">
-          {#if r.image}<img src={r.image} alt="" />{:else if r.all}<Heart size={16} weight="fill" />{:else}<Playlist size={16} />{/if}
+          {#if r.image}<img src={r.image} alt="" />{:else if r.all}<Icon name="Heart" size={16} weight="fill" />{:else}<Icon name="Playlist" size={16} />{/if}
         </span>
         <span class="txt">
           <span class="ellipsis">{r.name}</span>
@@ -82,7 +80,7 @@
   .row { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-bottom: 1px solid var(--sep); }
   .row:hover { background: var(--fill); }
   .row input { width: 16px; height: 16px; accent-color: var(--accent); }
-  .thumb { flex: none; width: 36px; height: 36px; border-radius: 5px; overflow: hidden; display: grid; place-items: center; background: var(--fill-2); color: var(--accent); }
+  .thumb { flex: none; width: 36px; height: 36px; border-radius: var(--r-xs); overflow: hidden; display: grid; place-items: center; background: var(--fill-2); color: var(--accent); }
   .thumb img { width: 100%; height: 100%; object-fit: cover; }
   .txt { flex: 1; min-width: 0; display: grid; line-height: 18px; }
   .res { flex: none; }

@@ -13,9 +13,9 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_http::reqwest;
 
-const SERVICE: &str = "Confluence Player Apple Music";
+const SERVICE: &str = "Qistara Apple Music";
 const API: &str = "https://api.music.apple.com";
-const UA: &str = concat!("ConfluencePlayer/", env!("CARGO_PKG_VERSION"));
+use crate::UA;
 
 #[derive(Serialize, Deserialize, Default, Clone)]
 struct Creds {
@@ -100,23 +100,23 @@ pub fn apple_logout(all: bool) -> Result<(), String> {
 fn page(dev: &str, state: &str) -> String {
     let (dev, state) = (serde_json::to_string(dev).unwrap_or_default(), serde_json::to_string(state).unwrap_or_default());
     format!(
-        r#"<!doctype html><meta charset=utf-8><title>Confluence Player</title>
+        r#"<!doctype html><meta charset=utf-8><title>Qistara</title>
 <body style="font:16px system-ui;display:grid;place-items:center;height:90vh;margin:0"><div style="text-align:center">
-<p id=m>Sign in with your Apple ID to let Confluence Player read your Apple Music library.</p>
+<p id=m>Sign in with your Apple ID to let Qistara read your Apple Music library.</p>
 <button id=b disabled style="font:inherit;padding:10px 18px;border-radius:8px">Sign In to Apple Music</button></div>
 <script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js" async></script>
 <script>
 const m = document.getElementById('m'), b = document.getElementById('b')
 document.addEventListener('musickitloaded', async () => {{
-  await MusicKit.configure({{ developerToken: {dev}, app: {{ name: 'Confluence Player', build: '{v}' }} }})
+  await MusicKit.configure({{ developerToken: {dev}, app: {{ name: 'Qistara', build: '{v}' }} }})
   b.disabled = false
   b.onclick = async () => {{
     try {{
       const token = await MusicKit.getInstance().authorize()
       await fetch('/token?state=' + encodeURIComponent({state}), {{ method: 'POST', body: token }})
-      m.textContent = 'Confluence Player is connected to Apple Music. You can close this tab.'
+      m.textContent = 'Qistara is connected to Apple Music. You can close this tab.'
       b.remove()
-    }} catch (e) {{ m.textContent = 'Sign-in did not finish. Go back to Confluence Player and try again.' }}
+    }} catch (e) {{ m.textContent = 'Sign-in did not finish. Go back to Qistara and try again.' }}
   }}
 }})
 </script>"#,

@@ -1,4 +1,4 @@
-# Confluence Player roadmap
+# Qistara roadmap
 
 ## Phase 1: first build
 - [x] M0 Setup: toolchain, Tauri + Svelte scaffold, libmpv
@@ -45,5 +45,16 @@
 - [x] Providers page; Apple Music (own MusicKit key) and Tidal (own developer app) playlist import
   (Apple and Tidal not yet tried with real accounts)
 - [ ] Offline copies of server songs, Deezer, Discord presence, UI translations
+
+## Phase 5: Qistara
+- [x] Rename from Confluence Player ("Confluence" is a registered name): pivot-Q mark, Obsidian and brass palette,
+  signal colours (bit-perfect cyan), data folder and Credential Manager carried over from either old name
+- [x] Back and Forward return to the scroll position, the selected artist or composer, Songs sort and Top period
+- [x] Downloads remember the folder, format and "add to library" choice (quick downloads use them too)
+- [x] Lyrics sources in priority order: local files, Navidrome/Subsonic, LRCLIB, NetEase, Kugou (word-synced KRC),
+  with "prefer word-synced"
+- [x] Settings tabs and search; theme presets (Catppuccin Frappé, Rosé Pine, Gruvbox Dark, Solarized Dark); corners;
+  blur window / blur UI; icon packs (Phosphor, Lucide, Iconoir, Remix, Solar)
+  (all of Phase 5 not yet checked by hand in the installed app)
 
 Not planned: fake-lossless checker, native DSD/DoP (mpv converts DSD to PCM), playing or downloading DRM streams.

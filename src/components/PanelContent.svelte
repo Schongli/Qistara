@@ -1,8 +1,7 @@
 <script lang="ts">
   // Lyrics (or the Qur'an view for a recitation) or Up Next, white on a dark backdrop. Shared by the
   // Now Playing sheet and the pane docked beside the library.
-  import Translate from 'phosphor-svelte/lib/Translate'
-  import GraduationCap from 'phosphor-svelte/lib/GraduationCap'
+  import Icon from './Icon.svelte'
   import WordCard from './WordCard.svelte'
   import QueueList from './QueueList.svelte'
   import LyricsView from './LyricsView.svelte'
@@ -35,7 +34,7 @@
           aria-label="Learn mode"
           title={settings.learnLyrics ? learn.error || 'Learn mode: tap any word for its meaning' : 'Learn: readings, romaji and word meanings'}
           onclick={() => (settings.learnLyrics = !settings.learnLyrics)}
-        ><GraduationCap size={18} weight={settings.learnLyrics ? 'bold' : 'regular'} /></button>
+        ><Icon name="GraduationCap" size={18} weight={settings.learnLyrics ? 'bold' : 'regular'} /></button>
         {#if !settings.learnLyrics}
           <button
             class="icon-btn press"
@@ -45,7 +44,7 @@
             aria-label="Translate lyrics to {lang}"
             title={!settings.translateLyrics ? `Translate to ${lang}` : tr.error || (tr.same ? `These lyrics are already in ${lang}` : `Translated to ${lang} by Google`)}
             onclick={() => (settings.translateLyrics = !settings.translateLyrics)}
-          ><Translate size={18} weight={settings.translateLyrics ? 'bold' : 'regular'} /></button>
+          ><Icon name="Translate" size={18} weight={settings.translateLyrics ? 'bold' : 'regular'} /></button>
         {/if}
       </div>
     {/if}

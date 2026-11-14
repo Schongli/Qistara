@@ -1,14 +1,19 @@
 // Network streams and saved internet radio stations.
+import { UA } from './ua'
 import { fetch } from '@tauri-apps/plugin-http'
-import { kvGet, kvSet } from './persist'
+import { kvLoad, kvSet } from './persist'
 import { queue } from './queue.svelte'
 import type { Track } from './library.svelte'
 
 export interface Station { name: string; url: string }
 
-export const radio = $state({ stations: [] as Station[] })
-kvGet<Station[]>('radio').then((s) => s && (radio.stations = s))
-const save = () => kvSet('radio', $state.snapshot(radio.stations))
+export const radio = $state({ stations: [] as Station[], loaded: false })
+// nothing is saved until the stored list is in, so it is never overwritten by a shorter one
+kvLoad<Station[]>('radio').then((s) => {
+  if (s) radio.stations = s
+  radio.loaded = true
+})
+const save = () => radio.loaded && kvSet('radio', $state.snapshot(radio.stations))
 
 /** True for http(s)/rtsp/rtmp/… addresses that mpv can stream. */
 export const isUrl = (s: string) => /^(https?|rtsps?|rtmps?|mms|srt|udp|rtp):\/\/\S+$/i.test(s.trim())
@@ -44,7 +49,7 @@ export interface FoundStation { id: string; name: string; url: string; country: 
 /** Radio Browser (radio-browser.info): the free, open directory of internet radio. */
 export async function searchStations(q: string): Promise<FoundStation[]> {
   const p = new URLSearchParams({ name: q.trim(), limit: '40', hidebroken: 'true', order: 'clickcount', reverse: 'true' })
-  const r = await fetch(`https://all.api.radio-browser.info/json/stations/search?${p}`, { headers: { 'User-Agent': 'ConfluencePlayer/0.2.0' } })
+  const r = await fetch(`https://all.api.radio-browser.info/json/stations/search?${p}`, { headers: { 'User-Agent': UA } })
   if (!r.ok) throw new Error(`Radio Browser answered ${r.status}`)
   const list = (await r.json()) as { stationuuid: string; name: string; url_resolved: string; url: string; country: string; codec: string; bitrate: number; tags: string }[]
   return list

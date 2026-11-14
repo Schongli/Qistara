@@ -1,10 +1,5 @@
 <script lang="ts">
-  import Play from 'phosphor-svelte/lib/Play'
-  import Pause from 'phosphor-svelte/lib/Pause'
-  import SkipBack from 'phosphor-svelte/lib/SkipBack'
-  import SkipForward from 'phosphor-svelte/lib/SkipForward'
-  import ArrowsOut from 'phosphor-svelte/lib/ArrowsOut'
-  import X from 'phosphor-svelte/lib/X'
+  import Icon from './Icon.svelte'
   import { getCurrentWindow } from '@tauri-apps/api/window'
   import Artwork from './Artwork.svelte'
   import Slider from './Slider.svelte'
@@ -24,17 +19,17 @@
   <div class="body" data-tauri-drag-region>
     <div class="txt" data-tauri-drag-region>
       <div class="title ellipsis">{icy || t?.title || 'Not Playing'}</div>
-      <div class="sub ellipsis">{t ? [t.artist, t.album].filter(Boolean).join(' — ') : 'Confluence Player'}</div>
+      <div class="sub ellipsis">{t ? [t.artist, t.album].filter(Boolean).join(' — ') : 'Qistara'}</div>
     </div>
     <div class="row">
-      <button class="icon-btn press" aria-label="Previous" onclick={() => queue.prev()} disabled={!t}><SkipBack size={16} weight="fill" /></button>
+      <button class="icon-btn press" aria-label="Previous" onclick={() => queue.prev()} disabled={!t}><Icon name="SkipBack" size={16} weight="fill" /></button>
       <button class="icon-btn press play" aria-label={mpv.pause || !t ? 'Play' : 'Pause'} onclick={togglePause} disabled={!t}>
-        {#if mpv.pause || !t}<Play size={20} weight="fill" />{:else}<Pause size={20} weight="fill" />{/if}
+        {#if mpv.pause || !t}<Icon name="Play" size={20} weight="fill" />{:else}<Icon name="Pause" size={20} weight="fill" />{/if}
       </button>
-      <button class="icon-btn press" aria-label="Next" onclick={() => queue.next()} disabled={!t}><SkipForward size={16} weight="fill" /></button>
+      <button class="icon-btn press" aria-label="Next" onclick={() => queue.next()} disabled={!t}><Icon name="SkipForward" size={16} weight="fill" /></button>
       <span class="sp" data-tauri-drag-region></span>
-      <button class="icon-btn press" aria-label="Back to the full player" title="Full player" onclick={exitMini}><ArrowsOut size={15} /></button>
-      <button class="icon-btn press" aria-label="Close Confluence Player" onclick={() => getCurrentWindow().close()}><X size={14} weight="bold" /></button>
+      <button class="icon-btn press" aria-label="Back to the full player" title="Full player" onclick={exitMini}><Icon name="ArrowsOut" size={15} /></button>
+      <button class="icon-btn press" aria-label="Close Qistara" onclick={() => getCurrentWindow().close()}><Icon name="X" size={14} weight="bold" /></button>
     </div>
   </div>
   {#if t && duration}<div class="scrub"><Slider label="Seek" value={mpv.time} max={duration} onchange={seek} /></div>{/if}
@@ -45,7 +40,7 @@
     position: fixed; inset: 0; display: flex; align-items: center; gap: 12px; padding: 0 8px 0 10px;
     background: var(--sidebar); color: var(--text);
   }
-  .art { flex: none; border-radius: 6px; }
+  .art { flex: none; border-radius: var(--r-sm); }
   .body { flex: 1; min-width: 0; display: grid; gap: 2px; }
   .txt { min-width: 0; padding-top: 2px; }
   .title { font-weight: 650; font-size: 13px; }

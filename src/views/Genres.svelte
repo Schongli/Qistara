@@ -31,7 +31,7 @@
 <style>
   h1 { margin: 0 0 20px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
-  .card { padding: 16px; border-radius: 12px; background: var(--fill); text-align: left; min-width: 0; }
+  .card { padding: 16px; border-radius: var(--r-lg); background: var(--fill); text-align: left; min-width: 0; }
   .card:hover { background: var(--fill-2); }
   .stack { position: relative; height: 80px; margin-bottom: 12px; }
   .stack span { position: absolute; left: calc(var(--i) * 40px); top: calc(var(--i) * 3px); z-index: calc(3 - var(--i)); }

@@ -4,7 +4,9 @@ mod japanese;
 mod keys;
 mod lastfm;
 mod lyrics;
+mod lyrics_online;
 mod media_keys;
+mod mpv;
 mod quran;
 mod scan;
 mod spotify;
@@ -21,6 +23,11 @@ use std::sync::atomic::{AtomicBool, Ordering::SeqCst};
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
+
+/// Every request identifies itself with this and nothing else (no personal data).
+pub const UA: &str = concat!("Qistara/", env!("CARGO_PKG_VERSION"));
+/// Data folders of the app's earlier names, newest first.
+const OLD_DATA: [&str; 2] = ["com.confluenceplayer.app", "com.sonora.player"];
 
 pub struct Lib {
   db: Mutex<rusqlite::Connection>,
@@ -82,10 +89,10 @@ fn extensions() -> Extensions {
   Extensions { audio: scan::AUDIO, video: scan::VIDEO }
 }
 
-/// Pictures\Confluence Player, created on first use (mpv won't create a missing screenshot folder).
+/// Pictures\Qistara, created on first use (mpv won't create a missing screenshot folder).
 #[tauri::command]
 fn screenshot_dir(app: AppHandle) -> Res<String> {
-  let d = app.path().picture_dir().map_err(err)?.join("Confluence Player");
+  let d = app.path().picture_dir().map_err(err)?.join("Qistara");
   std::fs::create_dir_all(&d).map_err(|e| format!("{}: {e}", d.display()))?;
   Ok(d.to_string_lossy().into_owned())
 }
@@ -95,14 +102,23 @@ fn lyrics_dir(lib: &Lib) -> std::path::PathBuf {
 }
 
 #[tauri::command]
-fn lyrics(lib: State<Lib>, path: String) -> Option<lyrics::Found> {
-  lyrics::local(Path::new(&path), &lyrics_dir(&lib))
+fn lyrics(path: String) -> Option<lyrics::Found> {
+  lyrics::local(Path::new(&path))
 }
 
-/// Caches an online result in app data, never in the music folder; "" records that none exists.
+/// One online source's lyrics for a track ("" = it has none), cached in app data, never in the music folder.
+/// Network trouble is an error and isn't cached, so the next play tries again.
 #[tauri::command]
-fn lyrics_store(lib: State<Lib>, path: String, text: String) -> Res<()> {
-  lyrics::store(Path::new(&path), &lyrics_dir(&lib), &text).map_err(err)
+async fn lyrics_fetch(lib: State<'_, Lib>, source: lyrics_online::Source, key: String, song: lyrics_online::Song) -> Res<String> {
+  let dir = lyrics_dir(&lib);
+  if let Some(text) = lyrics::cached(&key, source.name(), &dir) {
+    return Ok(text);
+  }
+  let text = lyrics_online::fetch(source, &song).await?;
+  if let Err(e) = lyrics::store(&key, source.name(), &dir, &text) {
+    log::warn!("couldn't cache lyrics: {e}");
+  }
+  Ok(text)
 }
 
 #[tauri::command]
@@ -337,7 +353,7 @@ async fn fetch_cover(lib: State<'_, Lib>, url: String) -> Res<String> {
     return Err("only Cover Art Archive images can be downloaded".into());
   }
   let client = tauri_plugin_http::reqwest::Client::builder()
-    .user_agent("ConfluencePlayer/0.2.0")
+    .user_agent(UA)
     .redirect(tauri_plugin_http::reqwest::redirect::Policy::custom(|a| {
       // CAA redirects to archive.org; nothing else
       if a.url().host_str().is_some_and(|h| h == "archive.org" || h.ends_with(".archive.org")) { a.follow() } else { a.stop() }
@@ -446,8 +462,8 @@ fn watch(app: &AppHandle) {
   }
 }
 
-/// The app was called Sonora, with its data in com.sonora.player: copy the library, settings (kv) and caches
-/// over once. Copies, never moves, so the old install keeps working. The database goes last: once it is
+/// The app was called Confluence Player (com.confluenceplayer.app) and before that Sonora (com.sonora.player):
+/// copy the newest old library, settings (kv) and caches over once. Copies, never moves, so the old install keeps working. The database goes last: once it is
 /// there, the copy is done.
 fn migrate(old: &Path, new: &Path) -> std::io::Result<bool> {
   if new.join("library.db").exists() || !old.join("library.db").exists() {
@@ -487,7 +503,7 @@ mod tests {
   #[test]
   fn copies_the_old_library_once_and_leaves_it_in_place() {
     let d = tempfile::tempdir().unwrap();
-    let (old, new) = (d.path().join("com.sonora.player"), d.path().join("com.confluenceplayer.app"));
+    let (old, new) = (d.path().join("com.sonora.player"), d.path().join("com.qistara.app"));
     std::fs::create_dir_all(old.join("art/sub")).unwrap();
     std::fs::create_dir_all(old.join("EBWebView")).unwrap();
     std::fs::write(old.join("library.db"), b"db").unwrap();
@@ -503,6 +519,20 @@ mod tests {
     assert_eq!(std::fs::read(new.join("library.db")).unwrap(), b"mine");
     // nothing to copy: a fresh install
     assert!(!migrate(&d.path().join("none"), &d.path().join("fresh")).unwrap());
+  }
+
+  #[test]
+  fn takes_the_newest_old_library() {
+    let d = tempfile::tempdir().unwrap();
+    for (n, db) in [("com.confluenceplayer.app", "confluence"), ("com.sonora.player", "sonora")] {
+      std::fs::create_dir_all(d.path().join(n)).unwrap();
+      std::fs::write(d.path().join(n).join("library.db"), db).unwrap();
+    }
+    let new = d.path().join("com.qistara.app");
+    std::fs::create_dir_all(&new).unwrap();
+    let copied: Vec<bool> = OLD_DATA.iter().map(|n| migrate(&d.path().join(n), &new).unwrap()).collect();
+    assert_eq!(copied, [true, false]);
+    assert_eq!(std::fs::read(new.join("library.db")).unwrap(), b"confluence");
   }
 
   #[test]
@@ -542,7 +572,8 @@ pub fn run() {
         )?;
       }
       let dir = app.path().app_local_data_dir()?;
-      if let Some(old) = dir.parent().map(|p| p.join("com.sonora.player")) {
+      // only the newest old library: if copying it fails, the next start tries it again (never an older one)
+      if let Some(old) = OLD_DATA.iter().filter_map(|n| dir.parent().map(|p| p.join(n))).find(|o| o.join("library.db").exists()) {
         match migrate(&old, &dir) {
           Ok(true) => log::info!("copied the library from {}", old.display()),
           Ok(false) => {}
@@ -574,7 +605,7 @@ pub fn run() {
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
-      library, add_folder, remove_folder, cover, art_color, rescan, extensions, screenshot_dir, lyrics, lyrics_store,
+      library, add_folder, remove_folder, cover, art_color, rescan, extensions, screenshot_dir, lyrics, lyrics_fetch,
       playlist_create, playlist_update, playlist_items, playlist_delete, rate, love, played, skipped, top,
       tag_write, fetch_cover, stage_image, read_text, write_playlist, kv_get, kv_set,
       lastfm_status, lastfm_set_keys, lastfm_begin, lastfm_finish, lastfm_logout, lastfm_now_playing, lastfm_scrobble, media_keys::media_track, media_keys::media_state,
@@ -585,7 +616,8 @@ pub fn run() {
       subsonic::subsonic_status, subsonic::subsonic_connect, subsonic::subsonic_logout, subsonic::subsonic_call,
       subsonic::subsonic_stream, subsonic::subsonic_cover, tidal::tidal_status, tidal::tidal_set_client, tidal::tidal_begin,
       tidal::tidal_logout, tidal::tidal_playlists, tidal::tidal_tracks, apple::apple_status, apple::apple_setup, apple::apple_begin,
-      apple::apple_logout, apple::apple_playlists, apple::apple_tracks
+      apple::apple_logout, apple::apple_playlists, apple::apple_tracks, mpv::mpv_init, mpv::mpv_command, mpv::mpv_set,
+      mpv::mpv_ytdl_sign_in
     ])
     .run(tauri::generate_context!())
     .expect("error while building tauri application");

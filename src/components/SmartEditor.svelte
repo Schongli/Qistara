@@ -1,7 +1,6 @@
 <script lang="ts">
   // Smart playlist rules sheet: dims the window and attaches to the top, like a macOS sheet.
-  import Plus from 'phosphor-svelte/lib/Plus'
-  import Minus from 'phosphor-svelte/lib/Minus'
+  import Icon from './Icon.svelte'
   import { FIELDS, OPS, evaluate, type Field, type LimitBy, type Rule, type Rules } from '../lib/smart'
   import { lib } from '../lib/library.svelte'
   import { plural } from '../lib/format'
@@ -71,8 +70,8 @@
           <select bind:value={rule.unit} aria-label="Unit"><option value="days">days</option><option value="weeks">weeks</option><option value="months">months</option></select>
         {/if}
         <span class="sp"></span>
-        <button class="icon-btn" aria-label="Remove rule" onclick={() => r.rules.splice(i, 1)} disabled={r.rules.length === 1}><Minus size={14} weight="bold" /></button>
-        <button class="icon-btn" aria-label="Add rule" onclick={add}><Plus size={14} weight="bold" /></button>
+        <button class="icon-btn" aria-label="Remove rule" onclick={() => r.rules.splice(i, 1)} disabled={r.rules.length === 1}><Icon name="Minus" size={14} weight="bold" /></button>
+        <button class="icon-btn" aria-label="Add rule" onclick={add}><Icon name="Plus" size={14} weight="bold" /></button>
       </div>
     {/each}
   </div>
@@ -100,7 +99,7 @@
   .scrim { position: fixed; inset: 0; z-index: 80; background: var(--sheet-dim); animation: fade 200ms; }
   .sheet {
     position: fixed; z-index: 81; top: 0; left: 50%; width: min(760px, 92vw); transform: translateX(-50%);
-    padding: 20px 22px 18px; border-radius: 0 0 14px 14px; background: var(--bg-2); border: 1px solid var(--sep); border-top: 0;
+    padding: 20px 22px 18px; border-radius: 0 0 var(--r-xl) var(--r-xl); background: var(--bg-2); border: 1px solid var(--sep); border-top: 0;
     box-shadow: var(--shadow-pop); animation: drop 280ms var(--ease-out);
   }
   @keyframes drop { from { transform: translate(-50%, -100%); } }
@@ -108,10 +107,10 @@
   .name { width: 100%; font-size: 20px; font-weight: 650; letter-spacing: -0.015em; border: 0; background: none; outline: none; padding: 2px 0 10px; border-bottom: 1px solid var(--sep); }
   .match, .limit { display: flex; align-items: center; gap: 8px; margin: 14px 0 10px; }
   .rules { display: grid; gap: 6px; max-height: 46vh; overflow-y: auto; }
-  .rule { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; background: var(--fill); }
+  .rule { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--r); background: var(--fill); }
   .sp { flex: 1; }
   select, input:not([type='checkbox']):not(.name) {
-    height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--sep); background: var(--bg); color: var(--text);
+    height: 28px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--sep); background: var(--bg); color: var(--text);
   }
   input[type='number'] { width: 80px; }
   .rule input:not([type='number']) { flex: 1; min-width: 120px; }

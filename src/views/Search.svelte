@@ -20,7 +20,7 @@
 {:else}
   {#if r.artists.length}
     <h2 class="t-h2">Artists</h2>
-    <div class="artists">
+    <div class="artists" data-scroll>
       {#each r.artists as a (a.name)}
         <button class="artist press" onclick={() => nav.go({ name: 'artists', artist: a.name })}>
           <Artwork art={a.art} size="96px" radius="50%" />
@@ -57,7 +57,7 @@
   .artist { display: grid; justify-items: center; gap: 8px; width: 110px; flex: none; }
   .artist span { max-width: 100%; }
   .songs { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 2px 20px; }
-  .song { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-radius: 8px; text-align: left; min-width: 0; }
+  .song { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-radius: var(--r); text-align: left; min-width: 0; }
   .song:hover { background: var(--fill); }
   .txt { flex: 1; min-width: 0; display: grid; }
   .vids { margin-top: 28px; }

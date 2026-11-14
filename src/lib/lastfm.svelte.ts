@@ -51,6 +51,6 @@ export async function finish() {
     lastfm.waiting = false
     lastfm.error = ''
   } catch (e) {
-    lastfm.error = `${e}. Approve Confluence Player on the Last.fm page first, then try again.`
+    lastfm.error = `${e}. Approve Qistara on the Last.fm page first, then try again.`
   }
 }

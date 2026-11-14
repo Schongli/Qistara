@@ -25,7 +25,7 @@
   }
 </script>
 
-<div class="scroll" bind:this={el} bind:clientHeight={height} onscroll={() => (top = el.scrollTop)} style:padding-top="{padTop}px">
+<div class="scroll" data-scroll bind:this={el} bind:clientHeight={height} onscroll={() => (top = el.scrollTop)} style:padding-top="{padTop}px">
   {#if header}<div bind:clientHeight={headH}>{@render header()}</div>{/if}
   <div class="body" style:height="{items.length * rowHeight}px">
     {#each visible as item, i (start + i)}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SOURCES } from '../lib/lyricsources'
   import { Spring } from 'svelte/motion'
   import { mpv, seek } from '../lib/player.svelte'
   import { lyr } from '../lib/lyrics.svelte'
@@ -131,7 +132,7 @@
       <div style:height="{h * 0.6}px"></div>
     </div>
   {/if}
-  {#if data && lyr.source === 'lrclib'}<p class="credit">Lyrics from LRCLIB</p>{/if}
+  {#if data && lyr.source && lyr.source !== 'local'}<p class="credit">Lyrics from {SOURCES[lyr.source].label}</p>{/if}
 </div>
 
 <style>
@@ -142,7 +143,7 @@
   .lyrics.plain { overflow-y: auto; mask-image: none; }
   .inner { will-change: transform; padding: 0 8px; }
   .line {
-    display: block; width: 100%; text-align: left; padding: 10px 12px; margin: 2px 0; border-radius: 12px;
+    display: block; width: 100%; text-align: left; padding: 10px 12px; margin: 2px 0; border-radius: var(--r-lg);
     font-size: clamp(24px, 2.4vw, 42px); line-height: 1.22; font-weight: 750; letter-spacing: -0.022em;
     color: rgba(255, 255, 255, 0.34); filter: blur(calc(var(--d) * 0.55px));
     transform: scale(0.97); transform-origin: left center;
@@ -164,7 +165,7 @@
   .learning .line:not(.on) { color: rgba(255, 255, 255, 0.5); }
   .learning .line:hover { background: none; }
   .words { display: block; }
-  .wd { font: inherit; color: inherit; letter-spacing: inherit; padding: 0 2px; margin: 0 -1px; border-radius: 6px; cursor: pointer; transition: background 120ms; }
+  .wd { font: inherit; color: inherit; letter-spacing: inherit; padding: 0 2px; margin: 0 -1px; border-radius: var(--r-sm); cursor: pointer; transition: background 120ms; }
   .wd:hover { background: rgba(255, 255, 255, 0.12); }
   .wd.sel { background: rgba(255, 255, 255, 0.26); color: #fff; }
   rt { font-size: 0.42em; font-weight: 600; letter-spacing: 0; opacity: 0.85; }

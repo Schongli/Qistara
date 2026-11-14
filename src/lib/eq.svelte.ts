@@ -2,18 +2,19 @@
 import { untrack } from 'svelte'
 import { cmd, mpv, set } from './player.svelte'
 import { afString, FLAT, hasGain, preampOf, type Band, type Eq } from './eq'
-import { kvGet, kvSet } from './persist'
+import { kvLoad, kvSet } from './persist'
 
 export const eq = $state<Eq>(structuredClone(FLAT))
 export const userPresets = $state<Record<string, Band[]>>({})
 const state = $state({ loaded: false })
-Promise.all([kvGet<Eq>('eq'), kvGet<Record<string, Band[]>>('eq.presets')]).then(([e, p]) => {
+Promise.all([kvLoad<Eq>('eq'), kvLoad<Record<string, Band[]>>('eq.presets')]).then(([e, p]) => {
   if (e) Object.assign(eq, e)
   if (p) Object.assign(userPresets, p)
   state.loaded = true
 })
 
 export function savePreset(name: string) {
+  if (!state.loaded) return // the stored presets aren't in yet: saving now would drop them
   userPresets[name] = $state.snapshot(eq.bands)
   kvSet('eq.presets', $state.snapshot(userPresets))
 }

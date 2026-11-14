@@ -5,11 +5,11 @@ out="$(dirname "$0")/../test-media"; mkdir -p "$out"; cd "$out"
 ff() { ffmpeg -hide_banner -loglevel error -y "$@"; }
 
 ff -f lavfi -i "sine=f=440:d=20" -ac 2 -ar 44100 -c:a flac -sample_fmt s16 \
-   -metadata title="Tone 44.1" -metadata artist="Confluence Test" -metadata album="Test Tones" -metadata track=1 tone_44k16.flac
+   -metadata title="Tone 44.1" -metadata artist="Qistara Test" -metadata album="Test Tones" -metadata track=1 tone_44k16.flac
 ff -f lavfi -i "sine=f=1000:d=20" -ac 2 -ar 96000 -c:a flac -sample_fmt s32 -bits_per_raw_sample 24 \
-   -metadata title="Tone 96" -metadata artist="Confluence Test" -metadata album="Test Tones" -metadata track=2 tone_96k24.flac
+   -metadata title="Tone 96" -metadata artist="Qistara Test" -metadata album="Test Tones" -metadata track=2 tone_96k24.flac
 
-printf '1\n00:00:01,000 --> 00:00:04,000\nHello from {\i1}Confluence Player{\i0}\n\n2\n00:00:05,000 --> 00:00:09,000\nSecond subtitle line\n' > subs.srt
+printf '1\n00:00:01,000 --> 00:00:04,000\nHello from {\i1}Qistara{\i0}\n\n2\n00:00:05,000 --> 00:00:09,000\nSecond subtitle line\n' > subs.srt
 printf ';FFMETADATA1\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=5000\ntitle=Opening\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=5000\nEND=12000\ntitle=Ending\n' > chapters.txt
 ff -f lavfi -i "testsrc2=s=1920x1080:r=24:d=12" -f lavfi -i "sine=f=330:d=12" -f lavfi -i "sine=f=660:d=12" -i subs.srt -i chapters.txt \
    -map 0:v -map 1:a -map 2:a -map 3:s -map_metadata 4 -map_chapters 4 \

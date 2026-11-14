@@ -1,18 +1,7 @@
 <script lang="ts">
   import { Spring } from 'svelte/motion'
   import { untrack } from 'svelte'
-  import CaretDown from 'phosphor-svelte/lib/CaretDown'
-  import Play from 'phosphor-svelte/lib/Play'
-  import Pause from 'phosphor-svelte/lib/Pause'
-  import SkipBack from 'phosphor-svelte/lib/SkipBack'
-  import SkipForward from 'phosphor-svelte/lib/SkipForward'
-  import Shuffle from 'phosphor-svelte/lib/Shuffle'
-  import Repeat from 'phosphor-svelte/lib/Repeat'
-  import RepeatOnce from 'phosphor-svelte/lib/RepeatOnce'
-  import SpeakerHigh from 'phosphor-svelte/lib/SpeakerHigh'
-  import Quotes from 'phosphor-svelte/lib/Quotes'
-  import ListBullets from 'phosphor-svelte/lib/ListBullets'
-  import Moon from 'phosphor-svelte/lib/Moon'
+  import Icon from './Icon.svelte'
   import { openMenu } from '../lib/menu.svelte'
   import { setSleep, sleep, sleepLabel } from '../lib/sleep.svelte'
   import Artwork from './Artwork.svelte'
@@ -104,7 +93,7 @@
     <div class="backdrop" aria-hidden="true">
       {#if cover}<img src={cover} alt="" />{/if}
     </div>
-    <button class="close icon-btn press" aria-label="Close Now Playing" onclick={() => (ui.nowPlaying = false)}><CaretDown size={20} weight="bold" /></button>
+    <button class="close icon-btn press" aria-label="Close Now Playing" onclick={() => (ui.nowPlaying = false)}><Icon name="CaretDown" size={20} weight="bold" /></button>
 
     <div class="stage" class:with-side={ui.lyrics || ui.queue}>
       <div class="player">
@@ -124,18 +113,18 @@
           </div>
         </div>
         <div class="transport">
-          <button class="icon-btn press" class:on={queue.shuffle} aria-label="Shuffle" onclick={() => queue.toggleShuffle()}><Shuffle size={18} weight="bold" /></button>
-          <button class="icon-btn press big" aria-label="Previous" onclick={() => queue.prev()}><SkipBack size={30} weight="fill" /></button>
+          <button class="icon-btn press" class:on={queue.shuffle} aria-label="Shuffle" onclick={() => queue.toggleShuffle()}><Icon name="Shuffle" size={18} weight="bold" /></button>
+          <button class="icon-btn press big" aria-label="Previous" onclick={() => queue.prev()}><Icon name="SkipBack" size={30} weight="fill" /></button>
           <button class="icon-btn press big play" aria-label={mpv.pause ? 'Play' : 'Pause'} onclick={togglePause}>
-            {#if mpv.pause}<Play size={42} weight="fill" />{:else}<Pause size={42} weight="fill" />{/if}
+            {#if mpv.pause}<Icon name="Play" size={42} weight="fill" />{:else}<Icon name="Pause" size={42} weight="fill" />{/if}
           </button>
-          <button class="icon-btn press big" aria-label="Next" onclick={() => queue.next()}><SkipForward size={30} weight="fill" /></button>
+          <button class="icon-btn press big" aria-label="Next" onclick={() => queue.next()}><Icon name="SkipForward" size={30} weight="fill" /></button>
           <button class="icon-btn press" class:on={queue.repeat !== 'off'} aria-label="Repeat {queue.repeat}" onclick={() => queue.cycleRepeat()}>
-            {#if queue.repeat === 'one'}<RepeatOnce size={18} weight="bold" />{:else}<Repeat size={18} weight="bold" />{/if}
+            {#if queue.repeat === 'one'}<Icon name="RepeatOnce" size={18} weight="bold" />{:else}<Icon name="Repeat" size={18} weight="bold" />{/if}
           </button>
         </div>
         <div class="bottom">
-          <div class="vol"><SpeakerHigh size={16} /><Slider label="Volume" value={volume()} max={100} live wheel={5} onchange={setVolume} /></div>
+          <div class="vol"><Icon name="SpeakerHigh" size={16} /><Slider label="Volume" value={volume()} max={100} live wheel={5} onchange={setVolume} /></div>
           <button
             class="icon-btn press sleep"
             class:on={sleep.until || sleep.endOfSong}
@@ -146,9 +135,9 @@
               { label: 'End of Current Song', action: () => setSleep('song') },
               ...[15, 30, 45, 60, 90].map((m) => ({ label: `${m} Minutes`, action: () => setSleep(m) })),
             ])}
-          ><Moon size={17} weight={sleep.until || sleep.endOfSong ? 'fill' : 'regular'} />{#if sleepLabel()}<span class="sl">{sleepLabel()}</span>{/if}</button>
-          <button class="icon-btn press" class:on={ui.lyrics} aria-label="Lyrics" onclick={() => { ui.lyrics = !ui.lyrics; ui.queue = false }}><Quotes size={18} weight="fill" /></button>
-          <button class="icon-btn press" class:on={ui.queue} aria-label="Up Next" onclick={() => { ui.queue = !ui.queue; ui.lyrics = false }}><ListBullets size={19} weight="bold" /></button>
+          ><Icon name="Moon" size={17} weight={sleep.until || sleep.endOfSong ? 'fill' : 'regular'} />{#if sleepLabel()}<span class="sl">{sleepLabel()}</span>{/if}</button>
+          <button class="icon-btn press" class:on={ui.lyrics} aria-label="Lyrics" onclick={() => { ui.lyrics = !ui.lyrics; ui.queue = false }}><Icon name="Quotes" size={18} weight="fill" /></button>
+          <button class="icon-btn press" class:on={ui.queue} aria-label="Up Next" onclick={() => { ui.queue = !ui.queue; ui.lyrics = false }}><Icon name="ListBullets" size={19} weight="bold" /></button>
         </div>
       </div>
       {#if ui.queue || ui.lyrics}
@@ -202,7 +191,7 @@
   .vol :global(.track) { background: rgba(255, 255, 255, 0.22); }
   .vol :global(.fill) { background: rgba(255, 255, 255, 0.86); }
 
-  .side-pane { align-self: stretch; width: 100%; max-width: 620px; min-height: 0; border-radius: 14px; }
+  .side-pane { align-self: stretch; width: 100%; max-width: 620px; min-height: 0; border-radius: var(--r-xl); }
   .side-pane.lyrics { height: min(78vh, 720px); align-self: center; padding: 0; }
 
   @media (prefers-reduced-motion: reduce) { .backdrop img { animation: none; } }

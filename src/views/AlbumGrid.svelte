@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Play from 'phosphor-svelte/lib/Play'
+  import Icon from '../components/Icon.svelte'
   import Artwork from '../components/Artwork.svelte'
   import type { Album } from '../lib/library.svelte'
   import { nav } from '../lib/nav.svelte'
@@ -11,14 +11,14 @@
 </script>
 
 {#if title}<h1 class="t-title">{title}</h1>{/if}
-<div class="grid" class:row>
+<div class="grid" class:row data-scroll={row || undefined}>
   {#each albums as a (a.key)}
-    <div class="tile" oncontextmenu={(e) => openMenu(e, trackMenu(a.tracks, a))} role="listitem">
+    <div class="tile" data-key={a.key} oncontextmenu={(e) => openMenu(e, trackMenu(a.tracks, a))} role="listitem">
       <div class="cover">
         <button class="open press" aria-label="Open {a.title}" onclick={() => nav.go({ name: 'album', key: a.key })}>
           <Artwork art={a.art} />
         </button>
-        <button class="play press" aria-label="Play {a.title}" onclick={() => queue.play(a.tracks)}><Play size={16} weight="fill" /></button>
+        <button class="play press" aria-label="Play {a.title}" onclick={() => queue.play(a.tracks)}><Icon name="Play" size={16} weight="fill" /></button>
       </div>
       <button class="name ellipsis" onclick={() => nav.go({ name: 'album', key: a.key })}>{a.title}</button>
       {#if showArtist}

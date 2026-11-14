@@ -21,7 +21,7 @@ export type Control =
 
 /** Liked Songs has no playlist id; this stands in for it. */
 export const LIKED = 'liked'
-const IMPORTS = 'spotifyImports' // Spotify playlist id → Confluence Player playlist id, so importing again updates
+const IMPORTS = 'spotifyImports' // Spotify playlist id → Qistara playlist id, so importing again updates
 
 export const spotify = $state({
   configured: false,
@@ -96,7 +96,7 @@ export async function loadPlaylists() {
   }
 }
 
-/** Copies one playlist (or Liked Songs) into Confluence Player as a playlist of your matching files. */
+/** Copies one playlist (or Liked Songs) into Qistara as a playlist of your matching files. */
 export async function importPlaylist(id: string, name: string) {
   spotify.importing = id
   try {
@@ -128,7 +128,7 @@ export function watchPlayer() {
 }
 
 export async function control(action: Control) {
-  // in Bit-Perfect mode Confluence Player holds the audio device alone, so Spotify on this PC couldn't play over it
+  // in Bit-Perfect mode Qistara holds the audio device alone, so Spotify on this PC couldn't play over it
   if (action.kind === 'play' && queue.current && !mpv.pause) await togglePause()
   const p = spotify.player
   if (p && (action.kind === 'play' || action.kind === 'pause')) p.playing = action.kind === 'play' // answer the click at once

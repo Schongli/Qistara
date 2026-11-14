@@ -1,7 +1,7 @@
 // MusicBrainz release lookup (1 request per second, per their rules) and Cover Art Archive URLs.
 import { fetch } from '@tauri-apps/plugin-http'
 
-const UA = 'ConfluencePlayer/0.2.0' // identifies the app only; no personal data
+import { UA } from './ua'
 let last = 0
 
 async function get<T>(path: string): Promise<T> {

@@ -1,8 +1,6 @@
 <script lang="ts">
   // The bar over the library: back and forward, and search. The window's caption buttons live in App.
-  import CaretLeft from 'phosphor-svelte/lib/CaretLeft'
-  import CaretRight from 'phosphor-svelte/lib/CaretRight'
-  import MagnifyingGlass from 'phosphor-svelte/lib/MagnifyingGlass'
+  import Icon from './Icon.svelte'
   import { nav, ui } from '../lib/nav.svelte'
 
   // caps: leave room for the caption buttons when nothing is docked to the right
@@ -15,11 +13,11 @@
 
 <header class="bar" class:caps data-tauri-drag-region>
   <div class="hist" data-tauri-drag-region>
-    <button class="icon-btn press" aria-label="Back" disabled={!nav.canBack} onclick={() => nav.back()}><CaretLeft size={17} weight="bold" /></button>
-    <button class="icon-btn press" aria-label="Forward" disabled={!nav.canForward} onclick={() => nav.forward()}><CaretRight size={17} weight="bold" /></button>
+    <button class="icon-btn press" aria-label="Back" disabled={!nav.canBack} onclick={() => nav.back()}><Icon name="CaretLeft" size={17} weight="bold" /></button>
+    <button class="icon-btn press" aria-label="Forward" disabled={!nav.canForward} onclick={() => nav.forward()}><Icon name="CaretRight" size={17} weight="bold" /></button>
   </div>
   <label class="search">
-    <MagnifyingGlass size={15} weight="bold" />
+    <Icon name="MagnifyingGlass" size={15} weight="bold" />
     <input
       bind:this={input}
       bind:value={nav.query}
@@ -37,7 +35,7 @@
   .bar {
     position: absolute; z-index: 10; inset: 0 0 auto 0; height: var(--bar-h);
     display: grid; grid-template-columns: 1fr minmax(240px, 440px) 1fr; align-items: center; gap: 12px;
-    padding: 0 14px; background: var(--bar); backdrop-filter: blur(30px) saturate(180%);
+    padding: 0 14px; background: var(--bar); backdrop-filter: var(--blur);
   }
   .bar.caps { padding-right: 146px; }
   .hist { display: flex; gap: 2px; }
@@ -49,7 +47,7 @@
   .search:focus-within { box-shadow: 0 0 0 2px var(--accent); background: var(--bg); }
   input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--text); }
   input::placeholder { color: var(--text-2); }
-  kbd { font: 600 10px var(--font); color: var(--text-3); border: 1px solid var(--sep); border-radius: 4px; padding: 1px 4px; }
+  kbd { font: 600 10px var(--font); color: var(--text-3); border: 1px solid var(--sep); border-radius: var(--r-xs); padding: 1px 4px; }
   .search:focus-within kbd { display: none; }
   @media (prefers-reduced-transparency: reduce) { .bar { backdrop-filter: none; } }
 </style>

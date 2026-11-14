@@ -1,23 +1,10 @@
 <script lang="ts">
   // The player along the bottom: what's playing, transport and progress, then the panes and volume.
-  import Play from 'phosphor-svelte/lib/Play'
-  import Pause from 'phosphor-svelte/lib/Pause'
-  import SkipBack from 'phosphor-svelte/lib/SkipBack'
-  import SkipForward from 'phosphor-svelte/lib/SkipForward'
-  import Shuffle from 'phosphor-svelte/lib/Shuffle'
-  import Repeat from 'phosphor-svelte/lib/Repeat'
-  import RepeatOnce from 'phosphor-svelte/lib/RepeatOnce'
-  import SpeakerHigh from 'phosphor-svelte/lib/SpeakerHigh'
-  import SpeakerNone from 'phosphor-svelte/lib/SpeakerNone'
-  import Quotes from 'phosphor-svelte/lib/Quotes'
-  import ListBullets from 'phosphor-svelte/lib/ListBullets'
-  import SlidersHorizontal from 'phosphor-svelte/lib/SlidersHorizontal'
-  import PictureInPicture from 'phosphor-svelte/lib/PictureInPicture'
-  import ArrowsOutSimple from 'phosphor-svelte/lib/ArrowsOutSimple'
-  import Heart from 'phosphor-svelte/lib/Heart'
+  import Icon from './Icon.svelte'
   import Artwork from './Artwork.svelte'
   import Slider from './Slider.svelte'
   import SignalPath from './SignalPath.svelte'
+  import { signal } from '../lib/signal.svelte'
   import { enterMini } from '../lib/mini'
   import { eq } from '../lib/eq.svelte'
   import { mpv, seek, togglePause } from '../lib/player.svelte'
@@ -53,7 +40,7 @@
       </div>
       {#if t.id > 0}
         <button class="icon-btn press love" class:on={loved} aria-label={loved ? 'Unlove' : 'Love'} aria-pressed={loved} onclick={() => love(lib.byId.get(t.id) ?? t)}>
-          <Heart size={16} weight={loved ? 'fill' : 'regular'} />
+          <Icon name="Heart" size={16} weight={loved ? 'fill' : 'regular'} />
         </button>
       {/if}
     {/if}
@@ -61,14 +48,14 @@
 
   <div class="center">
     <div class="transport">
-      <button class="icon-btn press" class:on={queue.shuffle} aria-label="Shuffle" aria-pressed={queue.shuffle} onclick={() => queue.toggleShuffle()}><Shuffle size={16} weight="bold" /></button>
-      <button class="icon-btn press" aria-label="Previous" onclick={() => queue.prev()} disabled={!t}><SkipBack size={18} weight="fill" /></button>
+      <button class="icon-btn press" class:on={queue.shuffle} aria-label="Shuffle" aria-pressed={queue.shuffle} onclick={() => queue.toggleShuffle()}><Icon name="Shuffle" size={16} weight="bold" /></button>
+      <button class="icon-btn press" aria-label="Previous" onclick={() => queue.prev()} disabled={!t}><Icon name="SkipBack" size={18} weight="fill" /></button>
       <button class="play press" aria-label={mpv.pause || !t ? 'Play' : 'Pause'} onclick={togglePause} disabled={!t}>
-        {#if mpv.pause || !t}<Play size={18} weight="fill" />{:else}<Pause size={18} weight="fill" />{/if}
+        {#if mpv.pause || !t}<Icon name="Play" size={18} weight="fill" />{:else}<Icon name="Pause" size={18} weight="fill" />{/if}
       </button>
-      <button class="icon-btn press" aria-label="Next" onclick={() => queue.next()} disabled={!t}><SkipForward size={18} weight="fill" /></button>
+      <button class="icon-btn press" aria-label="Next" onclick={() => queue.next()} disabled={!t}><Icon name="SkipForward" size={18} weight="fill" /></button>
       <button class="icon-btn press" class:on={queue.repeat !== 'off'} aria-label="Repeat {queue.repeat}" onclick={() => queue.cycleRepeat()}>
-        {#if queue.repeat === 'one'}<RepeatOnce size={16} weight="bold" />{:else}<Repeat size={16} weight="bold" />{/if}
+        {#if queue.repeat === 'one'}<Icon name="RepeatOnce" size={16} weight="bold" />{:else}<Icon name="Repeat" size={16} weight="bold" />{/if}
       </button>
     </div>
     <div class="scrub" class:hidden={!t || live}>
@@ -80,17 +67,17 @@
 
   <div class="right">
     {#if t}
-      <button bind:this={badge} class="badge sig" aria-label="Signal path" aria-expanded={signalOpen} title={q?.detail} onclick={() => (signalOpen = !signalOpen)}>{q?.badge ?? (t.codec || 'Info')}</button>
+      <button bind:this={badge} class="badge sig" class:pure={signal.verdict.bitPerfect} aria-label={signal.verdict.bitPerfect ? 'Signal path: bit-perfect' : 'Signal path'} aria-expanded={signalOpen} title={q?.detail} onclick={() => (signalOpen = !signalOpen)}>{q?.badge ?? (t.codec || 'Info')}</button>
     {/if}
-    <button class="icon-btn press" class:on={ui.panel === 'lyrics'} aria-label="Lyrics" aria-pressed={ui.panel === 'lyrics'} onclick={() => toggle('lyrics')}><Quotes size={17} weight="fill" /></button>
-    <button class="icon-btn press" class:on={ui.panel === 'queue'} aria-label="Up Next" aria-pressed={ui.panel === 'queue'} onclick={() => toggle('queue')}><ListBullets size={18} weight="bold" /></button>
-    <button class="icon-btn press" class:on={eq.enabled} aria-label="Equalizer" title="Equalizer" onclick={() => nav.root({ name: 'eq' })}><SlidersHorizontal size={17} weight="bold" /></button>
+    <button class="icon-btn press" class:on={ui.panel === 'lyrics'} aria-label="Lyrics" aria-pressed={ui.panel === 'lyrics'} onclick={() => toggle('lyrics')}><Icon name="Quotes" size={17} weight="fill" /></button>
+    <button class="icon-btn press" class:on={ui.panel === 'queue'} aria-label="Up Next" aria-pressed={ui.panel === 'queue'} onclick={() => toggle('queue')}><Icon name="ListBullets" size={18} weight="bold" /></button>
+    <button class="icon-btn press" class:on={eq.enabled} aria-label="Equalizer" title="Equalizer" onclick={() => nav.root({ name: 'eq' })}><Icon name="SlidersHorizontal" size={17} weight="bold" /></button>
     <div class="vol">
-      {#if vol === 0}<SpeakerNone size={16} />{:else}<SpeakerHigh size={16} />{/if}
+      {#if vol === 0}<Icon name="SpeakerNone" size={16} />{:else}<Icon name="SpeakerHigh" size={16} />{/if}
       <Slider label="Volume" value={vol} max={100} live wheel={5} onchange={setVolume} />
     </div>
-    <button class="icon-btn press" aria-label="MiniPlayer" title="MiniPlayer (Ctrl+Shift+M)" onclick={enterMini}><PictureInPicture size={17} /></button>
-    <button class="icon-btn press" aria-label="Open Now Playing" title="Now Playing" onclick={() => (ui.nowPlaying = true)} disabled={!t}><ArrowsOutSimple size={16} weight="bold" /></button>
+    <button class="icon-btn press" aria-label="MiniPlayer" title="MiniPlayer (Ctrl+Shift+M)" onclick={enterMini}><Icon name="PictureInPicture" size={17} /></button>
+    <button class="icon-btn press" aria-label="Open Now Playing" title="Now Playing" onclick={() => (ui.nowPlaying = true)} disabled={!t}><Icon name="ArrowsOutSimple" size={16} weight="bold" /></button>
   </div>
 </footer>
 <SignalPath bind:open={signalOpen} anchor={badge} />
@@ -98,11 +85,11 @@
 <style>
   .player {
     flex: none; height: var(--player-h); display: grid; grid-template-columns: minmax(180px, 1fr) minmax(300px, 600px) minmax(180px, 1fr);
-    align-items: center; gap: 16px; padding: 0 14px; background: var(--bar); backdrop-filter: blur(30px) saturate(180%);
+    align-items: center; gap: 16px; padding: 0 14px; background: var(--bar); backdrop-filter: var(--blur);
     border-top: 1px solid var(--sep);
   }
   .now { display: flex; align-items: center; gap: 12px; min-width: 0; }
-  .cover { flex: none; border-radius: 6px; }
+  .cover { flex: none; border-radius: var(--r-sm); }
   .meta { min-width: 0; display: grid; }
   .title { font-weight: 600; text-align: left; }
   .title:not(:disabled):hover { text-decoration: underline; text-underline-offset: 2px; }
@@ -123,6 +110,7 @@
   .right { display: flex; align-items: center; justify-content: flex-end; gap: 2px; min-width: 0; }
   .sig { margin-right: 6px; }
   .sig:hover, .sig[aria-expanded='true'] { color: var(--text); border-color: var(--text-3); }
+  .sig.pure { color: var(--signal-pure); border-color: color-mix(in srgb, var(--signal-pure) 45%, transparent); }
   .vol { display: flex; align-items: center; gap: 7px; flex: 0 1 110px; min-width: 64px; margin: 0 6px; color: var(--text-2); }
   .vol :global(.slider) { flex: 1; }
   @media (max-width: 1100px) { .sig { display: none; } }

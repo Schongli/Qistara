@@ -3,7 +3,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { remoteTrack } from './radio.svelte'
 import { ytCookies } from './downloads.svelte'
-import { mpv, set } from './player.svelte'
+import { mpv } from './player.svelte'
 import { settings } from './settings.svelte'
 import type { Track } from './library.svelte'
 
@@ -35,19 +35,11 @@ export const lookUp = (text: string) =>
   /^https?:\/\//i.test(text.trim()) ? run('From your link', 'youtube_list', { url: text.trim() }) : run(`Results for “${text.trim()}”`, 'youtube_search', { query: text })
 export const likedMusic = () => run('Liked Music', 'youtube_list', { url: 'liked' })
 
-// mpv's length-prefixed quoting, so commas or '=' in a path can't split the option list
-const quote = (s: string) => `%${new TextEncoder().encode(s).length}%${s}`
-
-// the same sign-in for playback as for search and downloads
+// the same sign-in for playback as for search and downloads: mpv.rs sets the hook's yt-dlp options
 $effect.root(() => {
   $effect(() => {
     const c = settings.ytCookies
     if (!mpv.ready) return
-    // a cookies file reaches yt-dlp as a checked copy (ytdlp.rs cookie_file), which it may write back to
-    const file = c && c !== 'firefox' ? invoke<string>('youtube_cookies', { path: c }).catch(() => '') : Promise.resolve('')
-    file.then((copy) => {
-      const raw = ['js-runtimes=node', c === 'firefox' ? 'cookies-from-browser=firefox' : copy ? `cookies=${quote(copy)}` : ''].filter(Boolean).join(',')
-      set('ytdl-raw-options', raw)
-    })
+    invoke('mpv_ytdl_sign_in', { cookies: c }).catch((e) => console.warn('YouTube playback sign-in:', e))
   })
 })

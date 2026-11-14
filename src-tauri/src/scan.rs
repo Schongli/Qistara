@@ -42,7 +42,7 @@ pub fn kind_of(p: &Path) -> Option<&'static str> {
 
 /// The tag editor's in-flight copies (tags.rs); ".sonora-tmp." is what the app wrote under its old name.
 fn is_tag_tmp(name: &str) -> bool {
-    name.contains(".confluence-tmp.") || name.contains(".sonora-tmp.")
+    name.contains(".qistara-tmp.") || name.contains(".confluence-tmp.") || name.contains(".sonora-tmp.")
 }
 
 pub fn now() -> i64 {

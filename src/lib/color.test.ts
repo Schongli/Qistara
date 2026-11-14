@@ -9,7 +9,8 @@ describe('accent colours', () => {
 
   it('keeps a readable accent as it is', () => {
     expect(readableAccent('#0a7f6f', '#ffffff')).toBe('#0a7f6f')
-    expect(readableAccent('#2cc4a9', '#1e1e1f')).toBe('#2cc4a9')
+    expect(readableAccent('#e5a93c', '#111318')).toBe('#e5a93c')
+    expect(readableAccent('#8f5e0e', '#ffffff')).toBe('#8f5e0e')
   })
 
   it('darkens a pale accent on a light page and lightens a dark one on a dark page', () => {
@@ -25,7 +26,7 @@ describe('accent colours', () => {
   })
 
   it('picks the button text that reads best', () => {
-    expect(onAccent('#0a7f6f')).toBe('#ffffff')
-    expect(onAccent('#2cc4a9')).toBe('#04231e')
+    expect(onAccent('#8f5e0e')).toBe('#ffffff')
+    expect(onAccent('#e5a93c')).toBe('#111318')
   })
 })

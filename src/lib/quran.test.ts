@@ -80,7 +80,7 @@ describe('quran detection', () => {
   })
 })
 
-// Alafasy's Al-Fatihah (mushaf 1445 H, Hafs): the pauses Confluence Player finds in the real file, and quran.com's
+// Alafasy's Al-Fatihah (mushaf 1445 H, Hafs): the pauses Qistara finds in the real file, and quran.com's
 // murattal verse lengths as the template. Isti'adha, then 7 ayahs (the basmala is ayah 1).
 const FATIHA_PAUSES: Pause[] = [[6.24, 7.12], [13.86, 15.06], [20.76, 21.46], [26.44, 27.02], [32.46, 33.06], [40.76, 41.52], [48.4, 49.1], [66.82, 73.6]]
 const FATIHA_MURATTAL = [6.09, 5.59, 4.62, 4.65, 6.71, 5.59, 13.25]

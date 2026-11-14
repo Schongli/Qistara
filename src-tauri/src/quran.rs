@@ -13,7 +13,7 @@ use tauri::{AppHandle, Manager};
 const QURAN_COM: &str = "https://api.quran.com/api/v4";
 // GitHub raw, not jsDelivr: jsDelivr refuses uncached files of this repo (over its 50 MB package limit)
 const EDITIONS: &str = "https://raw.githubusercontent.com/fawazahmed0/quran-api/1/editions";
-const UA: &str = "ConfluencePlayer/0.2.0"; // identifies the app only; no personal data
+use crate::UA;
 /// Mishary Rashid Alafasy (murattal) on quran.com: the pacing template for ayah sync.
 const ALAFASY: u32 = 7;
 

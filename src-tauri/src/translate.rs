@@ -45,7 +45,7 @@ pub async fn google_translate(text: String, from: String, to: String, dictionary
     let r = http1_client()?
         .post(ENDPOINT)
         .query(&query(&from, &to, dictionary))
-        .header("User-Agent", "ConfluencePlayer/0.2.0") // identifies the app only; no personal data
+        .header("User-Agent", crate::UA)
         .form(&[("q", text.as_str())])
         .send()
         .await

@@ -1,6 +1,11 @@
+<script lang="ts" module>
+  type Col = 'title' | 'artist' | 'album' | 'duration' | 'addedAt'
+  // kept across visits, like the rest of the view's place
+  let sort = $state<{ col: Col; desc: boolean }>({ col: 'title', desc: false })
+</script>
+
 <script lang="ts">
-  import CaretUp from 'phosphor-svelte/lib/CaretUp'
-  import CaretDown from 'phosphor-svelte/lib/CaretDown'
+  import Icon from '../components/Icon.svelte'
   import VirtualList from '../components/VirtualList.svelte'
   import Artwork from '../components/Artwork.svelte'
   import Playing from '../components/Playing.svelte'
@@ -11,8 +16,6 @@
   import { openMenu, trackMenu } from '../lib/menu.svelte'
   import { byName, collator, plural, quality, time } from '../lib/format'
 
-  type Col = 'title' | 'artist' | 'album' | 'duration' | 'addedAt'
-  let sort = $state<{ col: Col; desc: boolean }>({ col: 'title', desc: false })
   const cmp: Record<Col, (a: Track, b: Track) => number> = {
     title: (a, b) => collator.compare(a.title, b.title),
     artist: (a, b) => byName(a.artist, b.artist) || collator.compare(a.album, b.album) || (a.track ?? 0) - (b.track ?? 0),
@@ -38,7 +41,7 @@
           <span class="col {c}" role="columnheader" aria-sort={sort.col === c ? (sort.desc ? 'descending' : 'ascending') : 'none'}>
             <button onclick={() => setSort(c)}>
               {label}
-              {#if sort.col === c}{#if sort.desc}<CaretDown size={10} weight="bold" />{:else}<CaretUp size={10} weight="bold" />{/if}{/if}
+              {#if sort.col === c}{#if sort.desc}<Icon name="CaretDown" size={10} weight="bold" />{:else}<Icon name="CaretUp" size={10} weight="bold" />{/if}{/if}
             </button>
           </span>
         {/each}
@@ -83,7 +86,7 @@
   .col { display: flex; }
   .col button { display: flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; color: var(--text-2); }
   .col.duration, .duration { justify-content: flex-end; text-align: right; }
-  .row { height: calc(36px * var(--density)); border-radius: 6px; }
+  .row { height: calc(36px * var(--density)); border-radius: var(--r-sm); }
   .row.odd { background: var(--fill); }
   .row:hover { background: var(--fill-2); }
   .row.sel { background: var(--accent); color: var(--on-accent); }

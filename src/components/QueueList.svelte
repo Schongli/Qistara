@@ -1,7 +1,5 @@
 <script lang="ts">
-  import X from 'phosphor-svelte/lib/X'
-  import DotsSixVertical from 'phosphor-svelte/lib/DotsSixVertical'
-  import InfinityIcon from 'phosphor-svelte/lib/Infinity'
+  import Icon from './Icon.svelte'
   import Artwork from './Artwork.svelte'
   import Playing from './Playing.svelte'
   import { queue } from '../lib/queue.svelte'
@@ -28,7 +26,7 @@
     <span>Up Next {#if queue.shuffle}<span class="sub">· Shuffled</span>{/if}</span>
     <span class="acts">
       <button class="auto" class:on={queue.autoplay} aria-pressed={queue.autoplay} title="Autoplay: keep playing similar songs when Up Next ends" onclick={() => queue.toggleAutoplay()}>
-        <InfinityIcon size={14} weight="bold" /> Autoplay
+        <Icon name="Infinity" size={14} weight="bold" /> Autoplay
       </button>
       {#if queue.upNext.length}<button class="clear" onclick={() => queue.clearUpNext()}>Clear</button>{/if}
     </span>
@@ -48,10 +46,10 @@
       ondblclick={() => queue.jump(at)}
       oncontextmenu={(e) => openMenu(e, trackMenu([t]))}
     >
-      <span class="grip"><DotsSixVertical size={14} weight="bold" /></span>
+      <span class="grip"><Icon name="DotsSixVertical" size={14} weight="bold" /></span>
       <Artwork art={t.art} size="40px" radius="4px" shadow={false} />
       <span class="txt"><span class="ellipsis">{t.title}</span><span class="sub ellipsis">{t.artist}</span></span>
-      <button class="rm" aria-label="Remove {t.title}" onclick={() => queue.remove(at)}><X size={12} weight="bold" /></button>
+      <button class="rm" aria-label="Remove {t.title}" onclick={() => queue.remove(at)}><Icon name="X" size={12} weight="bold" /></button>
     </div>
   {:else}
     <p class="sub empty">{queue.current ? 'Nothing up next. Use Play Next or Play Later on any song or album.' : 'Play something to fill Up Next.'}</p>
@@ -66,7 +64,7 @@
   .acts { display: flex; align-items: center; gap: 12px; }
   .auto { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 11px; font-size: 11.5px; font-weight: 600; color: var(--text-2); background: var(--fill); }
   .auto.on { color: var(--on-accent); background: var(--accent); }
-  .item { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; min-width: 0; border-top: 2px solid transparent; }
+  .item { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--r); min-width: 0; border-top: 2px solid transparent; }
   .item:hover { background: var(--fill); }
   .item.over { border-top-color: var(--accent); }
   .txt { flex: 1; min-width: 0; display: grid; line-height: 17px; }

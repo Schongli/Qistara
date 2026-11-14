@@ -77,7 +77,7 @@ pub fn checksum_for(sums: &str, name: &str) -> Option<String> {
 fn release_client() -> Result<tauri_plugin_http::reqwest::Client, String> {
     use tauri_plugin_http::reqwest::{redirect::Policy, Client};
     Client::builder()
-        .user_agent(concat!("ConfluencePlayer/", env!("CARGO_PKG_VERSION")))
+        .user_agent(crate::UA)
         .redirect(Policy::custom(|a| if a.url().scheme() == "https" && a.url().host_str().is_some_and(|h| RELEASE_HOSTS.contains(&h)) { a.follow() } else { a.stop() }))
         .build()
         .map_err(|e| e.to_string())

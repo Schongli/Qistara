@@ -1,6 +1,5 @@
 <script lang="ts">
-  import FilmStrip from 'phosphor-svelte/lib/FilmStrip'
-  import Play from 'phosphor-svelte/lib/Play'
+  import Icon from '../components/Icon.svelte'
   import { lib, type Track } from '../lib/library.svelte'
   import { queue } from '../lib/queue.svelte'
   import { openMenu, trackMenu } from '../lib/menu.svelte'
@@ -18,8 +17,8 @@
   {#each videos as v, i (v.id)}
     <button class="tile press" onclick={() => queue.play(videos, i)} oncontextmenu={(e) => openMenu(e, trackMenu([v]))}>
       <div class="frame">
-        <FilmStrip size={34} weight="light" />
-        <span class="play"><Play size={16} weight="fill" /></span>
+        <Icon name="FilmStrip" size={34} weight="light" />
+        <span class="play"><Icon name="Play" size={16} weight="fill" /></span>
         {#if v.duration}<span class="dur">{time(v.duration)}</span>{/if}
       </div>
       <div class="name ellipsis">{v.title}</div>
@@ -42,6 +41,6 @@
     color: #fff; background: rgba(0, 0, 0, 0.45); opacity: 0; transition: opacity 140ms;
   }
   .tile:hover .play { opacity: 1; }
-  .dur { position: absolute; right: 8px; bottom: 8px; font-size: 11px; padding: 1px 5px; border-radius: 4px; background: rgba(0, 0, 0, 0.55); color: #fff; font-variant-numeric: tabular-nums; }
+  .dur { position: absolute; right: 8px; bottom: 8px; font-size: 11px; padding: 1px 5px; border-radius: var(--r-xs); background: rgba(0, 0, 0, 0.55); color: #fff; font-variant-numeric: tabular-nums; }
   .name { font-weight: 550; }
 </style>

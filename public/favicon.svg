@@ -1,16 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <!-- Confluence Player: two streams meeting and flowing on as one -->
+  <!-- Qistara: the pivot Q. A brass ring (the balance), a 45° tail breaking out of it, a pivot dot at the centre -->
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#16B39A"/>
-      <stop offset="0.55" stop-color="#0B7F80"/>
-      <stop offset="1" stop-color="#0A3B5E"/>
-    </linearGradient>
+    <mask id="cut"><rect width="1024" height="1024" fill="#fff"/><path d="M631.9 631.9L728.1 728.1" stroke="#000" stroke-width="156"/></mask>
   </defs>
-  <rect width="1024" height="1024" rx="228" fill="url(#bg)"/>
-  <g fill="none" stroke-linecap="round" stroke-width="96">
-    <path d="M236 706 C 430 706, 450 512, 640 512" stroke="#A7EBDD"/>
-    <path d="M236 318 C 430 318, 450 512, 640 512" stroke="#fff"/>
-    <path d="M600 512 H 792" stroke="#fff"/>
-  </g>
+  <rect width="1024" height="1024" rx="228" fill="#111318"/>
+  <rect x="4" y="4" width="1016" height="1016" rx="224" fill="none" stroke="#252934" stroke-width="8"/>
+  <circle cx="482" cy="482" r="280" fill="none" stroke="#E5A93C" stroke-width="96" mask="url(#cut)"/>
+  <path d="M650.3 582.4L862.4 794.5L862.4 808.7L808.7 862.4L794.5 862.4L582.4 650.3Z" fill="#E5A93C"/>
+  <circle cx="482" cy="482" r="77" fill="#F3D078"/>
 </svg>

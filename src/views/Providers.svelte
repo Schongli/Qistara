@@ -3,21 +3,17 @@
   // imported. Each one signs in or out here.
   import { open } from '@tauri-apps/plugin-dialog'
   import { openUrl } from '@tauri-apps/plugin-opener'
-  import FolderSimple from 'phosphor-svelte/lib/FolderSimple'
-  import YoutubeLogo from 'phosphor-svelte/lib/YoutubeLogo'
-  import SpotifyLogo from 'phosphor-svelte/lib/SpotifyLogo'
-  import HardDrives from 'phosphor-svelte/lib/HardDrives'
+  import Icon from '../components/Icon.svelte'
   import { server, signIn as serverSignIn, signOut as serverSignOut } from '../lib/subsonic.svelte'
-  import AppleLogo from 'phosphor-svelte/lib/AppleLogo'
-  import Waves from 'phosphor-svelte/lib/Waves'
   import { apple, tidal } from '../lib/services.svelte'
-  import CaretDown from 'phosphor-svelte/lib/CaretDown'
   import { lib } from '../lib/library.svelte'
   import { nav } from '../lib/nav.svelte'
   import { settings } from '../lib/settings.svelte'
   import { plural } from '../lib/format'
   import { connect as connectSpotify, disconnect, setClient, spotify } from '../lib/spotify.svelte'
 
+  // embedded: shown as the Providers tab in Settings
+  let { embedded = false }: { embedded?: boolean } = $props()
   let openId = $state('')
   const toggle = (id: string) => (openId = openId === id ? '' : id)
   let clientId = $state('')
@@ -43,15 +39,15 @@
   }
 </script>
 
-<h1 class="t-title">Providers</h1>
+{#if !embedded}<h1 class="t-title">Providers</h1>{/if}
 <p class="t-sub lede">Your own files always play bit-perfect. Your server and YouTube play here too; Spotify, Apple Music and Tidal lend their playlists, matched to the files you have.</p>
 
 <div class="list">
   <section class="prov">
     <button class="top press" aria-expanded={openId === 'local'} onclick={() => toggle('local')}>
-      <span class="ic"><FolderSimple size={20} /></span>
+      <span class="ic"><Icon name="FolderSimple" size={20} /></span>
       <span class="name">Local music<span class="t-sub">{plural(lib.folders.length, 'folder')} · {plural(lib.tracks.length, 'file')}</span></span>
-      <span class="state on">In use</span><span class="caret" class:open={openId === 'local'}><CaretDown size={12} weight="bold" /></span>
+      <span class="state on">In use</span><span class="caret" class:open={openId === 'local'}><Icon name="CaretDown" size={12} weight="bold" /></span>
     </button>
     {#if openId === 'local'}
       <div class="body">
@@ -63,9 +59,9 @@
 
   <section class="prov">
     <button class="top press" aria-expanded={openId === 'youtube'} onclick={() => toggle('youtube')}>
-      <span class="ic"><YoutubeLogo size={20} /></span>
+      <span class="ic"><Icon name="YoutubeLogo" size={20} /></span>
       <span class="name">YouTube<span class="t-sub">Search, play and download, through yt-dlp</span></span>
-      <span class="state" class:on={!!settings.ytCookies}>{ytStatus}</span><span class="caret" class:open={openId === 'youtube'}><CaretDown size={12} weight="bold" /></span>
+      <span class="state" class:on={!!settings.ytCookies}>{ytStatus}</span><span class="caret" class:open={openId === 'youtube'}><Icon name="CaretDown" size={12} weight="bold" /></span>
     </button>
     {#if openId === 'youtube'}
       <div class="body">
@@ -82,9 +78,9 @@
 
   <section class="prov">
     <button class="top press" aria-expanded={openId === 'server'} onclick={() => toggle('server')}>
-      <span class="ic"><HardDrives size={20} /></span>
+      <span class="ic"><Icon name="HardDrives" size={20} /></span>
       <span class="name">Navidrome / Subsonic<span class="t-sub">Stream your own music server, lossless included</span></span>
-      <span class="state" class:on={!!server.account}>{server.account ? `${server.account.user} on ${server.account.server.replace(/^https?:\/\//, '')}` : 'Sign in'}</span><span class="caret" class:open={openId === 'server'}><CaretDown size={12} weight="bold" /></span>
+      <span class="state" class:on={!!server.account}>{server.account ? `${server.account.user} on ${server.account.server.replace(/^https?:\/\//, '')}` : 'Sign in'}</span><span class="caret" class:open={openId === 'server'}><Icon name="CaretDown" size={12} weight="bold" /></span>
     </button>
     {#if openId === 'server'}
       <div class="body">
@@ -109,9 +105,9 @@
 
   <section class="prov">
     <button class="top press" aria-expanded={openId === 'spotify'} onclick={() => toggle('spotify')}>
-      <span class="ic"><SpotifyLogo size={20} /></span>
+      <span class="ic"><Icon name="SpotifyLogo" size={20} /></span>
       <span class="name">Spotify<span class="t-sub">Import playlists, control the Spotify app</span></span>
-      <span class="state" class:on={!!spotify.user}>{spotify.user ? `Signed in as ${spotify.user}` : 'Sign in'}</span><span class="caret" class:open={openId === 'spotify'}><CaretDown size={12} weight="bold" /></span>
+      <span class="state" class:on={!!spotify.user}>{spotify.user ? `Signed in as ${spotify.user}` : 'Sign in'}</span><span class="caret" class:open={openId === 'spotify'}><Icon name="CaretDown" size={12} weight="bold" /></span>
     </button>
     {#if openId === 'spotify'}
       <div class="body">
@@ -120,10 +116,10 @@
             <button class="btn press" onclick={() => nav.root({ name: 'spotify' })}>Open Spotify</button>
             <button class="btn press" onclick={() => disconnect()}>Sign Out</button>
           </div>
-          <p class="t-sub">Signing out deletes Confluence Player's access. To remove it on Spotify's side too, use
+          <p class="t-sub">Signing out deletes Qistara's access. To remove it on Spotify's side too, use
             <button class="link" onclick={() => openUrl('https://www.spotify.com/account/apps/')}>spotify.com/account/apps</button>.</p>
         {:else if spotify.configured}
-          <p class="t-sub">Approve Confluence Player in the browser window that opens. It never sees your Spotify password.</p>
+          <p class="t-sub">Approve Qistara in the browser window that opens. It never sees your Spotify password.</p>
           <div class="actions">
             <button class="btn primary press" onclick={connectSpotify} disabled={spotify.waiting}>{spotify.waiting ? 'Waiting for your browser…' : 'Sign In to Spotify…'}</button>
             <button class="btn press" onclick={() => disconnect(true)}>Use a Different Client ID</button>
@@ -132,7 +128,7 @@
           <p class="t-sub">Spotify needs your own free developer app (your account must have Premium):</p>
           <ol class="steps t-sub">
             <li>Open the <button class="link" onclick={() => openUrl('https://developer.spotify.com/dashboard')}>Spotify Developer Dashboard</button> and choose <b>Create app</b>.</li>
-            <li>Name it Confluence Player, add the Redirect URI <code>http://127.0.0.1/callback</code> and tick <b>Web API</b>.</li>
+            <li>Name it Qistara, add the Redirect URI <code>http://127.0.0.1/callback</code> and tick <b>Web API</b>.</li>
             <li>Copy the app's <b>Client ID</b> and paste it below. No client secret is needed.</li>
           </ol>
           <div class="keys">
@@ -146,9 +142,9 @@
   </section>
   <section class="prov">
     <button class="top press" aria-expanded={openId === 'apple'} onclick={() => toggle('apple')}>
-      <span class="ic"><AppleLogo size={20} /></span>
+      <span class="ic"><Icon name="AppleLogo" size={20} /></span>
       <span class="name">Apple Music<span class="t-sub">Import library playlists and songs</span></span>
-      <span class="state" class:on={!!apple.s.user}>{apple.s.user ? 'Signed in' : 'Sign in'}</span><span class="caret" class:open={openId === 'apple'}><CaretDown size={12} weight="bold" /></span>
+      <span class="state" class:on={!!apple.s.user}>{apple.s.user ? 'Signed in' : 'Sign in'}</span><span class="caret" class:open={openId === 'apple'}><Icon name="CaretDown" size={12} weight="bold" /></span>
     </button>
     {#if openId === 'apple'}
       <div class="body">
@@ -158,7 +154,7 @@
             <button class="btn press" onclick={() => apple.disconnect()}>Sign Out</button>
           </div>
         {:else if apple.s.configured}
-          <p class="t-sub">A page opens in your browser: click Sign In there and approve with your Apple ID. Confluence Player never sees your password.</p>
+          <p class="t-sub">A page opens in your browser: click Sign In there and approve with your Apple ID. Qistara never sees your password.</p>
           <div class="actions">
             <button class="btn primary press" onclick={apple.connect} disabled={apple.s.waiting}>{apple.s.waiting ? 'Waiting for your browser…' : 'Sign In to Apple Music…'}</button>
             <button class="btn press" onclick={() => apple.disconnect(true)}>Use a Different Key</button>
@@ -182,9 +178,9 @@
 
   <section class="prov">
     <button class="top press" aria-expanded={openId === 'tidal'} onclick={() => toggle('tidal')}>
-      <span class="ic"><Waves size={20} /></span>
+      <span class="ic"><Icon name="Waves" size={20} /></span>
       <span class="name">Tidal<span class="t-sub">Import playlists and My Tracks</span></span>
-      <span class="state" class:on={!!tidal.s.user}>{tidal.s.user ? `Signed in as ${tidal.s.user}` : 'Sign in'}</span><span class="caret" class:open={openId === 'tidal'}><CaretDown size={12} weight="bold" /></span>
+      <span class="state" class:on={!!tidal.s.user}>{tidal.s.user ? `Signed in as ${tidal.s.user}` : 'Sign in'}</span><span class="caret" class:open={openId === 'tidal'}><Icon name="CaretDown" size={12} weight="bold" /></span>
     </button>
     {#if openId === 'tidal'}
       <div class="body">
@@ -194,7 +190,7 @@
             <button class="btn press" onclick={() => tidal.disconnect()}>Sign Out</button>
           </div>
         {:else if tidal.s.configured}
-          <p class="t-sub">Approve Confluence Player in the browser window that opens. It never sees your Tidal password.</p>
+          <p class="t-sub">Approve Qistara in the browser window that opens. It never sees your Tidal password.</p>
           <div class="actions">
             <button class="btn primary press" onclick={tidal.connect} disabled={tidal.s.waiting}>{tidal.s.waiting ? 'Waiting for your browser…' : 'Sign In to Tidal…'}</button>
             <button class="btn press" onclick={() => tidal.disconnect(true)}>Use a Different Client ID</button>
@@ -221,10 +217,10 @@
   h1 { margin: 0 0 6px; }
   .lede { max-width: 640px; margin: 0 0 20px; line-height: 1.5; }
   .list { max-width: 760px; display: grid; gap: 6px; }
-  .prov { border-radius: 12px; background: var(--fill); overflow: hidden; }
+  .prov { border-radius: var(--r-lg); background: var(--fill); overflow: hidden; }
   .top { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 58px; padding: 8px 14px; text-align: left; }
   .top:hover { background: var(--fill); }
-  .ic { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--fill-2); color: var(--text); flex: none; }
+  .ic { display: grid; place-items: center; width: 34px; height: 34px; border-radius: var(--r); background: var(--fill-2); color: var(--text); flex: none; }
   .name { flex: 1; min-width: 0; display: grid; font-weight: 600; }
   .name .t-sub { font-weight: 400; }
   .state { font-size: 12px; color: var(--text-2); white-space: nowrap; }
@@ -242,11 +238,11 @@
   .link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
   .steps { margin: 0; padding-left: 20px; line-height: 1.7; }
   .keys { display: flex; gap: 8px; width: min(480px, 100%); }
-  .keys input { flex: 1; min-width: 0; height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--sep); background: var(--bg-2); color: var(--text); }
+  .keys input { flex: 1; min-width: 0; height: 30px; padding: 0 10px; border-radius: var(--r); border: 1px solid var(--sep); background: var(--bg-2); color: var(--text); }
   .form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: min(560px, 100%); }
-  .form input { height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--sep); background: var(--bg-2); color: var(--text); min-width: 0; }
+  .form input { height: 30px; padding: 0 10px; border-radius: var(--r); border: 1px solid var(--sep); background: var(--bg-2); color: var(--text); min-width: 0; }
   .form input:first-child { grid-column: 1 / -1; }
   .form .btn { justify-self: start; }
-  code { font-size: 12px; padding: 1px 5px; border-radius: 4px; background: var(--fill-2); user-select: text; }
+  code { font-size: 12px; padding: 1px 5px; border-radius: var(--r-xs); background: var(--fill-2); user-select: text; }
   .err { color: #e5484d; }
 </style>

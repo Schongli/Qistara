@@ -1,15 +1,15 @@
 <script lang="ts">
   import { open } from '@tauri-apps/plugin-dialog'
   import { invoke } from '@tauri-apps/api/core'
-  import Plus from 'phosphor-svelte/lib/Plus'
-  import Trash from 'phosphor-svelte/lib/Trash'
+  import Icon from '../components/Icon.svelte'
   import Toggle from '../components/Toggle.svelte'
   import { eq, savePreset, userPresets } from '../lib/eq.svelte'
   import { freqs, hasGain, MAX_BANDS, parseApo, PRESETS, preampOf, response, total, TYPES, type Band } from '../lib/eq'
   import { settings } from '../lib/settings.svelte'
 
   const RANGE = 18 // ±dB shown
-  const COLORS = ['#ff4f6d', '#ff9f0a', '#ffd60a', '#30d158', '#64d2ff', '#0a84ff', '#bf5af2', '#ff6482', '#ac8e68', '#8e8e93']
+  // a band takes the colour of its region (sub-bass coral … air violet); the combined curve is the brass accent
+  const bandColor = (f: number) => (f < 80 ? '#fb7185' : f < 400 ? '#fbbf24' : f < 2500 ? '#34d399' : f < 6000 ? '#38bdf8' : '#a78bfa')
   let w = $state(800)
   const h = 300
   let sel = $state(0)
@@ -103,7 +103,7 @@
       <text x="4" y={y(g) - 4} class="lbl">{g > 0 ? '+' : ''}{g} dB</text>
     {/each}
     {#each eq.bands as b, i (i)}
-      {#if b.on}<path d={bandPath(b)} class="band" style:stroke={COLORS[i]} class:dim={i !== sel} />{/if}
+      {#if b.on}<path d={bandPath(b)} class="band" style:stroke={bandColor(b.f)} class:dim={i !== sel} />{/if}
     {/each}
     <path d={path} class="curve" />
     {#each eq.bands as b, i (i)}
@@ -128,7 +128,7 @@
         }}
       >
         <circle cx={x(b.f)} cy={nodeY(b)} r="14" class="hit" />
-        <circle cx={x(b.f)} cy={nodeY(b)} r="8" style:fill={COLORS[i]} />
+        <circle cx={x(b.f)} cy={nodeY(b)} r="8" style:fill={bandColor(b.f)} />
         <text x={x(b.f)} y={nodeY(b) + 3.5} class="n">{i + 1}</text>
       </g>
     {/each}
@@ -138,9 +138,9 @@
 
 <div class="bands">
   {#each eq.bands as b, i (i)}
-    <button class="chip" class:sel={i === sel} style:--c={COLORS[i]} onclick={() => (sel = i)}><i></i>{i + 1}</button>
+    <button class="chip" class:sel={i === sel} style:--c={bandColor(b.f)} onclick={() => (sel = i)}><i></i>{i + 1}</button>
   {/each}
-  {#if eq.bands.length < MAX_BANDS}<button class="chip add" onclick={addBand} aria-label="Add band"><Plus size={12} weight="bold" /></button>{/if}
+  {#if eq.bands.length < MAX_BANDS}<button class="chip add" onclick={addBand} aria-label="Add band"><Icon name="Plus" size={12} weight="bold" /></button>{/if}
 </div>
 
 {#if band}
@@ -152,7 +152,7 @@
     <label class:muted={!hasGain(band.type)}>Gain <input type="number" min={-RANGE} max={RANGE} step="0.1" bind:value={band.g} disabled={!hasGain(band.type)} /> dB</label>
     <label>Q <input type="number" min="0.1" max="10" step="0.01" bind:value={band.q} /></label>
     <label class="on"><input type="checkbox" bind:checked={band.on} /> On</label>
-    <button class="icon-btn" aria-label="Remove band" onclick={() => { eq.bands.splice(sel, 1); sel = Math.max(0, sel - 1) }} disabled={eq.bands.length <= 1}><Trash size={15} /></button>
+    <button class="icon-btn" aria-label="Remove band" onclick={() => { eq.bands.splice(sel, 1); sel = Math.max(0, sel - 1) }} disabled={eq.bands.length <= 1}><Icon name="Trash" size={15} /></button>
   </div>
 {/if}
 
@@ -168,10 +168,10 @@
 <style>
   h1 { margin: 0 0 16px; }
   .top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
-  .master { flex: 1 1 420px; border-radius: 10px; background: var(--fill); }
-  select, input[type='number'] { height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--sep); background: var(--bg-2); color: var(--text); }
+  .master { flex: 1 1 420px; border-radius: var(--r-lg); background: var(--fill); }
+  select, input[type='number'] { height: 28px; padding: 0 8px; border-radius: var(--r-sm); border: 1px solid var(--sep); background: var(--bg-2); color: var(--text); }
   input[type='number'] { width: 84px; }
-  .graph { border-radius: 12px; background: var(--fill); overflow: hidden; touch-action: none; transition: opacity 200ms; }
+  .graph { border-radius: var(--r-lg); background: var(--fill); overflow: hidden; touch-action: none; transition: opacity 200ms; }
   .graph.off { opacity: 0.55; }
   svg { display: block; }
   .grid { stroke: var(--sep); stroke-width: 1; }
@@ -179,7 +179,7 @@
   .lbl { fill: var(--text-3); font-size: 10px; }
   .band { fill: none; stroke-width: 1.5; opacity: 0.45; }
   .band.dim { opacity: 0.18; }
-  .curve { fill: none; stroke: var(--text); stroke-width: 2.5; stroke-linejoin: round; }
+  .curve { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
   .node { cursor: grab; }
   .node:active { cursor: grabbing; }
   .node .hit { fill: transparent; }
@@ -194,7 +194,7 @@
   .chip { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 13px; background: var(--fill); font-weight: 600; font-variant-numeric: tabular-nums; }
   .chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
   .chip.sel { background: var(--fill-2); box-shadow: inset 0 0 0 1.5px var(--c); }
-  .detail, .pre { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 12px 14px; border-radius: 10px; background: var(--fill); margin-bottom: 10px; }
+  .detail, .pre { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 12px 14px; border-radius: var(--r-lg); background: var(--fill); margin-bottom: 10px; }
   label { display: flex; align-items: center; gap: 8px; color: var(--text-2); }
   label.muted { opacity: 0.45; }
   .on { color: var(--text); }

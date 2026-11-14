@@ -4,11 +4,7 @@
   import { Spring } from 'svelte/motion'
   import { fly } from 'svelte/transition'
   import { cubicOut } from 'svelte/easing'
-  import X from 'phosphor-svelte/lib/X'
-  import Star from 'phosphor-svelte/lib/Star'
-  import Play from 'phosphor-svelte/lib/Play'
-  import Crosshair from 'phosphor-svelte/lib/Crosshair'
-  import ArrowCounterClockwise from 'phosphor-svelte/lib/ArrowCounterClockwise'
+  import Icon from './Icon.svelte'
   import { mpv, seek, set } from '../lib/player.svelte'
   import { queue } from '../lib/queue.svelte'
   import { settings } from '../lib/settings.svelte'
@@ -122,9 +118,9 @@
         <button class="chip press" class:on={settings.quranTranslations.includes(t.id)} aria-pressed={settings.quranTranslations.includes(t.id)} title={t.name} onclick={() => toggleTr(t.id)}>{t.short}</button>
       {/each}
       <button class="chip press" class:on={settings.quranTranslit} aria-pressed={settings.quranTranslit} title="Transliteration" onclick={() => (settings.quranTranslit = !settings.quranTranslit)}>Latin</button>
-      <button class="chip press fix" class:on={quran.fixing} aria-pressed={quran.fixing} title="Tap the ayah being recited to sync it" onclick={() => (quran.fixing = !quran.fixing)}><Crosshair size={13} weight="bold" />Fix sync</button>
+      <button class="chip press fix" class:on={quran.fixing} aria-pressed={quran.fixing} title="Tap the ayah being recited to sync it" onclick={() => (quran.fixing = !quran.fixing)}><Icon name="Crosshair" size={13} weight="bold" />Fix sync</button>
       {#if Object.keys(quran.anchors).length}
-        <button class="chip press" title="Forget the ayahs you tapped" onclick={clearMarks}><ArrowCounterClockwise size={13} weight="bold" /></button>
+        <button class="chip press" title="Forget the ayahs you tapped" onclick={clearMarks}><Icon name="ArrowCounterClockwise" size={13} weight="bold" /></button>
       {/if}
     </div>
     {#if quran.fixing}
@@ -181,14 +177,14 @@
 
   {#if card}
     <div class="card" role="dialog" aria-label="Word" transition:fly={{ y: reduced ? 0 : 24, duration: 220, easing: cubicOut }}>
-      <button class="icon-btn press close" aria-label="Close" onclick={() => (card = null)}><X size={15} weight="bold" /></button>
+      <button class="icon-btn press close" aria-label="Close" onclick={() => (card = null)}><Icon name="X" size={15} weight="bold" /></button>
       <div class="head" lang="ar" dir="rtl">{card.word.ar}</div>
       {#if card.word.tr}<div class="say">{card.word.tr}</div>{/if}
       <div class="meaning">{card.word.mean || '—'}</div>
       <div class="from">{SURAHS[card.ayah.surah - 1].en} {card.ayah.surah}:{card.ayah.n}</div>
       <div class="actions">
-        <button class="btn press" onclick={() => card && go(card.word.seg?.[0] ?? startOf(card.unit))}><Play size={13} weight="fill" />{card.word.seg ? 'Hear it' : 'Hear the ayah'}</button>
-        <button class="btn press" class:primary={!saved} onclick={toggleSave}><Star size={13} weight={saved ? 'fill' : 'bold'} />{saved ? 'Saved' : 'Save to Vocabulary'}</button>
+        <button class="btn press" onclick={() => card && go(card.word.seg?.[0] ?? startOf(card.unit))}><Icon name="Play" size={13} weight="fill" />{card.word.seg ? 'Hear it' : 'Hear the ayah'}</button>
+        <button class="btn press" class:primary={!saved} onclick={toggleSave}><Icon name="Star" size={13} weight={saved ? 'fill' : 'bold'} />{saved ? 'Saved' : 'Save to Vocabulary'}</button>
       </div>
     </div>
   {/if}
@@ -210,7 +206,7 @@
 
   .scroll { position: relative; flex: 1; overflow: hidden; mask-image: linear-gradient(transparent, #000 8%, #000 82%, transparent); }
   .inner { will-change: transform; padding: 0 8px; }
-  .unit { display: block; width: 100%; text-align: center; padding: 10px 12px; margin: 4px 0; border-radius: 14px; color: rgba(255, 255, 255, 0.42); filter: blur(calc(var(--d) * 0.4px)); transition: color 380ms var(--ease-out), filter 380ms var(--ease-out), background 380ms; }
+  .unit { display: block; width: 100%; text-align: center; padding: 10px 12px; margin: 4px 0; border-radius: var(--r-xl); color: rgba(255, 255, 255, 0.42); filter: blur(calc(var(--d) * 0.4px)); transition: color 380ms var(--ease-out), filter 380ms var(--ease-out), background 380ms; }
   .manual .unit { filter: none; color: rgba(255, 255, 255, 0.7); }
   .unit.on { color: #fff; filter: none; background: rgba(255, 255, 255, 0.06); }
   .unit:hover { filter: none; }
@@ -218,7 +214,7 @@
   .surah { display: block; font-size: 12px; letter-spacing: 0.02em; color: rgba(255, 255, 255, 0.55); margin-top: 10px; }
   .ayah { cursor: default; }
   .ar { margin: 0; font-size: calc(30px * var(--lyrics-scale, 1)); line-height: 2.15; }
-  .w { font: inherit; color: inherit; padding: 0 1px; border-radius: 6px; }
+  .w { font: inherit; color: inherit; padding: 0 1px; border-radius: var(--r-sm); }
   .w:hover { background: rgba(255, 255, 255, 0.12); }
   .w.now { color: #fff; text-shadow: 0 0 14px rgba(255, 255, 255, 0.55); }
   .ayah:not(.on) .w.now { text-shadow: none; }
@@ -228,7 +224,7 @@
   .src { font-size: 11px; opacity: 0.6; }
 
   .card {
-    position: absolute; left: 10px; right: 10px; bottom: 10px; padding: 16px 18px 14px; border-radius: 16px; color: #fff;
+    position: absolute; left: 10px; right: 10px; bottom: 10px; padding: 16px 18px 14px; border-radius: var(--r-xl); color: #fff;
     background: rgba(28, 28, 30, 0.78); backdrop-filter: blur(30px) saturate(1.6); box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
   }
   .close { position: absolute; top: 8px; right: 8px; color: rgba(255, 255, 255, 0.7); }

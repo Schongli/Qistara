@@ -10,7 +10,7 @@ import { settings } from './settings.svelte'
 import { targetLanguage, tr } from './translate.svelte'
 import { fileTrack } from './library.svelte'
 import { toast } from './nav.svelte'
-import { kvGet, kvSet } from './persist'
+import { kvGet, kvLoad, kvSet } from './persist'
 import { toHiragana, toRomaji } from './kana'
 import { gloss, isJapanese, lineRomaji, posName, withGaps, type JpWord, type Piece } from './japanese'
 import { parseLookup, type Lookup } from './lookup'
@@ -129,7 +129,7 @@ export const meanings = (l: Lookup | null): string[] =>
 
 export const vocab = $state({ items: [] as VocabItem[], loaded: false })
 // nothing is saved until the stored list is in, so it is never overwritten by an empty one
-kvGet<VocabItem[]>('vocab').then((v) => {
+kvLoad<VocabItem[]>('vocab').then((v) => {
   vocab.items = v ?? []
   vocab.loaded = true
 })

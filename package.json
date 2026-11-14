@@ -1,5 +1,5 @@
 {
-  "name": "confluence-player",
+  "name": "qistara",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,6 +12,11 @@
     "test": "vitest run"
   },
   "devDependencies": {
+    "@iconify-json/iconoir": "1.2.12",
+    "@iconify-json/lucide": "1.2.149",
+    "@iconify-json/ph": "1.2.2",
+    "@iconify-json/ri": "1.2.10",
+    "@iconify-json/solar": "1.2.13",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tauri-apps/cli": "^2.12.4",
     "@tsconfig/svelte": "^5.0.8",
@@ -29,7 +34,6 @@
     "@tauri-apps/plugin-dialog": "^2.8.4",
     "@tauri-apps/plugin-http": "^2.9.0",
     "@tauri-apps/plugin-opener": "^2.7.3",
-    "phosphor-svelte": "^3.1.1",
     "tauri-plugin-libmpv-api": "^0.3.2"
   }
 }

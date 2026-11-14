@@ -36,4 +36,4 @@ export function readableAccent(hex: string, page: string): string | null {
 }
 
 /** Text on an accent-filled button: white or near-black, whichever reads better. */
-export const onAccent = (accent: string) => (contrast(accent, '#ffffff') >= contrast(accent, '#04231e') ? '#ffffff' : '#04231e')
+export const onAccent = (accent: string) => (contrast(accent, '#ffffff') >= contrast(accent, '#111318') ? '#ffffff' : '#111318')

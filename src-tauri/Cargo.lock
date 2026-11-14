@@ -647,39 +647,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "confluence-player"
-version = "0.2.0"
-dependencies = [
- "base64 0.22.1",
- "getrandom 0.3.4",
- "image",
- "keyring",
- "lindera",
- "lofty",
- "log",
- "md5",
- "notify-debouncer-mini",
- "rayon",
- "ring",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "souvlaki",
- "symphonia",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-http",
- "tauri-plugin-libmpv",
- "tauri-plugin-log",
- "tauri-plugin-opener",
- "tempfile",
- "url",
- "walkdir",
-]
-
-[[package]]
 name = "const-oid"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3717,6 +3684,40 @@ name = "pxfm"
 version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
+
+[[package]]
+name = "qistara"
+version = "0.3.0"
+dependencies = [
+ "base64 0.22.1",
+ "flate2",
+ "getrandom 0.3.4",
+ "image",
+ "keyring",
+ "lindera",
+ "lofty",
+ "log",
+ "md5",
+ "notify-debouncer-mini",
+ "rayon",
+ "ring",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "souvlaki",
+ "symphonia",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-http",
+ "tauri-plugin-libmpv",
+ "tauri-plugin-log",
+ "tauri-plugin-opener",
+ "tempfile",
+ "url",
+ "walkdir",
+]
 
 [[package]]
 name = "quick-error"

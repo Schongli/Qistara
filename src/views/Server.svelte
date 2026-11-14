@@ -1,9 +1,6 @@
 <script lang="ts">
   // Your music server: albums, artists, playlists and search, played straight from it.
-  import Play from 'phosphor-svelte/lib/Play'
-  import Shuffle from 'phosphor-svelte/lib/Shuffle'
-  import CaretLeft from 'phosphor-svelte/lib/CaretLeft'
-  import MagnifyingGlass from 'phosphor-svelte/lib/MagnifyingGlass'
+  import Icon from '../components/Icon.svelte'
   import Artwork from '../components/Artwork.svelte'
   import TrackTable from '../components/TrackTable.svelte'
   import { albumList, cover, getAlbum, getArtist, getArtists, getPlaylist, getPlaylists, search, server, toTracks, type SAlbum, type SArtist, type SPlaylist } from '../lib/subsonic.svelte'
@@ -101,14 +98,14 @@
       {/each}
     </div>
     <form class="search" onsubmit={(e) => (e.preventDefault(), find())}>
-      <MagnifyingGlass size={14} weight="bold" />
+      <Icon name="MagnifyingGlass" size={14} weight="bold" />
       <input bind:value={query} placeholder="Search the server" aria-label="Search the server" spellcheck="false" />
     </form>
   </div>
   {#if error}<p class="err">{error}</p>{/if}
 
   {#if detail}
-    <button class="back press" onclick={() => (detail = null)}><CaretLeft size={14} weight="bold" />Back</button>
+    <button class="back press" onclick={() => (detail = null)}><Icon name="CaretLeft" size={14} weight="bold" />Back</button>
     <header class="head">
       {#await cover(detail.coverArt)}<Artwork art={null} size="180px" />{:then art}<Artwork {art} size="180px" />{/await}
       <div>
@@ -116,8 +113,8 @@
         <p class="t-sub">{detail.sub}</p>
         {#if detail.tracks?.length}
           <div class="actions">
-            <button class="btn primary press" onclick={() => detail?.tracks && queue.play(detail.tracks)}><Play size={14} weight="fill" />Play</button>
-            <button class="btn press" onclick={() => detail?.tracks && queue.play(detail.tracks, Math.floor(Math.random() * detail.tracks.length), true)}><Shuffle size={14} weight="bold" />Shuffle</button>
+            <button class="btn primary press" onclick={() => detail?.tracks && queue.play(detail.tracks)}><Icon name="Play" size={14} weight="fill" />Play</button>
+            <button class="btn press" onclick={() => detail?.tracks && queue.play(detail.tracks, Math.floor(Math.random() * detail.tracks.length), true)}><Icon name="Shuffle" size={14} weight="bold" />Shuffle</button>
           </div>
         {/if}
       </div>
@@ -150,7 +147,7 @@
 <style>
   h1 { margin: 0 0 4px; }
   .sub { margin: 0 0 16px; }
-  .card { display: grid; gap: 10px; justify-items: start; max-width: 560px; padding: 16px; border-radius: 12px; background: var(--fill); }
+  .card { display: grid; gap: 10px; justify-items: start; max-width: 560px; padding: 16px; border-radius: var(--r-lg); background: var(--fill); }
   .card p { margin: 0; line-height: 1.5; }
   .bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
   .tabs { display: flex; gap: 4px; flex-wrap: wrap; }
@@ -168,7 +165,7 @@
   .head p { margin: 0 0 14px; }
   .actions { display: flex; gap: 8px; }
   .names { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px; }
-  .nm { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; border-radius: 8px; background: var(--fill); text-align: left; min-width: 0; }
+  .nm { display: flex; justify-content: space-between; gap: 8px; padding: 8px 12px; border-radius: var(--r); background: var(--fill); text-align: left; min-width: 0; }
   .nm:hover { background: var(--fill-2); }
   h2.t-h2 { margin: 20px 0 10px; }
   .more { margin-bottom: 30px; }

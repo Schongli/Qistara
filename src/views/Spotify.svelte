@@ -1,15 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import { openUrl } from '@tauri-apps/plugin-opener'
-  import SpotifyLogo from 'phosphor-svelte/lib/SpotifyLogo'
-  import Play from 'phosphor-svelte/lib/Play'
-  import Pause from 'phosphor-svelte/lib/Pause'
-  import SkipBack from 'phosphor-svelte/lib/SkipBack'
-  import SkipForward from 'phosphor-svelte/lib/SkipForward'
-  import SpeakerHigh from 'phosphor-svelte/lib/SpeakerHigh'
-  import ArrowSquareOut from 'phosphor-svelte/lib/ArrowSquareOut'
-  import ArrowsClockwise from 'phosphor-svelte/lib/ArrowsClockwise'
-  import Heart from 'phosphor-svelte/lib/Heart'
+  import Icon from '../components/Icon.svelte'
   import Slider from '../components/Slider.svelte'
   import ImportList from '../components/ImportList.svelte'
   import { LIKED, control, importPlaylist, loadPlaylists, setRemoteVolume, spotify, watchPlayer } from '../lib/spotify.svelte'
@@ -48,7 +40,7 @@
     {#if p?.title}
       <div class="card">
         <div class="art">
-          {#if p.image}<img src={p.image} alt="" />{:else}<SpotifyLogo size={40} />{/if}
+          {#if p.image}<img src={p.image} alt="" />{:else}<Icon name="SpotifyLogo" size={40} />{/if}
         </div>
         <div class="meta">
           <div class="name ellipsis">{p.title}</div>
@@ -59,18 +51,18 @@
             <span>-{time(Math.max(0, p.duration - progress))}</span>
           </div>
           <div class="controls">
-            <button class="icon-btn press" aria-label="Previous on Spotify" onclick={() => control({ kind: 'previous' })}><SkipBack size={20} weight="fill" /></button>
+            <button class="icon-btn press" aria-label="Previous on Spotify" onclick={() => control({ kind: 'previous' })}><Icon name="SkipBack" size={20} weight="fill" /></button>
             <button class="icon-btn press play" aria-label={p.playing ? 'Pause Spotify' : 'Play Spotify'} onclick={() => control({ kind: p.playing ? 'pause' : 'play' })}>
-              {#if p.playing}<Pause size={24} weight="fill" />{:else}<Play size={24} weight="fill" />{/if}
+              {#if p.playing}<Icon name="Pause" size={24} weight="fill" />{:else}<Icon name="Play" size={24} weight="fill" />{/if}
             </button>
-            <button class="icon-btn press" aria-label="Next on Spotify" onclick={() => control({ kind: 'next' })}><SkipForward size={20} weight="fill" /></button>
+            <button class="icon-btn press" aria-label="Next on Spotify" onclick={() => control({ kind: 'next' })}><Icon name="SkipForward" size={20} weight="fill" /></button>
             {#if p.volume !== null}
-              <div class="vol"><SpeakerHigh size={15} /><Slider label="Spotify volume" value={p.volume} max={100} wheel={5} onchange={setRemoteVolume} /></div>
+              <div class="vol"><Icon name="SpeakerHigh" size={15} /><Slider label="Spotify volume" value={p.volume} max={100} wheel={5} onchange={setRemoteVolume} /></div>
             {/if}
           </div>
           <div class="foot t-sub">
-            <span class="dev"><SpotifyLogo size={14} weight="fill" />Playing on {p.device}</span>
-            {#if p.url}<button class="link" onclick={() => openUrl(p.url!)}>Open in Spotify <ArrowSquareOut size={12} /></button>{/if}
+            <span class="dev"><Icon name="SpotifyLogo" size={14} weight="fill" />Playing on {p.device}</span>
+            {#if p.url}<button class="link" onclick={() => openUrl(p.url!)}>Open in Spotify <Icon name="ArrowSquareOut" size={12} /></button>{/if}
           </div>
         </div>
       </div>
@@ -91,7 +83,7 @@
   />
   {#if spotify.error}<p class="err">{spotify.error}</p>{/if}
 
-  <p class="attr t-sub"><SpotifyLogo size={14} weight="fill" />Playlists, songs and artwork from Spotify.</p>
+  <p class="attr t-sub"><Icon name="SpotifyLogo" size={14} weight="fill" />Playlists, songs and artwork from Spotify.</p>
 {/if}
 
 <style>
@@ -100,8 +92,8 @@
   section { max-width: 900px; margin: 22px 0 30px; }
   h2 { margin: 0 0 10px; }
   p { margin: 0 0 12px; line-height: 1.5; }
-  .card { display: flex; gap: 18px; padding: 14px; border-radius: 14px; background: var(--fill); }
-  .art { flex: none; width: 132px; height: 132px; border-radius: 8px; overflow: hidden; display: grid; place-items: center; background: var(--fill-2); color: var(--text-3); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18); }
+  .card { display: flex; gap: 18px; padding: 14px; border-radius: var(--r-xl); background: var(--fill); }
+  .art { flex: none; width: 132px; height: 132px; border-radius: var(--r); overflow: hidden; display: grid; place-items: center; background: var(--fill-2); color: var(--text-3); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18); }
   .art img { width: 100%; height: 100%; object-fit: cover; }
   .meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
   .name { font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }

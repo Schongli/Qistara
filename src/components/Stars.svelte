@@ -1,6 +1,6 @@
 <script lang="ts">
   // Five-star rating (MusicBee/iTunes): hover previews, click sets, clicking the same star clears.
-  import Star from 'phosphor-svelte/lib/Star'
+  import Icon from './Icon.svelte'
   let { value, onchange }: { value: number; onchange: (v: number) => void } = $props()
   let hover = $state(0)
 </script>
@@ -14,7 +14,7 @@
       class:on={(hover || value) >= n}
       onpointerenter={() => (hover = n)}
       onclick={(e) => { e.stopPropagation(); onchange(value === n ? 0 : n) }}
-    ><Star size={11} weight={(hover || value) >= n ? 'fill' : 'regular'} /></button>
+    ><Icon name="Star" size={11} weight={(hover || value) >= n ? 'fill' : 'regular'} /></button>
   {/each}
 </span>
 

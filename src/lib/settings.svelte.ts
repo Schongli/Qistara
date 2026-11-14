@@ -2,27 +2,39 @@
 import { untrack } from 'svelte'
 import { mpv, set } from './player.svelte'
 import { queue } from './queue.svelte'
-import { kvGet, kvSet } from './persist'
+import { kvLoad, kvSet } from './persist'
+import type { Preset } from './downloads.svelte'
+import { normalizeSources } from './lyricsources'
+import type { ThemeId } from './themes'
 
 // lyricsLanguage '' = the Windows display language
 // quranTranslations: ids from quran.svelte.ts TRANSLATIONS, shown under each ayah
 const defaults = {
-  bitPerfect: true, soundCheck: false, passthrough: false, hwdec: true, onlineLyrics: true, translateLyrics: false, lyricsLanguage: '', learnLyrics: false,
+  bitPerfect: true, soundCheck: false, passthrough: false, hwdec: true, translateLyrics: false, lyricsLanguage: '', learnLyrics: false,
   quranTranslations: ['kemenag'] as string[], quranTranslit: true,
-  // Appearance (appearance.svelte.ts): accent '' = the default teal; zoom scales the whole UI
-  theme: 'auto' as 'auto' | 'light' | 'dark', accent: '', matchArtwork: false, zoom: 1,
+  // Settings › Lyrics: where lyrics come from, in order; preferWordSync keeps asking for word timing
+  lyricsSources: normalizeSources(undefined), preferWordSync: false,
+  // Appearance (appearance.svelte.ts): accent '' = the default brass; zoom scales the whole UI
+  theme: 'auto' as ThemeId, accent: '', matchArtwork: false, zoom: 1,
+  corners: 'rounded' as 'square' | 'subtle' | 'rounded' | 'round', blurUi: true,
+  iconPack: 'phosphor' as 'phosphor' | 'lucide' | 'iconoir' | 'remix' | 'solar',
   density: 'comfortable' as 'comfortable' | 'compact', solidChrome: false, font: 'inter' as 'inter' | 'system',
   hiddenNav: [] as string[],
   // YouTube sign-in for yt-dlp: '' guest, 'firefox' (its cookies), or the path of a cookies.txt file
   ytCookies: '',
+  // Downloads: the folder ('' = Music\Qistara Downloads), format and whether new downloads join the library
+  downloadFolder: '', downloadPreset: 'audioOriginal' as Preset, downloadToLibrary: true,
 }
 type Settings = typeof defaults
 
 export const settings = $state<Settings>({ ...defaults })
 // nothing is saved or applied until the stored values are in, so they are never overwritten by defaults
 const state = $state({ loaded: false })
-kvGet<Partial<Settings>>('settings').then((v) => {
+kvLoad<Partial<Settings> & { onlineLyrics?: boolean }>('settings').then((v) => {
   if (v) Object.assign(settings, v)
+  // the one "Find lyrics online" switch became the source list
+  settings.lyricsSources = normalizeSources(v?.lyricsSources, v?.onlineLyrics)
+  delete (settings as { onlineLyrics?: boolean }).onlineLyrics
   state.loaded = true
 })
 

@@ -1,9 +1,6 @@
-// Bridge to libmpv: observed properties land in `mpv`, commands go straight through.
-import {
-  command, destroy, init, listenEvents, observeProperties, setProperty,
-  type MpvObservableProperty,
-} from 'tauri-plugin-libmpv-api'
-import { appLocalDataDir, join } from '@tauri-apps/api/path'
+// Bridge to libmpv: observed properties land in `mpv`. Commands and properties go through mpv.rs, which
+// lets through only what the app uses: the page isn't granted the plugin's own command/set_property/init.
+import { destroy, listenEvents, observeProperties, type MpvObservableProperty } from 'tauri-plugin-libmpv-api'
 import { invoke } from '@tauri-apps/api/core'
 import type { AudioParams } from './signal'
 
@@ -138,31 +135,25 @@ export async function startMpv() {
     // A page reload leaves the old instance running and init would skip, so start fresh.
     // (Re-reading props with get_property instead crashed libmpv-wrapper 0.3.2.)
     await destroy().catch(() => {})
-    const ytdlp = await join(await appLocalDataDir(), 'bin', 'yt-dlp.exe')
-    await init({
-      initialOptions: {
-        ...BIT_PERFECT,
-        vo: 'gpu-next', hwdec: 'auto-safe', 'target-colorspace-hint': 'yes', 'video-sync': 'audio',
-        idle: 'yes', 'force-window': 'no', 'keep-open': 'yes',
-        'gapless-audio': 'weak', 'prefetch-playlist': 'yes', 'audio-display': 'no', 'cover-art-auto': 'no',
-        'input-default-bindings': 'no', 'input-vo-keyboard': 'no', osc: 'no', 'osd-level': 0,
-        'sub-auto': 'fuzzy', 'msg-level': 'all=warn',
-        // YouTube tracks are ytdl://… (youtube.svelte.ts): the hook runs our own yt-dlp (ytdlp.rs). Other URLs,
-        // radio included, are opened by mpv itself; length-quoted so a comma in the path can't split the list.
-        ytdl: 'yes', 'ytdl-format': 'bestaudio/best', 'ytdl-raw-options': 'js-runtimes=node',
-        'script-opts': `ytdl_hook-ytdl_path=%${new TextEncoder().encode(ytdlp).length}%${ytdlp},ytdl_hook-all_formats=no`,
-        'watch-later-options': 'start,aid,sid,sub-delay,audio-delay,sub-scale',
-        'screenshot-format': 'png', 'screenshot-template': 'Confluence Player %F %wH.%wM.%wS',
+    // mpv.rs adds the options that hold a path: the ytdl hook's yt-dlp, resume folder, log, screenshot folder
+    await invoke('mpv_init', {
+      mpvConfig: {
+        initialOptions: {
+          ...BIT_PERFECT,
+          vo: 'gpu-next', hwdec: 'auto-safe', 'target-colorspace-hint': 'yes', 'video-sync': 'audio',
+          idle: 'yes', 'force-window': 'no', 'keep-open': 'yes',
+          'gapless-audio': 'weak', 'prefetch-playlist': 'yes', 'audio-display': 'no', 'cover-art-auto': 'no',
+          'input-default-bindings': 'no', 'input-vo-keyboard': 'no', osc: 'no', 'osd-level': 0,
+          'sub-auto': 'fuzzy', 'msg-level': 'all=warn',
+          // YouTube tracks are ytdl://… (youtube.svelte.ts), played by the hook with our own yt-dlp (ytdlp.rs).
+          // Other URLs, radio included, are opened by mpv itself.
+          ytdl: 'yes', 'ytdl-format': 'bestaudio/best',
+          'watch-later-options': 'start,aid,sid,sub-delay,audio-delay,sub-scale',
+          'screenshot-format': 'png', 'screenshot-template': 'Qistara %F %wH.%wM.%wS',
+        },
+        observedProperties: Object.fromEntries(PROPS),
       },
-      observedProperties: PROPS,
     })
-    await setProperty('watch-later-dir', await join(await appLocalDataDir(), 'resume'))
-    // dev builds keep mpv's own log (format negotiation, device errors) next to the library
-    if (import.meta.env.DEV) await setProperty('log-file', await join(await appLocalDataDir(), 'mpv.log'))
-    // optional: a missing Pictures folder must not stop playback from starting
-    invoke<string>('screenshot_dir')
-      .then((d) => setProperty('screenshot-directory', d))
-      .catch((e) => console.warn('screenshots stay in the working folder:', e))
     mpv.ready = true
   } catch (e) {
     mpv.error = String(e)
@@ -171,12 +162,13 @@ export async function startMpv() {
 }
 
 export async function load(path: string, mode: 'replace' | 'append' | 'append-play' = 'replace') {
-  await command('loadfile', [path, mode])
+  await cmd('loadfile', path, mode)
   // keep-open pauses at end of file and the pause carries over to the next load
-  if (mode === 'replace') await setProperty('pause', false)
+  if (mode === 'replace') await set('pause', false)
 }
-export const togglePause = () => setProperty('pause', !mpv.pause)
-export const seek = (t: number) => command('seek', [t, 'absolute'])
-export const stop = () => command('stop')
-export const set = (name: string, value: string | number | boolean) => setProperty(name, value)
-export const cmd = (name: string, ...args: (string | number | boolean)[]) => command(name, args)
+export const togglePause = () => set('pause', !mpv.pause)
+export const seek = (t: number) => cmd('seek', t, 'absolute')
+export const stop = () => cmd('stop')
+// a new command or property must also be allowed in mpv.rs
+export const set = (name: string, value: string | number | boolean) => invoke<void>('mpv_set', { name, value })
+export const cmd = (name: string, ...args: (string | number | boolean)[]) => invoke<void>('mpv_command', { name, args })

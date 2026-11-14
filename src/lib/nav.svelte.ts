@@ -1,5 +1,6 @@
 import type { Rules } from './smart'
 import type { Track } from './library.svelte'
+import type { Restore, Snap } from './scrollmemo'
 
 export type Route =
   | { name: 'home' }
@@ -11,7 +12,7 @@ export type Route =
   | { name: 'videos' }
   | { name: 'album'; key: string }
   | { name: 'search' }
-  | { name: 'settings' }
+  | { name: 'settings'; tab?: string }
   | { name: 'playlist'; id: number }
   | { name: 'loved' }
   | { name: 'recentPlayed' }
@@ -29,40 +30,52 @@ export type Route =
   | { name: 'apple' }
   | { name: 'tidal' }
 
+interface Entry { route: Route; snap?: Snap }
+
 class Nav {
   route = $state<Route>({ name: 'home' })
   query = $state('')
-  #back: Route[] = []
-  #forward: Route[] = []
+  #back: Entry[] = []
+  #forward: Entry[] = []
   canBack = $state(false)
   canForward = $state(false)
+  /** Set by App: the scroll positions of the page about to be left, so Back can return to them. */
+  capture: () => Snap | undefined = () => undefined
+  /** What the page now showing should do with its scroll position (read by App after each change). */
+  restore: Restore = 'top'
 
-  #sync() {
+  #set(r: Route, restore: Restore) {
+    this.restore = restore
+    this.route = r
     this.canBack = this.#back.length > 0
     this.canForward = this.#forward.length > 0
   }
   go(r: Route) {
-    this.#back.push(this.route)
+    this.#back.push({ route: this.route, snap: this.capture() })
     this.#forward = []
-    this.route = r
-    this.#sync()
+    this.#set(r, 'top')
   }
   /** Sidebar destinations reset history. */
   root(r: Route) {
     this.#back = []
     this.#forward = []
-    this.route = r
-    this.#sync()
+    this.#set(r, 'top')
+  }
+  /** The same page with a different selection (the artist picked in Artists): no history, no scrolling. */
+  replace(r: Route) {
+    this.#set(r, 'keep')
   }
   back() {
-    const r = this.#back.pop()
-    if (r) this.#forward.push(this.route), (this.route = r)
-    this.#sync()
+    const e = this.#back.pop()
+    if (!e) return
+    this.#forward.push({ route: this.route, snap: this.capture() })
+    this.#set(e.route, e.snap ?? 'top')
   }
   forward() {
-    const r = this.#forward.pop()
-    if (r) this.#back.push(this.route), (this.route = r)
-    this.#sync()
+    const e = this.#forward.pop()
+    if (!e) return
+    this.#back.push({ route: this.route, snap: this.capture() })
+    this.#set(e.route, e.snap ?? 'top')
   }
 }
 
@@ -77,8 +90,9 @@ export const ui = $state({
   lyrics: false,
   // the docked pane beside the library
   panel: '' as '' | 'lyrics' | 'queue',
-  // bumped to focus the search field (Ctrl+F, the sidebar's Search)
+  // bumped to focus the search field (Ctrl+F, the sidebar's Search); Ctrl+F in Settings searches settings
   search: 0,
+  settingsSearch: 0,
   // smart playlist editor: id undefined = creating a new one
   editor: null as null | { id?: number; name: string; rules?: Rules },
   tagEditor: null as null | Track[],

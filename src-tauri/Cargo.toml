@@ -1,9 +1,9 @@
 [package]
-name = "confluence-player"
-version = "0.2.0"
-description = "Confluence Player: lossless music and media player"
+name = "qistara"
+version = "0.3.0"
+description = "Qistara: lossless music and media player"
 authors = []
-license = ""
+license = "MIT"
 repository = ""
 edition = "2024"
 rust-version = "1.90"
@@ -11,7 +11,7 @@ rust-version = "1.90"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "confluence_lib"
+name = "qistara_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -39,6 +39,7 @@ keyring = { version = "4.2.0", default-features = false, features = ["v1", "wind
 # Spotify sign-in (PKCE); all four were already in the build as dependencies of other crates
 sha2 = "0.10"
 base64 = "0.22"
+flate2 = "1"
 getrandom = "0.3"
 url = "2"
 # Apple Music developer tokens (ES256); already in the build through rustls

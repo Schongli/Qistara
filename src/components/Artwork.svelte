@@ -1,5 +1,5 @@
 <script lang="ts">
-  import MusicNotes from 'phosphor-svelte/lib/MusicNotes'
+  import Icon from './Icon.svelte'
   import { artUrl } from '../lib/library.svelte'
 
   let { art, src = null, size = '100%', radius = 'var(--r-art)', shadow = true }: {
@@ -22,7 +22,7 @@
   {#if url && !failed}
     <img src={url} alt="" loading="lazy" decoding="async" draggable="false" onerror={() => (failed = true)} />
   {:else}
-    <div class="ph"><MusicNotes size="38%" weight="light" /></div>
+    <div class="ph"><Icon name="MusicNotes" size="38%" weight="light" /></div>
   {/if}
 </div>
 

@@ -11,14 +11,14 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_http::reqwest;
 
-const SERVICE: &str = "Confluence Player Tidal";
+const SERVICE: &str = "Qistara Tidal";
 const API: &str = "https://openapi.tidal.com/v2";
 const LOGIN: &str = "https://login.tidal.com/authorize";
 const TOKEN: &str = "https://auth.tidal.com/v1/oauth2/token";
 const SCOPES: &str = "user.read collection.read playlists.read";
 /// Tidal only redirects to a URI registered exactly, port included; Providers shows this one.
 pub const PORT: u16 = 47823;
-const UA: &str = concat!("ConfluencePlayer/", env!("CARGO_PKG_VERSION"));
+use crate::UA;
 
 #[derive(Serialize, Deserialize, Default, Clone)]
 struct Creds {
