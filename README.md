@@ -4,6 +4,8 @@ A lossless music and media player for Windows that keeps your music in true bala
 what is in the file. Your files, your music server and YouTube in one place.
 Built with [Tauri 2](https://tauri.app), [Svelte 5](https://svelte.dev) and [libmpv](https://mpv.io).
 
+![Qistara's album library, with a hi-res song playing bit-perfect](docs/screenshots/albums.png)
+
 ## Features
 
 - **Bit-perfect audio.** WASAPI exclusive output at each file's own sample rate and bit depth, on by default.
@@ -41,9 +43,28 @@ Built with [Tauri 2](https://tauri.app), [Svelte 5](https://svelte.dev) and [lib
   checked against the release's SHA-256 list; an ffmpeg on your PATH is used, or fetched the same way.
   Download only what you have the right to keep.
 
+## Screenshots
+
+| | |
+|---|---|
+| ![An album with its synced lyrics beside it, highlighted word by word](docs/screenshots/album-lyrics.png) | ![Now Playing with synced lyrics](docs/screenshots/now-playing.png) |
+| An album, with lyrics highlighted word by word | Now Playing |
+| ![The Signal Path, showing a 24-bit/96 kHz FLAC reaching the DAC untouched](docs/screenshots/signal-path.png) | ![The parametric equalizer with five bands](docs/screenshots/equalizer.png) |
+| The Signal Path: every step from file to DAC | Parametric EQ, with AutoEQ import |
+| ![Appearance settings: themes, accent colours, corners and icon packs](docs/screenshots/settings.png) | ![The album library in the light theme](docs/screenshots/albums-light.png) |
+| Settings, with tabs and search | The light theme |
+
+The screenshots show the demo library that `scripts/make-test-media.sh` makes: the artists are made up.
+
+## Documentation
+
+- [User guide](docs/user-guide.md): every feature, the Signal Path, lyrics sources, accounts, shortcuts and troubleshooting.
+- [How Qistara is built](docs/architecture.md): the parts, how playback and data work, and the rules that keep it safe.
+- [Contributing](CONTRIBUTING.md), [Security policy](SECURITY.md) and [Changelog](CHANGELOG.md).
+
 ## Install
 
-Download `Qistara_x.y.z_x64-setup.exe` from [Releases](../../releases) and run it.
+Download `Qistara_x.y.z_x64-setup.exe` from [Releases](https://github.com/Schongli/Qistara/releases) and run it.
 - **Requirements:** 64-bit Windows 10 or 11.
 - **Windows warning:** the installer isn't signed yet, so Windows shows "Windows protected your PC". Choose **More info → Run anyway**.
 
@@ -64,7 +85,7 @@ npm run tauri build                     # installer in src-tauri/target/release/
 
 The first build downloads the IPADIC dictionary for Japanese word analysis and embeds it in the app.
 
-Tests: `npx vitest run` and `cargo test --lib --manifest-path src-tauri/Cargo.toml`.
+Tests: `npx vitest run` and `cargo test --lib --manifest-path src-tauri/Cargo.toml`. More in [CONTRIBUTING.md](CONTRIBUTING.md).
 `bash scripts/make-test-media.sh` (needs ffmpeg) makes test files: hi-res FLAC tones, an HEVC 10-bit video with subtitles,
 and a small tagged library.
 

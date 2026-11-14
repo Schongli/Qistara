@@ -4,7 +4,7 @@ version = "0.3.0"
 description = "Qistara: lossless music and media player"
 authors = []
 license = "MIT"
-repository = ""
+repository = "https://github.com/Schongli/Qistara"
 edition = "2024"
 rust-version = "1.90"
 

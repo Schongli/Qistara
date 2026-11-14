@@ -40,6 +40,12 @@ album "Aurora Lane" "Glass Weather" 2023 "Ambient" 0xff9a8b 0xff6a88 44100 16 fl
 album "The Midnight Cartographers" "Paper Maps" 2019 "Indie" 0x134e5e 0x71b280 48000 24 alac 4
 album "Kiko Saraswati" "Sore di Jakarta" 2024 "Jazz" 0xf7971e 0xffd200 192000 24 flac 3
 album "Kiko Saraswati" "Radio Edits" 2022 "Jazz" 0x8e2de2 0x4a00e0 44100 16 mp3 4
+album "Aurora Lane" "Low Light" 2025 "Ambient" 0x355c7d 0xc06c84 192000 24 flac 3
+album "Cobalt Garden" "Night Bloom" 2020 "Electronic" 0x0f2027 0x2c5364 48000 24 flac 4
+album "Paper Lanterns Club" "After the Rain" 2018 "Indie" 0xee9ca7 0xffdde1 44100 16 flac 4
+album "Static Harbor" "Quiet Signals" 2025 "Electronic" 0x0b8793 0x360033 96000 24 flac 3
+album "Velvet Meridian" "Slow Orbit" 2022 "Soul" 0xc94b4b 0x4b134f 88200 24 flac 4
+album "Saffron Avenue" "Lantern Season" 2017 "Folk" 0xe65c00 0xf9d423 44100 16 alac 3
 cp video_hevc10.mkv "$lib/Concert Clip.mkv"
 find "$lib" -type f | wc -l
 
