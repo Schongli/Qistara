@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SYSTEM } from '../lib/os'
   import { open } from '@tauri-apps/plugin-dialog'
   import { invoke } from '@tauri-apps/api/core'
   import Icon from '../components/Icon.svelte'
@@ -80,7 +81,7 @@
 
 <h1 class="t-title">Equalizer</h1>
 <div class="top">
-  <div class="group master"><Toggle bind:checked={eq.enabled} label="Parametric EQ" hint={settings.bitPerfect ? 'Exclusive mode and the native sample rate stay on, but EQ changes the samples, so playback is no longer bit-perfect.' : 'Shapes the sound before it reaches the Windows mixer.'} /></div>
+  <div class="group master"><Toggle bind:checked={eq.enabled} label="Parametric EQ" hint={settings.bitPerfect ? 'Exclusive mode and the native sample rate stay on, but EQ changes the samples, so playback is no longer bit-perfect.' : `Shapes the sound before it reaches the ${SYSTEM} mixer.`} /></div>
   <select onchange={(e) => (applyPreset(e.currentTarget.value), (e.currentTarget.value = ''))} aria-label="Presets">
     <option value="">Presets…</option>
     {#each Object.keys(PRESETS) as p (p)}<option value={p}>{p}</option>{/each}

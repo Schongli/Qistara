@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { OS } from '../lib/os'
   import { getCurrentWindow } from '@tauri-apps/api/window'
   import { open } from '@tauri-apps/plugin-dialog'
   import Icon from './Icon.svelte'
@@ -94,7 +95,7 @@
   }
   async function shot() {
     await cmd('screenshot', 'video')
-    say('Screenshot saved to Pictures\\Qistara')
+    say(`Screenshot saved to Pictures${OS === 'windows' ? '\\' : '/'}Qistara`)
   }
   async function abLoop() {
     await cmd('ab-loop')

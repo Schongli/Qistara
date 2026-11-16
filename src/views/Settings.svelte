@@ -1,11 +1,13 @@
 <script lang="ts">
+  import { SYSTEM } from '../lib/os'
   import { tick } from 'svelte'
   import { open } from '@tauri-apps/plugin-dialog'
   import { invoke } from '@tauri-apps/api/core'
   import { openUrl } from '@tauri-apps/plugin-opener'
   import Icon from '../components/Icon.svelte'
   import { addFolder, lib, removeFolder, rescan } from '../lib/library.svelte'
-  import { mpv, set } from '../lib/player.svelte'
+  import { mpv, OS, set } from '../lib/player.svelte'
+  import { pickable } from '../lib/signal'
   import { settings } from '../lib/settings.svelte'
   import { nav, ui } from '../lib/nav.svelte'
   import Toggle from '../components/Toggle.svelte'
@@ -248,7 +250,7 @@
           <span>Font</span>
           <select bind:value={settings.font}>
             <option value="inter">Inter</option>
-            <option value="system">Segoe UI (Windows)</option>
+            <option value="system">{OS === 'windows' ? 'Segoe UI (Windows)' : 'System font'}</option>
           </select>
         </label>
         <label class="line">
@@ -271,7 +273,7 @@
     <section>
       <h2 class="t-h2">Window</h2>
       <div class="group">
-        <Toggle bind:checked={() => !settings.solidChrome, (v) => (settings.solidChrome = !v)} label="Blur window" hint="Lets the Windows Mica material show through the sidebar and bars." />
+        {#if OS === 'windows'}<Toggle bind:checked={() => !settings.solidChrome, (v) => (settings.solidChrome = !v)} label="Blur window" hint="Lets the Windows Mica material show through the sidebar and bars." />{/if}
         <Toggle bind:checked={settings.blurUi} label="Blur UI" hint="Frosted bars, menus and popovers. Off makes them solid." />
       </div>
     </section>
@@ -289,7 +291,7 @@
   {#if shown('playback')}
     <section>
       <h2 class="t-h2">Audio</h2>
-      <p class="t-sub">Bit-perfect mode sends every sample to your DAC untouched: WASAPI exclusive output at the file's own sample rate and bit depth, with nothing in between. Volume then controls your device directly.</p>
+      <p class="t-sub">Bit-perfect mode sends every sample to your DAC untouched: {OS === 'windows' ? 'WASAPI exclusive output' : OS === 'macos' ? 'CoreAudio hog mode' : 'ALSA straight to the device (pick a “hw:” device below)'} at the file's own sample rate and bit depth, with nothing in between. Volume then controls your device directly.</p>
       <div class="group">
         <Toggle bind:checked={settings.bitPerfect} label="Bit-Perfect mode" hint="Exclusive access to the output device. Other apps can't play sound while Qistara plays." />
         <Toggle bind:checked={settings.soundCheck} disabled={settings.bitPerfect} label="Sound Check" hint={settings.bitPerfect ? 'Changes levels, so it is off in Bit-Perfect mode.' : 'Plays songs at a similar loudness using ReplayGain tags.'} />
@@ -304,7 +306,7 @@
         <label class="line">
           <span>Audio device</span>
           <select value={mpv.device} onchange={(e) => set('audio-device', e.currentTarget.value)}>
-            {#each mpv.devices.filter((d) => d.name === 'auto' || d.name.startsWith('wasapi/')) as d (d.name)}
+            {#each mpv.devices.filter((d) => pickable(OS, d.name)) as d (d.name)}
               <option value={d.name}>{d.name === 'auto' ? 'System default' : d.description}</option>
             {/each}
           </select>
@@ -338,7 +340,7 @@
         <label class="line">
           <span>Translate to</span>
           <select bind:value={settings.lyricsLanguage}>
-            <option value="">{languageName(targetFor(navigator.language))} (Windows language)</option>
+            <option value="">{languageName(targetFor(navigator.language))} ({SYSTEM} language)</option>
             {#each LANGUAGES as [code, name] (code)}<option value={code}>{name}</option>{/each}
           </select>
         </label>

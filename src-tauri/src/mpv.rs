@@ -25,8 +25,47 @@ enum Kind {
     Aspect,
     Device,
     Af,
+    /// the audio output: one per OS, each the one bit-perfect path that OS has
+    Ao,
 }
 use Kind::*;
+
+/// The rules differ per OS (device names, what a local path looks like). `cfg` only picks the OS: the
+/// functions take it as a value, so every OS's rules are tested on every machine.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Os {
+    Windows,
+    Mac,
+    Linux,
+}
+pub const OS: Os = if cfg!(windows) { Os::Windows } else if cfg!(target_os = "macos") { Os::Mac } else { Os::Linux };
+
+/// WASAPI exclusive, CoreAudio hog mode (mpv's coreaudio redirects to coreaudio_exclusive), ALSA hw:.
+fn ao(os: Os, s: &str) -> bool {
+    s == match os {
+        Os::Windows => "wasapi",
+        Os::Mac => "coreaudio",
+        Os::Linux => "alsa",
+    }
+}
+
+/// An output device as mpv lists it. ALSA names are held to plain hardware PCMs: an ALSA PCM name can also be a
+/// plugin that writes a file (`file:…`), which would undo everything the allowlist keeps out.
+pub fn device(os: Os, s: &str) -> bool {
+    s == "auto"
+        || match os {
+            Os::Windows => s.starts_with("wasapi/"),
+            Os::Mac => s.strip_prefix("coreaudio/").is_some_and(|uid| !uid.is_empty() && uid.len() <= 256 && !uid.chars().any(char::is_control)),
+            Os::Linux => s.strip_prefix("alsa/").is_some_and(|name| {
+                let (pcm, args) = name.split_once(':').unwrap_or((name, ""));
+                let mut a = args.split(',');
+                let card = |c: &str| c.strip_prefix("CARD=").is_some_and(|c| (1..=32).contains(&c.len()) && c.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_'));
+                let dev = |d: &str| d.strip_prefix("DEV=").is_some_and(|n| (1..=2).contains(&n.len()) && n.bytes().all(|b| b.is_ascii_digit()));
+                matches!(pcm, "default" | "sysdefault" | "hw" | "plughw" | "front" | "iec958" | "hdmi")
+                    && (args.is_empty() || (a.next().is_some_and(card) && a.next().is_none_or(dev) && a.next().is_none()))
+            }),
+        }
+}
 
 /// Properties and start options the page may set (player.svelte.ts and its callers), and what each may hold.
 const PROPS: &[(&str, Kind)] = &[
@@ -37,7 +76,7 @@ const PROPS: &[(&str, Kind)] = &[
     ("replaygain", One(&["no", "track", "album"])), ("audio-spdif", One(&["", "ac3,eac3,dts,dts-hd,truehd"])),
     ("hwdec", One(&["auto-safe", "no"])),
     // start options (startMpv)
-    ("ao", One(&["wasapi"])), ("vo", One(&["gpu-next"])), ("target-colorspace-hint", Flag),
+    ("ao", Ao), ("vo", One(&["gpu-next"])), ("target-colorspace-hint", Flag),
     ("video-sync", One(&["audio"])), ("idle", Flag), ("force-window", Flag), ("keep-open", Flag),
     ("gapless-audio", One(&["weak", "yes", "no"])), ("prefetch-playlist", Flag), ("audio-display", One(&["no"])),
     ("cover-art-auto", One(&["no"])), ("input-default-bindings", Flag), ("input-vo-keyboard", Flag), ("osc", Flag),
@@ -86,24 +125,37 @@ fn af(s: &str) -> bool {
         })
 }
 
-/// A file on a drive or a share (not a device path like \\.\pipe\…).
-fn local(p: &str) -> bool {
+/// A file on a drive or a share (not a device path like \\.\pipe\…); on Linux and macOS an absolute path
+/// outside the kernel's own trees.
+pub fn local_on(os: Os, p: &str) -> bool {
+    if os != Os::Windows {
+        return p.starts_with('/')
+            && !p.starts_with("//")
+            && !p.contains('\0')
+            && !p.split('/').any(|s| s == "..")
+            && !["/dev/", "/proc/", "/sys/"].iter().any(|d| p.starts_with(d));
+    }
     let b = p.as_bytes();
     let drive = b.len() > 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && matches!(b[2], b'\\' | b'/');
     drive || (p.starts_with(r"\\") && !p.starts_with(r"\\?\") && !p.starts_with(r"\\.\"))
 }
 
+
 /// A local file, a stream or a ytdl:// web page: never mpv's other protocols (av://, lavf://, edl://, fd://…).
-fn media(p: &str) -> bool {
+fn media(os: Os, p: &str) -> bool {
     let l = p.to_ascii_lowercase();
     let web = |u: &str| u.starts_with("http://") || u.starts_with("https://");
-    local(p)
+    local_on(os, p)
         || web(&l)
         || ["rtsp://", "rtmp://", "mms://", "mmsh://"].iter().any(|s| l.starts_with(s))
         || l.strip_prefix("ytdl://").is_some_and(web)
 }
 
 pub fn check_prop(name: &str, value: &Value) -> Result<(), String> {
+    check_prop_on(OS, name, value)
+}
+
+pub fn check_prop_on(os: Os, name: &str, value: &Value) -> Result<(), String> {
     let kind = PROPS.iter().find(|(n, _)| *n == name).map(|(_, k)| *k);
     let ok = kind.zip(text(value)).is_some_and(|(kind, s)| match kind {
         Flag => s == "yes" || s == "no",
@@ -111,23 +163,28 @@ pub fn check_prop(name: &str, value: &Value) -> Result<(), String> {
         Track => s == "no" || s == "auto" || index(&s),
         One(allowed) => allowed.contains(&s.as_str()),
         Aspect => s == "-1" || s.split_once(':').is_some_and(|(w, h)| num(w) && num(h)),
-        Device => s == "auto" || s.starts_with("wasapi/"),
+        Device => device(os, &s),
         Af => af(&s),
+        Ao => ao(os, &s),
     });
     if ok { Ok(()) } else { Err(format!("mpv: {name} can't be set to {value}")) }
 }
 
 pub fn check_command(name: &str, args: &[Value]) -> Result<(), String> {
+    check_command_on(OS, name, args)
+}
+
+pub fn check_command_on(os: Os, name: &str, args: &[Value]) -> Result<(), String> {
     let refuse = || format!("mpv: command {name} {} isn't allowed", Value::from(args));
     let owned = args.iter().map(text).collect::<Option<Vec<_>>>().ok_or_else(refuse)?;
     let a: Vec<&str> = owned.iter().map(String::as_str).collect();
     let ok = match (name, a.as_slice()) {
-        ("set", [p, _]) => return check_prop(p, &args[1]),
-        ("loadfile", [p] | [p, "replace" | "append" | "append-play"]) => media(p),
+        ("set", [p, _]) => return check_prop_on(os, p, &args[1]),
+        ("loadfile", [p] | [p, "replace" | "append" | "append-play"]) => media(os, p),
         // resume and reload (queue.svelte.ts): per-file options are only ever the start time
-        ("loadfile", [p, "replace", "-1", start]) => media(p) && start.strip_prefix("start=").is_some_and(num),
+        ("loadfile", [p, "replace", "-1", start]) => media(os, p) && start.strip_prefix("start=").is_some_and(num),
         ("seek", [t, "absolute" | "relative"]) => num(t),
-        ("sub-add", [p, "select"]) => local(p),
+        ("sub-add", [p, "select"]) => local_on(os, p),
         ("af-command", ["pre", "volume", v]) => v.strip_suffix("dB").is_some_and(num),
         ("af-command", [l, "f" | "w" | "g", v]) => eq_label(l) && num(v),
         ("playlist-remove", [i]) => index(i),
@@ -241,17 +298,17 @@ mod tests {
         for _ in 0..20_000 {
             let args: Vec<Value> = (0..next() % 5).map(|_| Value::String((0..1 + next() % 4).map(|_| pieces[next() % pieces.len()]).collect())).collect();
             let name = names[next() % names.len()];
-            if check_command(name, &args).is_err() {
+            if check_command_on(Os::Windows, name, &args).is_err() {
                 continue;
             }
             accepted += 1;
             let a: Vec<String> = args.iter().filter_map(text).collect();
             assert!(!matches!(name, "run" | "subprocess" | "load-script"), "{name}");
             if name == "loadfile" {
-                assert!(media(&a[0]) && !a[0].to_ascii_lowercase().starts_with("av://"), "{a:?}");
+                assert!(media(Os::Windows, &a[0]) && !a[0].to_ascii_lowercase().starts_with("av://"), "{a:?}");
             }
             if name == "sub-add" {
-                assert!(local(&a[0]), "{a:?}");
+                assert!(local_on(Os::Windows, &a[0]), "{a:?}");
             }
             // a file name may say anything; filters and properties may not
             if matches!(name, "set" | "af-command") {
@@ -262,7 +319,38 @@ mod tests {
     }
 
     fn cmd(name: &str, args: Value) -> Result<(), String> {
-        check_command(name, args.as_array().unwrap())
+        check_command_on(Os::Windows, name, args.as_array().unwrap())
+    }
+    fn check_prop(name: &str, value: &Value) -> Result<(), String> {
+        check_prop_on(Os::Windows, name, value)
+    }
+
+    #[test]
+    fn each_os_gets_its_own_bit_perfect_output_and_devices() {
+        let ok = |os, name: &str, v: &str| check_prop_on(os, name, &json!(v)).is_ok();
+        assert!(ok(Os::Windows, "ao", "wasapi") && !ok(Os::Windows, "ao", "coreaudio"));
+        assert!(ok(Os::Mac, "ao", "coreaudio") && !ok(Os::Mac, "ao", "wasapi") && !ok(Os::Mac, "ao", "coreaudio_exclusive"));
+        assert!(ok(Os::Linux, "ao", "alsa") && !ok(Os::Linux, "ao", "pulse") && !ok(Os::Linux, "ao", "pcm"));
+        assert!(ok(Os::Mac, "audio-device", "coreaudio/AppleUSBAudioEngine:Chord:Mojo:14100000:1"));
+        assert!(!ok(Os::Mac, "audio-device", "coreaudio/") && !ok(Os::Mac, "audio-device", "wasapi/{x}"));
+        for good in ["auto", "alsa/default", "alsa/hw:CARD=PCH,DEV=0", "alsa/plughw:CARD=Mojo,DEV=0", "alsa/iec958:CARD=PCH", "alsa/hdmi:CARD=NVidia,DEV=3", "alsa/sysdefault:CARD=U192k"] {
+            assert!(ok(Os::Linux, "audio-device", good), "{good}");
+        }
+        // ALSA plugins that write files or run things, and anything not a hardware PCM
+        for bad in ["alsa/file:'/tmp/x',raw", "alsa/hw:CARD=PCH,DEV=0,x", "alsa/hw:CARD=../x", "alsa/pipe:CMD=sh", "alsa/hw:CARD=", "pulse/x", "alsa/dmix:CARD=PCH", "alsa/hw:CARD=PCH,DEV=100"] {
+            assert!(!ok(Os::Linux, "audio-device", bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn plays_local_files_on_every_os() {
+        assert!(local_on(Os::Linux, "/home/me/Music/a.flac") && local_on(Os::Mac, "/Users/me/Music/a b.flac"));
+        for bad in ["/dev/snd/pcmC0D0p", "/proc/self/environ", "/sys/x", "/home/../proc/self/environ", "//server/x", "relative/a.flac", r"D:\a.flac"] {
+            assert!(!local_on(Os::Linux, bad), "{bad}");
+        }
+        assert!(!local_on(Os::Windows, "/home/me/a.flac"));
+        assert!(check_command_on(Os::Linux, "loadfile", &[json!("/home/me/a.flac"), json!("replace")]).is_ok());
+        assert!(check_command_on(Os::Linux, "sub-add", &[json!("/proc/self/fd/0"), json!("select")]).is_err());
     }
 
     #[test]

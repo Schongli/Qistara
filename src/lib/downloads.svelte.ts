@@ -1,4 +1,5 @@
 // Downloads with yt-dlp (ytdlp.rs): the tools, and this session's jobs with their progress.
+import { isUnder } from './paths'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { audioDir, join } from '@tauri-apps/api/path'
@@ -83,7 +84,7 @@ export const defaultFolder = async () => join(await audioDir(), 'Qistara Downloa
 /** Where downloads go: the folder picked in Downloads, kept in settings, or the default. */
 export const downloadFolder = async () => settings.downloadFolder || defaultFolder()
 
-const inLibrary = (dir: string) => lib.folders.some((f) => dir.toLowerCase().startsWith(f.toLowerCase().replace(/[\\/]*$/, '\\')) || dir.toLowerCase() === f.toLowerCase())
+const inLibrary = (dir: string) => lib.folders.some((f) => isUnder(dir, f))
 
 /** Queues one job for all the links. The folder joins the library once the job is in (download_add
  *  creates it); its rescan picks up whatever is already saved, the watcher the rest. */

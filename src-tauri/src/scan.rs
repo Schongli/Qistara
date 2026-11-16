@@ -197,7 +197,9 @@ pub fn read(path: &Path, mtime: i64, size: i64, art: &Art) -> Track {
 fn under(path: &str, folder: &str) -> bool {
     let f = folder.trim_end_matches(['\\', '/']).as_bytes();
     let p = path.as_bytes();
-    p.len() > f.len() && p[..f.len()].eq_ignore_ascii_case(f) && matches!(p[f.len()], b'\\' | b'/')
+    // Windows paths ignore case; Linux and macOS paths are what the file system reported
+    let same = |a: &[u8], b: &[u8]| if cfg!(windows) { a.eq_ignore_ascii_case(b) } else { a == b };
+    p.len() > f.len() && same(&p[..f.len()], f) && matches!(p[f.len()], b'\\' | b'/')
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
@@ -374,7 +376,7 @@ mod tests {
 
     #[test]
     fn folder_matching_is_case_insensitive_and_boundary_safe() {
-        assert!(under(r"D:\Music\a.flac", r"d:\music"));
+        assert_eq!(under(r"D:\Music\a.flac", r"d:\music"), cfg!(windows), "only Windows ignores case");
         assert!(under(r"D:\Music\a.flac", r"D:\Music\"));
         assert!(!under(r"D:\Musicals\a.flac", r"D:\Music"));
         assert!(under(r"D:\a.flac", r"D:\"));

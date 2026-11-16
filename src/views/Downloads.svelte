@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { FILE_MANAGER, SYSTEM } from '../lib/os'
   import { open } from '@tauri-apps/plugin-dialog'
   import { revealItemInDir } from '@tauri-apps/plugin-opener'
   import Icon from '../components/Icon.svelte'
@@ -36,7 +37,7 @@
 {:else if !dl.tools.ytdlp}
   <section class="card">
     <h2 class="t-h2">Get yt-dlp</h2>
-    <p class="t-sub">Downloads come through yt-dlp, a free open-source tool. Qistara fetches the official Windows build from its GitHub release (about 18 MB) and checks it against the release's published SHA-256 before using it.</p>
+    <p class="t-sub">Downloads come through yt-dlp, a free open-source tool. Qistara fetches the official {SYSTEM} build from its GitHub release (about 18 MB) and checks it against the release's published SHA-256 before using it.</p>
     <button class="btn primary press" onclick={() => install('ytdlp')} disabled={!!dl.installing}>
       <Icon name="DownloadSimple" size={15} weight="bold" />{dl.installing === 'ytdlp' ? `Downloading… ${dl.toolTotal ? Math.round((dl.toolDone / dl.toolTotal) * 100) : 0}%` : 'Get yt-dlp'}
     </button>
@@ -85,7 +86,7 @@
           </div>
           {#if j.status === 'done'}<span class="ok"><Icon name="CheckCircle" size={18} weight="fill" /></span>{/if}
           {#if j.status === 'failed'}<span class="bad"><Icon name="WarningCircle" size={18} weight="fill" /></span>{/if}
-          {#if j.files.length}<button class="icon-btn" aria-label="Show in File Explorer" title="Show in File Explorer" onclick={() => revealItemInDir(j.files[j.files.length - 1])}><Icon name="FolderOpen" size={16} /></button>{/if}
+          {#if j.files.length}<button class="icon-btn" aria-label="Show in {FILE_MANAGER}" title="Show in {FILE_MANAGER}" onclick={() => revealItemInDir(j.files[j.files.length - 1])}><Icon name="FolderOpen" size={16} /></button>{/if}
           {#if j.status === 'queued' || j.status === 'running'}<button class="icon-btn" aria-label="Cancel" title="Cancel" onclick={() => cancel(j.id)}><Icon name="X" size={15} weight="bold" /></button>{/if}
         </li>
       {/each}

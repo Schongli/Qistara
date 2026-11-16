@@ -5,6 +5,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { settings } from './settings.svelte'
 import { queue } from './queue.svelte'
+import { OS } from './player.svelte'
 import { onAccent, readableAccent } from './color'
 import { presetOf, presetVars } from './themes'
 
@@ -14,6 +15,8 @@ export const ACCENTS: [string, string][] = [
 ]
 
 const root = document.documentElement
+// macOS keeps its own traffic lights top-left (tauri.macos.conf.json); Linux and Windows get Caps.svelte
+root.classList.add(`os-${OS}`)
 const system = matchMedia('(prefers-color-scheme: dark)')
 const scheme = $state({ systemDark: system.matches })
 system.addEventListener('change', (e) => (scheme.systemDark = e.matches))

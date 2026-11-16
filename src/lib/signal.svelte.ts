@@ -5,7 +5,7 @@ import { settings } from './settings.svelte'
 import { verdict } from './signal'
 
 const v = $derived(verdict({
-  audioIn: mpv.audioIn, audioOut: mpv.audioOut, ao: mpv.ao, exclusive: settings.bitPerfect,
+  audioIn: mpv.audioIn, audioOut: mpv.audioOut, ao: mpv.ao, exclusive: settings.bitPerfect, device: mpv.device ?? '',
   filters: mpv.af.length, volume: mpv.volume, speed: mpv.speed,
   replayGain: !settings.bitPerfect && settings.soundCheck, sourceBits: queue.current?.bitDepth ?? undefined,
 }))

@@ -38,6 +38,7 @@
     padding: 0 14px; background: var(--bar); backdrop-filter: var(--blur);
   }
   .bar.caps { padding-right: 146px; }
+  :global(.os-macos) .bar.caps { padding-right: 16px; }
   .hist { display: flex; gap: 2px; }
   .icon-btn:disabled { color: var(--text-3); background: none; }
   .search {

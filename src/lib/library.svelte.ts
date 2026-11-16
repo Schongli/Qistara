@@ -1,3 +1,4 @@
+import { joinPath, pathKey } from './paths'
 import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { byName, collator } from './format'
@@ -144,7 +145,7 @@ listen<string>('scan-error', (e) => {
 
 /** A cached cover by name, or a remote track's https picture (YouTube) as it is. */
 export const artUrl = (art: string | null | undefined) =>
-  art?.startsWith('https://') ? art : art && lib.artDir ? convertFileSrc(`${lib.artDir}\\${art}`) : null
+  art?.startsWith('https://') ? art : art && lib.artDir ? convertFileSrc(joinPath(lib.artDir, art)) : null
 
 export const addFolder = (path: string) => invoke('add_folder', { path })
 export const removeFolder = (path: string) => invoke('remove_folder', { path })
@@ -159,7 +160,7 @@ export const mediaExtensions = () => (extensions ??= invoke('extensions'))
 let adHoc = -1
 /** A track for a file outside the library (opened or dropped); reuses the library entry when there is one. */
 export async function fileTrack(path: string): Promise<Track | null> {
-  const known = lib.tracks.find((t) => t.path.toLowerCase() === path.toLowerCase())
+  const known = lib.tracks.find((t) => pathKey(t.path) === pathKey(path))
   if (known) return known
   const ext = path.split('.').pop()?.toLowerCase() ?? ''
   const { audio, video } = await mediaExtensions()

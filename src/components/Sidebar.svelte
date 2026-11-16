@@ -138,6 +138,8 @@
     width: 236px; flex: none; display: flex; flex-direction: column; min-height: 0;
     padding: 0 10px 10px; background: var(--sidebar); border-right: 1px solid var(--sep);
   }
+  /* room for macOS's own traffic lights above the logo */
+  :global(.os-macos) .side { padding-top: 30px; }
   .brand { display: flex; align-items: center; gap: 9px; height: var(--bar-h); padding: 0 8px; flex: none; }
   .brand span { font-weight: 700; font-size: 15px; letter-spacing: -0.02em; }
   .scroll { flex: 1; min-height: 0; overflow-y: auto; display: grid; align-content: start; gap: 1px; margin: 0 -4px; padding: 0 4px; }
