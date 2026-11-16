@@ -48,7 +48,8 @@ fn apply(tag: &mut Tag, e: &Edit) -> Result<(), String> {
     text(tag, &e.album_artist, |t, v| { t.insert_text(ItemKey::AlbumArtist, v); }, |t| t.remove_key(ItemKey::AlbumArtist));
     text(tag, &e.composer, |t, v| { t.insert_text(ItemKey::Composer, v); }, |t| t.remove_key(ItemKey::Composer));
     match number(&e.year)? {
-        Some(Some(y)) => tag.set_date(Timestamp { year: y as u16, month: None, day: None, hour: None, minute: None, second: None }),
+        Some(Some(y)) if (1..=9999).contains(&y) => tag.set_date(Timestamp { year: y as u16, month: None, day: None, hour: None, minute: None, second: None }),
+        Some(Some(y)) => return Err(format!("{y} isn't a year")),
         Some(None) => tag.remove_date(),
         None => {}
     }
@@ -126,6 +127,16 @@ pub fn write(path: &Path, edit: &Edit) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn refuses_years_that_dont_fit_a_tag() {
+        let edit = |y: &str| Edit { title: None, artist: None, album_artist: None, album: None, genre: None, composer: None, year: Some(y.into()), track: None, disc: None, cover: None };
+        let mut tag = Tag::new(lofty::tag::TagType::Id3v2);
+        assert!(apply(&mut tag, &edit("70000")).is_err(), "65536+ used to wrap to a wrong year");
+        assert!(apply(&mut tag, &edit("0")).is_err());
+        apply(&mut tag, &edit("1999")).unwrap();
+        assert_eq!(tag.date().map(|d| d.year), Some(1999));
+    }
 
     fn copy(name: &str, dir: &Path) -> PathBuf {
         let to = dir.join(name);

@@ -493,6 +493,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn fuzz_progress_lines_never_panic() {
+        let mut x = 99u32;
+        let mut next = || {
+            x ^= x << 13;
+            x ^= x >> 17;
+            x ^= x << 5;
+            x as usize
+        };
+        let pieces = ["DL ", "FILE ", "|", "%", "NA", "12.5", "nan", "é", "\u{0}", " ", "Unknown"];
+        for _ in 0..20_000 {
+            let line: String = (0..next() % 10).map(|_| pieces[next() % pieces.len()]).collect();
+            if let Some(p) = parse_progress(1, &line) {
+                assert!(p.percent.is_none_or(|v| !v.is_nan() || line.contains("nan")));
+            }
+        }
+    }
+
+    #[test]
     fn accepts_web_links_only() {
         assert!(valid_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
         assert!(valid_url("http://example.com/a.mp3"));

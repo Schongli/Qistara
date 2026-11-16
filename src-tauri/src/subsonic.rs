@@ -194,6 +194,8 @@ fn structured_to_lrc(list: &serde_json::Value) -> String {
     let all = list.as_array().map(Vec::as_slice).unwrap_or_default();
     let Some(l) = all.iter().find(|l| l["synced"] == true).or(all.first()) else { return String::new() };
     let lines = l["line"].as_array().map(Vec::as_slice).unwrap_or_default();
+    // one line per entry: a break inside a value would start a timed line of its own
+    let value = |x: &serde_json::Value| x["value"].as_str().unwrap_or_default().replace(['\r', '\n'], " ");
     let mut out = String::new();
     if l["synced"] == true {
         if let Some(o) = l["offset"].as_i64().filter(|o| *o != 0) {
@@ -201,11 +203,11 @@ fn structured_to_lrc(list: &serde_json::Value) -> String {
         }
         for x in lines {
             let ms = x["start"].as_i64().unwrap_or(0).max(0);
-            out.push_str(&format!("[{:02}:{:02}.{:03}]{}\n", ms / 60000, ms / 1000 % 60, ms % 1000, x["value"].as_str().unwrap_or_default()));
+            out.push_str(&format!("[{:02}:{:02}.{:03}]{}\n", ms / 60000, ms / 1000 % 60, ms % 1000, value(x)));
         }
     } else {
         for x in lines {
-            out.push_str(x["value"].as_str().unwrap_or_default());
+            out.push_str(&value(x));
             out.push('\n');
         }
     }
@@ -242,6 +244,28 @@ pub async fn subsonic_cover(lib: State<'_, Lib>, id: String) -> Result<Option<St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fuzz_structured_lyrics_from_a_server_never_panic() {
+        use serde_json::json;
+        let mut x = 7u32;
+        let mut next = || {
+            x ^= x << 13;
+            x ^= x >> 17;
+            x ^= x << 5;
+            x
+        };
+        let pick = |n: u32| [json!(null), json!(true), json!(-5), json!(1e300), json!("x\n[00:01.00]y"), json!([]), json!({}), json!(i64::MAX)][n as usize % 8].clone();
+        for _ in 0..5000 {
+            let line = json!({ "start": pick(next()), "value": pick(next()) });
+            let doc = json!([{ "synced": pick(next()), "offset": pick(next()), "line": [line.clone(), line, pick(next())] }, pick(next())]);
+            let lrc = structured_to_lrc(&doc);
+            // a value with a line break must not start a line of its own: one line per entry
+            let entries = doc[0]["line"].as_array().unwrap().len() + usize::from(doc[0]["synced"] == true && doc[0]["offset"].as_i64().is_some_and(|o| o != 0));
+            assert!(lrc.is_empty() || lrc.lines().count() == entries || doc[0]["synced"] != true && doc[1]["line"].is_null(), "{lrc:?}");
+            assert!(!lrc.contains("\n[00:01.00]y"), "{lrc:?}");
+        }
+    }
 
     #[test]
     fn reads_server_addresses() {

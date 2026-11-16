@@ -2,7 +2,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { open, save } from '@tauri-apps/plugin-dialog'
 import { createPlaylist, lib, type Track } from './library.svelte'
-import { buildM3u, parseM3u } from './m3u'
+import { buildM3u, isPosixDir, parseM3u } from './m3u'
 import { nav, toast } from './nav.svelte'
 import { plural } from './format'
 
@@ -21,11 +21,13 @@ export async function importPlaylist() {
   const file = await open({ multiple: false, title: 'Import playlist', filters: [{ name: 'Playlists', extensions: ['m3u8', 'm3u'] }] })
   if (typeof file !== 'string') return
   try {
-    const text = await invoke<string>('read_text', { path: file })
+    const text = await invoke<string>('read_text', { path: file, playlist: true })
     const dir = file.replace(/[\\/][^\\/]*$/, '')
-    const byPath = new Map(lib.tracks.map((t) => [t.path.toLowerCase(), t.id]))
+    // Windows paths ignore case; Linux and macOS (as Qistara's library sees them) don't
+    const key = isPosixDir(dir) ? (p: string) => p : (p: string) => p.toLowerCase()
+    const byPath = new Map(lib.tracks.map((t) => [key(t.path), t.id]))
     const entries = parseM3u(text, dir)
-    const ids = entries.map((e) => byPath.get(e.path.toLowerCase())).filter((id): id is number => id !== undefined)
+    const ids = entries.map((e) => byPath.get(key(e.path))).filter((id): id is number => id !== undefined)
     const name = file.split(/[\\/]/).pop()!.replace(/\.m3u8?$/i, '')
     const id = await createPlaylist(name, null, ids)
     nav.root({ name: 'playlist', id })

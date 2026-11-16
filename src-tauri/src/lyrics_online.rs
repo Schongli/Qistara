@@ -88,7 +88,8 @@ async fn lrclib(title: &str, artist: &str, album: &str, duration: f64) -> Result
     }
     let j: serde_json::Value = serde_json::from_str(&r.text().await.map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     let pick = |k: &str| j[k].as_str().filter(|s| !s.trim().is_empty()).map(str::to_owned);
-    Ok(pick("syncedLyrics").or_else(|| pick("plainLyrics")).unwrap_or_default())
+    // LRCLIB keeps whatever the uploader pasted, credits included
+    Ok(pick("syncedLyrics").or_else(|| pick("plainLyrics")).map(|l| drop_credits(&l, title, artist)).unwrap_or_default())
 }
 
 /// A search result to choose from: (id, title, length in ms, artists).
@@ -203,6 +204,11 @@ fn stamp(ms: i64) -> String {
 fn krc_to_lrc(krc: &str) -> String {
     let mut out = String::new();
     for line in krc.lines() {
+        // the KRC header's offset applies to the LRC the same way
+        if let Some(off) = line.trim().strip_prefix("[offset:").and_then(|o| o.strip_suffix(']')).filter(|o| o.trim().parse::<i64>().is_ok()) {
+            out.push_str(&format!("[offset:{}]\n", off.trim()));
+            continue;
+        }
         let Some((head, rest)) = line.strip_prefix('[').and_then(|l| l.split_once(']')) else { continue };
         let Some((Ok(start), Ok(_))) = head.split_once(',').map(|(a, b)| (a.parse::<i64>(), b.parse::<i64>())) else { continue };
         let mut words: Vec<(i64, i64, String)> = Vec::new();
@@ -228,20 +234,35 @@ fn krc_to_lrc(krc: &str) -> String {
     out
 }
 
-/// Both services open with credit lines ("作词 : …", "Lyrics by: …") and a "Title - Artist" line.
+/// Credit labels that open a "label: name" line. A label counts when it contains one of these (CJK, so
+/// "混音工程师" is "混音") or starts with one (Latin, so "Mixed by" but not a lyric that mentions it later).
+const CREDITS_CJK: [&str; 37] = [
+    "作词", "作曲", "编曲", "制作", "监制", "混音", "母带", "录音", "和声", "配唱", "出品", "发行", "吉他", "贝斯", "鼓手", "键盘",
+    "弦乐", "人声", "监唱", "企划", "统筹", "作詞", "編曲", "製作", "監製", "錄音", "和聲", "演唱", "原唱", "翻唱", "词", "曲",
+    "작사", "작곡", "편곡", "프로듀서", "보컬",
+];
+const CREDITS_LATIN: [&str; 20] = [
+    "lyrics by", "composed by", "produced by", "written by", "arranged by", "mixed by", "mastered by", "recorded by",
+    "music by", "words by", "lyricist", "composer", "arranger", "producer", "lyrics", "music", "vocals", "vocal", "op", "sp",
+];
+
+fn credit_line(t: &str) -> bool {
+    let Some((label, _)) = t.split_once([':', '：']) else { return false };
+    let label = label.trim();
+    !label.is_empty()
+        && label.chars().count() <= 16
+        && (CREDITS_CJK.iter().any(|c| label.contains(c)) || CREDITS_LATIN.iter().any(|c| label == *c || label.starts_with(&format!("{c} "))))
+}
+
+/// Lyrics services open with credit lines ("作词 : …", "Lyrics by: …") and a "Title - Artist" line.
 fn drop_credits(lrc: &str, title: &str, artist: &str) -> String {
-    const CREDITS: [&str; 22] = [
-        "作词", "作曲", "编曲", "制作人", "制作", "监制", "混音", "母带", "录音", "和声", "配唱", "出品", "发行", "词", "曲",
-        "lyrics by", "composed by", "produced by", "written by", "arranged by", "op", "sp",
-    ];
     let heading = [alnum(&format!("{title}{artist}")), alnum(&format!("{artist}{title}"))];
     let mut out = String::new();
     let mut sung = false;
     for line in lrc.lines() {
         let text: String = line.split(']').next_back().unwrap_or_default().split('>').filter_map(|p| p.split('<').next()).collect();
         let t = text.trim().to_lowercase();
-        let credit = CREDITS.iter().any(|c| t.strip_prefix(c).is_some_and(|r| r.trim_start().starts_with([':', '：'])));
-        if credit || (!t.is_empty() && heading.contains(&alnum(&t))) || line.trim_start().starts_with('{') {
+        if credit_line(&t) || (!t.is_empty() && heading.contains(&alnum(&t))) || line.trim_start().starts_with('{') {
             continue;
         }
         // a sung line, timed or plain; "[ti:…]"-style tags alone are not lyrics
@@ -257,6 +278,25 @@ fn drop_credits(lrc: &str, title: &str, artist: &str) -> String {
 mod tests {
     use super::*;
     use std::io::Write;
+
+    #[test]
+    fn fuzz_krc_and_credits_never_panic() {
+        let mut x = 0xdead_beefu32;
+        let mut next = || {
+            x ^= x << 13;
+            x ^= x >> 17;
+            x ^= x << 5;
+            x
+        };
+        let pieces = ["[", "]", "<", ">", ",", "0", "999999999999999999999", "-1", "作词", "：", ":", "\n", "offset:", "a", " "];
+        for _ in 0..20_000 {
+            let mut raw = b"krc1".to_vec();
+            raw.extend((0..next() % 64).map(|_| next() as u8));
+            let _ = decrypt_krc(&raw);
+            let text: String = (0..next() % 24).map(|_| pieces[next() as usize % pieces.len()]).collect();
+            let _ = drop_credits(&krc_to_lrc(&text), "t", "a");
+        }
+    }
 
     #[test]
     fn decrypts_krc_and_keeps_word_timing() {
@@ -276,6 +316,13 @@ mod tests {
         assert_eq!(drop_credits(lrc, "Shape of You", "Ed Sheeran"), "[00:09.480]The club isn't the best place\n[00:12.000]\n");
         assert_eq!(drop_credits("[00:00.000] 作词 : x\n", "a", "b"), "", "credits alone are no lyrics");
         assert_eq!(drop_credits("[ti:x]\nPlain line\n", "a", "b"), "[ti:x]\nPlain line\n", "unsynced lyrics stay");
+        let more = "[00:00.10]混音工程师 : A\n[00:00.20]和声编写：B\n[00:00.30]作詞：C\n[00:00.40]작사 : D\n[00:00.50]Mixed by: E\n[00:00.60]Lyricist : F\n[00:05.00]Music is all I need\n[00:06.00]Producer of dreams, that's me\n";
+        assert_eq!(drop_credits(more, "t", "a"), "[00:05.00]Music is all I need\n[00:06.00]Producer of dreams, that's me\n");
+    }
+
+    #[test]
+    fn keeps_the_krc_offset() {
+        assert_eq!(krc_to_lrc("[offset:-250]\n[1000,500]<0,500,0>Hi\n"), "[offset:-250]\n[00:01.000]<00:01.000>Hi<00:01.500>\n");
     }
 
     #[test]

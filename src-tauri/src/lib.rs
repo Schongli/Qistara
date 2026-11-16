@@ -325,14 +325,15 @@ fn write_playlist(path: String, text: String) -> Res<()> {
   std::fs::write(&path, text.as_bytes()).map_err(err)
 }
 
-/// Reads a small text file the user picked (an Equalizer APO / AutoEQ preset).
+/// Reads a text file the user picked: an Equalizer APO / AutoEQ preset, or an M3U playlist (any encoding).
 #[tauri::command]
-fn read_text(path: String) -> Res<String> {
+fn read_text(path: String, playlist: Option<bool>) -> Res<String> {
+  let (max, what) = if playlist == Some(true) { (16 << 20, "a playlist") } else { (1 << 20, "a preset") };
   let m = std::fs::metadata(&path).map_err(err)?;
-  if m.len() > 1024 * 1024 {
-    return Err("file is too large for a preset".into());
+  if m.len() > max {
+    return Err(format!("This file is too large to be {what}."));
   }
-  std::fs::read_to_string(&path).map_err(err)
+  Ok(lyrics::decode_text(&std::fs::read(&path).map_err(err)?))
 }
 
 /// A picked image file, staged so the tag editor can preview it before embedding.
@@ -417,6 +418,16 @@ fn rescan(app: AppHandle) {
   }
   std::thread::spawn(move || {
     let lib = app.state::<Lib>();
+    /// If anything below panics, later rescans must still run.
+    struct Unstick<'a>(&'a AtomicBool);
+    impl Drop for Unstick<'_> {
+      fn drop(&mut self) {
+        if std::thread::panicking() {
+          self.0.store(false, SeqCst);
+        }
+      }
+    }
+    let _unstick = Unstick(&lib.scanning);
     loop {
       lib.again.store(false, SeqCst);
       match scan::scan(&lib.db, &lib.art, &|done, total| {

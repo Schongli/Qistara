@@ -252,8 +252,11 @@ pub fn scan(db: &Mutex<Connection>, art: &Art, progress: &(dyn Fn(usize, usize) 
     let total = todo.len();
     let parsed: Vec<Track> = todo
         .par_iter()
-        .map(|(p, m, s)| {
-            let t = read(p, *m, *s, art);
+        .filter_map(|(p, m, s)| {
+            // a crafted or damaged file that panics a parser costs that file, not the whole scan
+            let t = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| read(p, *m, *s, art)))
+                .inspect_err(|_| log::warn!("skipped a file the tag reader choked on: {}", p.display()))
+                .ok();
             let n = done.fetch_add(1, Ordering::Relaxed) + 1;
             if n.is_multiple_of(25) || n == total {
                 progress(n, total);

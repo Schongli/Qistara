@@ -140,15 +140,21 @@ fn read_request(s: &mut std::net::TcpStream) -> (String, String) {
             break;
         }
         buf.extend_from_slice(&chunk[..n]);
-        let text = String::from_utf8_lossy(&buf);
-        if let Some(end) = text.find("\r\n\r\n") {
-            let len = text[..end].lines().find_map(|l| l.to_ascii_lowercase().strip_prefix("content-length:").and_then(|v| v.trim().parse::<usize>().ok())).unwrap_or(0);
-            if buf.len() >= end + 4 + len {
-                return (text[..end].to_string(), text[end + 4..end + 4 + len.min(text.len() - end - 4)].to_string());
-            }
+        if let Some(req) = parse_request(&buf) {
+            return req;
         }
     }
     (String::from_utf8_lossy(&buf).to_string(), String::new())
+}
+
+/// A complete request's head and body, or None while more bytes are due. Works on bytes, so a request
+/// that isn't UTF-8 (or splits a character) can't make the slicing panic.
+pub fn parse_request(buf: &[u8]) -> Option<(String, String)> {
+    let end = buf.windows(4).position(|w| w == b"\r\n\r\n")?;
+    let head = String::from_utf8_lossy(&buf[..end]).into_owned();
+    let len = head.lines().find_map(|l| l.to_ascii_lowercase().strip_prefix("content-length:").and_then(|v| v.trim().parse::<usize>().ok())).unwrap_or(0);
+    let body = buf.get(end + 4..)?;
+    (body.len() >= len).then(|| (head, String::from_utf8_lossy(&body[..len]).into_owned()))
 }
 
 /// Only our own address: a web page that rebinds its domain to 127.0.0.1 sends its own Host, and so can't
@@ -289,6 +295,23 @@ pub async fn apple_tracks(playlist: Option<String>) -> Result<Vec<Track>, String
 mod tests {
     use super::*;
     use ring::signature::{EcdsaKeyPair, KeyPair, UnparsedPublicKey, ECDSA_P256_SHA256_FIXED, ECDSA_P256_SHA256_FIXED_SIGNING};
+
+    #[test]
+    fn parses_requests_byte_by_byte_without_panicking() {
+        let req = b"POST /done HTTP/1.1\r\nHost: 127.0.0.1:5\r\nContent-Length: 4\r\n\r\n\xc3\xa9ab";
+        assert_eq!(parse_request(req), Some(("POST /done HTTP/1.1\r\nHost: 127.0.0.1:5\r\nContent-Length: 4".into(), "éab".into())));
+        assert_eq!(parse_request(&req[..req.len() - 1]), None, "body still arriving");
+        // a body that splits a character, or a head that isn't UTF-8, once panicked the sign-in thread
+        assert!(parse_request(b"GET / HTTP/1.1\r\nX: \xff\xfe\r\nContent-Length: 1\r\n\r\n\xc3\xa9").is_some());
+        let mut x = 0x9e3779b9u32;
+        for _ in 0..20_000 {
+            let n = (x % 96) as usize;
+            let bytes: Vec<u8> = (0..n).map(|_| { x ^= x << 13; x ^= x >> 17; x ^= x << 5; [b'\r', b'\n', b':', b'1', 0xc3, 0xa9, b'a'][(x % 7) as usize] }).collect();
+            let mut v = b"Content-Length: 3\r\n".to_vec();
+            v.extend(bytes);
+            let _ = parse_request(&v);
+        }
+    }
 
     #[test]
     fn signs_a_developer_token_that_verifies() {

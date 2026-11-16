@@ -101,9 +101,12 @@ export function parseApo(text: string): Eq | null {
   const bands: Band[] = []
   for (const m of text.matchAll(/Filter\s*\d*:\s*(ON|OFF)\s+(\w+)\s+Fc\s+([\d.]+)\s*Hz(?:\s+Gain\s+([-\d.]+)\s*dB)?(?:\s+Q\s+([\d.]+))?/gi)) {
     const t = type[m[2].toUpperCase()]
-    if (t) bands.push({ type: t, f: +m[3], g: +(m[4] ?? 0), q: +(m[5] ?? 0.707), on: m[1].toUpperCase() === 'ON' })
+    const band = { type: t, f: +m[3], g: +(m[4] ?? 0), q: +(m[5] ?? 0.707), on: m[1].toUpperCase() === 'ON' }
+    // "1.2.3 Hz" reads as NaN, which mpv would refuse
+    if (t && [band.f, band.g, band.q].every(Number.isFinite)) bands.push(band)
   }
   if (!bands.length) return null
   const pre = text.match(/Preamp:\s*([-\d.]+)\s*dB/i)
-  return { enabled: true, autoPreamp: !pre, preamp: pre ? +pre[1] : 0, bands: bands.slice(0, MAX_BANDS) }
+  const preamp = pre ? +pre[1] : NaN
+  return { enabled: true, autoPreamp: !Number.isFinite(preamp), preamp: Number.isFinite(preamp) ? preamp : 0, bands: bands.slice(0, MAX_BANDS) }
 }

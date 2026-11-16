@@ -3665,6 +3665,7 @@ name = "qistara"
 version = "0.3.0"
 dependencies = [
  "base64 0.22.1",
+ "encoding_rs",
  "flate2",
  "getrandom 0.3.4",
  "image",

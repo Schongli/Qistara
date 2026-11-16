@@ -221,6 +221,46 @@ pub async fn mpv_ytdl_sign_in(window: WebviewWindow, cookies: String) -> Result<
 mod tests {
     use super::*;
 
+    #[test]
+    fn fuzz_the_allowlist_never_lets_anything_dangerous_through() {
+        let pieces = [
+            "loadfile", "run", "subprocess", "script-opts", "ytdl-raw-options", "@eq0:lavfi=[", "@pre:lavfi=[", "equalizer=f=", "volume=",
+            "amovie=", "]", ",", ":", "=", "dB", "\\\\.\\pipe\\x", "\\\\?\\C:\\", "D:\\a.flac", "/etc/passwd", "ytdl://", "https://x",
+            "av://", "edl://", "lavf://", "replace", "start=", "1", "-1", "yes", "no", "nan", "inf", "1e999", "wasapi/", "alsa/", "file:",
+            "hw:CARD=x,DEV=0", " ", "%", "t=q", "eq", "af", "sid", "auto",
+        ];
+        let names = ["loadfile", "set", "af-command", "seek", "sub-add", "run", "subprocess", "load-script", "stop", "cycle", "playlist-remove"];
+        let mut x = 0x1234_5677u32;
+        let mut next = || {
+            x ^= x << 13;
+            x ^= x >> 17;
+            x ^= x << 5;
+            x as usize
+        };
+        let mut accepted = 0;
+        for _ in 0..20_000 {
+            let args: Vec<Value> = (0..next() % 5).map(|_| Value::String((0..1 + next() % 4).map(|_| pieces[next() % pieces.len()]).collect())).collect();
+            let name = names[next() % names.len()];
+            if check_command(name, &args).is_err() {
+                continue;
+            }
+            accepted += 1;
+            let a: Vec<String> = args.iter().filter_map(text).collect();
+            assert!(!matches!(name, "run" | "subprocess" | "load-script"), "{name}");
+            if name == "loadfile" {
+                assert!(media(&a[0]) && !a[0].to_ascii_lowercase().starts_with("av://"), "{a:?}");
+            }
+            if name == "sub-add" {
+                assert!(local(&a[0]), "{a:?}");
+            }
+            // a file name may say anything; filters and properties may not
+            if matches!(name, "set" | "af-command") {
+                assert!(a.iter().all(|v| !v.contains("amovie") && !v.contains("script-opts") && !v.contains("ytdl-raw-options")), "{name} {a:?}");
+            }
+        }
+        assert!(accepted > 50, "the fuzzer should reach accepted commands too ({accepted})");
+    }
+
     fn cmd(name: &str, args: Value) -> Result<(), String> {
         check_command(name, args.as_array().unwrap())
     }
