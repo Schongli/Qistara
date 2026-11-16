@@ -35,7 +35,8 @@ image = { version = "0.25.10", default-features = false, features = ["jpeg", "pn
 souvlaki = "0.9.3"
 md5 = "0.8.1"
 tauri-plugin-opener = "2.7.3"
-keyring = { version = "4.2.0", default-features = false, features = ["v1", "windows-native-keyring-store"] }
+# v1 picks the native store per OS: Credential Manager, macOS Keychain, Secret Service
+keyring = { version = "4.2.0", default-features = false, features = ["v1"] }
 # Spotify sign-in (PKCE); all four were already in the build as dependencies of other crates
 sha2 = "0.10"
 base64 = "0.22"
@@ -45,8 +46,8 @@ url = "2"
 # Apple Music developer tokens (ES256); already in the build through rustls
 ring = "0.17"
 # Japanese lyrics for learners: word splitting, readings and dictionary forms. The IPADIC dictionary is
-# downloaded once at build time (md5-checked) and embedded: ~46 MB in the app, ~7 MB in the installer.
-lindera = { version = "6.2", features = ["embed-ipadic"] }
+# optional: Learn mode downloads and builds it on first use (japanese.rs), so the app doesn't carry ~46 MB.
+lindera = "6.2"
 # decoding recitations to find the pauses between ayahs (pure Rust)
 symphonia = { version = "0.5", default-features = false, features = ["aac", "alac", "flac", "isomp4", "mp3", "wav", "pcm", "ogg", "vorbis"] }
 

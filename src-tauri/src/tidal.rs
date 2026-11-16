@@ -111,11 +111,10 @@ fn read_token(c: &mut Creds, j: &Value) -> Result<(String, Instant), String> {
 async fn access(app: &AppHandle, renew: bool) -> Result<String, String> {
     let state = app.state::<TidalToken>();
     let mut held = state.0.lock().await;
-    if let Some((t, until)) = held.as_ref().filter(|_| !renew) {
-        if Instant::now() < *until {
+    if let Some((t, until)) = held.as_ref().filter(|_| !renew)
+        && Instant::now() < *until {
             return Ok(t.clone());
         }
-    }
     let mut c = load().filter(|c| c.refresh.is_some()).ok_or("Sign in to Tidal in Providers first.")?;
     let refresh = c.refresh.clone().unwrap_or_default();
     let j = token_request(&[("grant_type", "refresh_token"), ("refresh_token", &refresh), ("client_id", &c.client_id)]).await?;

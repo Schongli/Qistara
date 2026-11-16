@@ -82,7 +82,10 @@ pub enum Call {
     Playlist { id: String },
 }
 
-pub fn endpoint(call: &Call) -> Result<(&'static str, Vec<(&'static str, String)>), String> {
+/// A Subsonic method and its query parameters.
+pub type Endpoint = (&'static str, Vec<(&'static str, String)>);
+
+pub fn endpoint(call: &Call) -> Result<Endpoint, String> {
     let id = |id: &String| if valid_id(id) { Ok(vec![("id", id.clone())]) } else { Err("bad id".to_string()) };
     Ok(match call {
         Call::AlbumList { kind, offset } => {

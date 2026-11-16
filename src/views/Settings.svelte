@@ -18,6 +18,8 @@
   import { defaultFolder } from '../lib/downloads.svelte'
   import { plural } from '../lib/format'
   import { LANGUAGES, languageName, targetFor } from '../lib/translate'
+  import { installDictionary, learn } from '../lib/learn.svelte'
+  import { mb } from '../lib/format'
 
   let { tab = 'general' }: { tab?: string } = $props()
 
@@ -88,6 +90,18 @@
   async function pickDownloads() {
     const d = await open({ directory: true, multiple: false, title: 'Save downloads in' })
     if (typeof d === 'string') settings.downloadFolder = d
+  }
+
+  // ---- Japanese dictionary (optional download, japanese.rs) ----
+  let dict = $state<{ installed: boolean; bytes: number } | null>(null)
+  const refreshDict = () => invoke<{ installed: boolean; bytes: number }>('japanese_status').then((d) => (dict = d), () => (dict = null))
+  $effect(() => {
+    learn.dict
+    if (shown('lyrics')) refreshDict()
+  })
+  async function removeDict() {
+    await invoke('japanese_remove').catch((e) => (learn.error = String(e)))
+    refreshDict()
   }
 
   // ---- Last.fm ----
@@ -328,6 +342,17 @@
             {#each LANGUAGES as [code, name] (code)}<option value={code}>{name}</option>{/each}
           </select>
         </label>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="t-h2">Learn mode</h2>
+      <div class="group">
+        <div class="line">
+          <span>Japanese dictionary <span class="t-sub">{learn.dict === 'installing' ? 'installing…' : dict?.installed ? `installed, ${mb(dict.bytes)}` : 'not installed: needed for readings and word forms'}</span></span>
+          {#if dict?.installed}<button class="btn press" onclick={removeDict}>Remove</button>
+          {:else}<button class="btn press" disabled={learn.dict === 'installing'} onclick={installDictionary}>Install (12 MB)</button>{/if}
+        </div>
       </div>
     </section>
   {/if}

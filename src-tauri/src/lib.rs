@@ -496,61 +496,6 @@ fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
   Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn copies_the_old_library_once_and_leaves_it_in_place() {
-    let d = tempfile::tempdir().unwrap();
-    let (old, new) = (d.path().join("com.sonora.player"), d.path().join("com.qistara.app"));
-    std::fs::create_dir_all(old.join("art/sub")).unwrap();
-    std::fs::create_dir_all(old.join("EBWebView")).unwrap();
-    std::fs::write(old.join("library.db"), b"db").unwrap();
-    std::fs::write(old.join("art/sub/a.jpg"), b"jpg").unwrap();
-    assert!(migrate(&old, &new).unwrap());
-    assert_eq!(std::fs::read(new.join("library.db")).unwrap(), b"db");
-    assert_eq!(std::fs::read(new.join("art/sub/a.jpg")).unwrap(), b"jpg");
-    assert!(!new.join("EBWebView").exists());
-    assert!(old.join("library.db").exists());
-    // a library of its own is never overwritten
-    std::fs::write(new.join("library.db"), b"mine").unwrap();
-    assert!(!migrate(&old, &new).unwrap());
-    assert_eq!(std::fs::read(new.join("library.db")).unwrap(), b"mine");
-    // nothing to copy: a fresh install
-    assert!(!migrate(&d.path().join("none"), &d.path().join("fresh")).unwrap());
-  }
-
-  #[test]
-  fn takes_the_newest_old_library() {
-    let d = tempfile::tempdir().unwrap();
-    for (n, db) in [("com.confluenceplayer.app", "confluence"), ("com.sonora.player", "sonora")] {
-      std::fs::create_dir_all(d.path().join(n)).unwrap();
-      std::fs::write(d.path().join(n).join("library.db"), db).unwrap();
-    }
-    let new = d.path().join("com.qistara.app");
-    std::fs::create_dir_all(&new).unwrap();
-    let copied: Vec<bool> = OLD_DATA.iter().map(|n| migrate(&d.path().join(n), &new).unwrap()).collect();
-    assert_eq!(copied, [true, false]);
-    assert_eq!(std::fs::read(new.join("library.db")).unwrap(), b"confluence");
-  }
-
-  #[test]
-  fn finds_a_covers_colour_and_none_in_grey_art() {
-    let half = image::RgbImage::from_fn(64, 64, |x, _| if x < 32 { image::Rgb([200, 30, 40]) } else { image::Rgb([128, 128, 128]) });
-    let c = vivid(&image::DynamicImage::ImageRgb8(half)).unwrap();
-    let [r, g, b] = [1, 3, 5].map(|i| u8::from_str_radix(&c[i..i + 2], 16).unwrap());
-    assert!(r > 170 && g < 70 && b < 80, "{c}");
-    // two strong hues: one of them, never the grey between them
-    let split = image::RgbImage::from_fn(64, 64, |x, _| if x < 40 { image::Rgb([20, 40, 120]) } else { image::Rgb([220, 170, 40]) });
-    let c = vivid(&image::DynamicImage::ImageRgb8(split)).unwrap();
-    let [r, g, b] = [1, 3, 5].map(|i| u8::from_str_radix(&c[i..i + 2], 16).unwrap());
-    assert!(b > 90 && r < 60 && g < 70, "{c}");
-    let grey = image::RgbImage::from_pixel(64, 64, image::Rgb([90, 90, 90]));
-    assert_eq!(vivid(&image::DynamicImage::ImageRgb8(grey)), None);
-  }
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -610,7 +555,8 @@ pub fn run() {
       tag_write, fetch_cover, stage_image, read_text, write_playlist, kv_get, kv_set,
       lastfm_status, lastfm_set_keys, lastfm_begin, lastfm_finish, lastfm_logout, lastfm_now_playing, lastfm_scrobble, media_keys::media_track, media_keys::media_state,
       spotify::spotify_status, spotify::spotify_set_client, spotify::spotify_begin, spotify::spotify_logout, spotify::spotify_playlists,
-      spotify::spotify_tracks, spotify::spotify_player, spotify::spotify_control, japanese::japanese_words, translate::google_translate,
+      spotify::spotify_tracks, spotify::spotify_player, spotify::spotify_control, japanese::japanese_words, japanese::japanese_install, japanese::japanese_status, japanese::japanese_remove,
+      translate::google_translate,
       quran::quran_fetch, quran::quran_pauses, ytdlp::tools_status, ytdlp::tool_install, ytdlp::ytdlp_update,
       ytdlp::download_add, ytdlp::download_cancel, ytdlp::youtube_search, ytdlp::youtube_list, ytdlp::youtube_cookies,
       subsonic::subsonic_status, subsonic::subsonic_connect, subsonic::subsonic_logout, subsonic::subsonic_call,
@@ -621,4 +567,59 @@ pub fn run() {
     ])
     .run(tauri::generate_context!())
     .expect("error while building tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn copies_the_old_library_once_and_leaves_it_in_place() {
+    let d = tempfile::tempdir().unwrap();
+    let (old, new) = (d.path().join("com.sonora.player"), d.path().join("com.qistara.app"));
+    std::fs::create_dir_all(old.join("art/sub")).unwrap();
+    std::fs::create_dir_all(old.join("EBWebView")).unwrap();
+    std::fs::write(old.join("library.db"), b"db").unwrap();
+    std::fs::write(old.join("art/sub/a.jpg"), b"jpg").unwrap();
+    assert!(migrate(&old, &new).unwrap());
+    assert_eq!(std::fs::read(new.join("library.db")).unwrap(), b"db");
+    assert_eq!(std::fs::read(new.join("art/sub/a.jpg")).unwrap(), b"jpg");
+    assert!(!new.join("EBWebView").exists());
+    assert!(old.join("library.db").exists());
+    // a library of its own is never overwritten
+    std::fs::write(new.join("library.db"), b"mine").unwrap();
+    assert!(!migrate(&old, &new).unwrap());
+    assert_eq!(std::fs::read(new.join("library.db")).unwrap(), b"mine");
+    // nothing to copy: a fresh install
+    assert!(!migrate(&d.path().join("none"), &d.path().join("fresh")).unwrap());
+  }
+
+  #[test]
+  fn takes_the_newest_old_library() {
+    let d = tempfile::tempdir().unwrap();
+    for (n, db) in [("com.confluenceplayer.app", "confluence"), ("com.sonora.player", "sonora")] {
+      std::fs::create_dir_all(d.path().join(n)).unwrap();
+      std::fs::write(d.path().join(n).join("library.db"), db).unwrap();
+    }
+    let new = d.path().join("com.qistara.app");
+    std::fs::create_dir_all(&new).unwrap();
+    let copied: Vec<bool> = OLD_DATA.iter().map(|n| migrate(&d.path().join(n), &new).unwrap()).collect();
+    assert_eq!(copied, [true, false]);
+    assert_eq!(std::fs::read(new.join("library.db")).unwrap(), b"confluence");
+  }
+
+  #[test]
+  fn finds_a_covers_colour_and_none_in_grey_art() {
+    let half = image::RgbImage::from_fn(64, 64, |x, _| if x < 32 { image::Rgb([200, 30, 40]) } else { image::Rgb([128, 128, 128]) });
+    let c = vivid(&image::DynamicImage::ImageRgb8(half)).unwrap();
+    let [r, g, b] = [1, 3, 5].map(|i| u8::from_str_radix(&c[i..i + 2], 16).unwrap());
+    assert!(r > 170 && g < 70 && b < 80, "{c}");
+    // two strong hues: one of them, never the grey between them
+    let split = image::RgbImage::from_fn(64, 64, |x, _| if x < 40 { image::Rgb([20, 40, 120]) } else { image::Rgb([220, 170, 40]) });
+    let c = vivid(&image::DynamicImage::ImageRgb8(split)).unwrap();
+    let [r, g, b] = [1, 3, 5].map(|i| u8::from_str_radix(&c[i..i + 2], 16).unwrap());
+    assert!(b > 90 && r < 60 && g < 70, "{c}");
+    let grey = image::RgbImage::from_pixel(64, 64, image::Rgb([90, 90, 90]));
+    assert_eq!(vivid(&image::DynamicImage::ImageRgb8(grey)), None);
+  }
 }

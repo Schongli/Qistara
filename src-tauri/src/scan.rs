@@ -143,8 +143,8 @@ pub fn read(path: &Path, mtime: i64, size: i64, art: &Art) -> Track {
         added_at: now(),
         ..Default::default()
     };
-    if t.kind == "audio" {
-        if let Ok(f) = lofty::read_from_path(path) {
+    if t.kind == "audio"
+        && let Ok(f) = lofty::read_from_path(path) {
             let p = f.properties();
             t.duration = p.duration().as_secs_f64();
             t.sample_rate = p.sample_rate();
@@ -187,7 +187,6 @@ pub fn read(path: &Path, mtime: i64, size: i64, art: &Art) -> Track {
                 t.art = front(tag).and_then(|p| art.thumb(p.data()));
             }
         }
-    }
     if t.art.is_none() {
         t.art = path.parent().and_then(|d| art.folder(d));
     }
@@ -256,7 +255,7 @@ pub fn scan(db: &Mutex<Connection>, art: &Art, progress: &(dyn Fn(usize, usize) 
         .map(|(p, m, s)| {
             let t = read(p, *m, *s, art);
             let n = done.fetch_add(1, Ordering::Relaxed) + 1;
-            if n % 25 == 0 || n == total {
+            if n.is_multiple_of(25) || n == total {
                 progress(n, total);
             }
             t

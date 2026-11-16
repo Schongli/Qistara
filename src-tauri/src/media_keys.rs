@@ -1,6 +1,5 @@
-// Windows media keys + the system media overlay (SMTC) via souvlaki.
+// Media keys and the system media overlay (SMTC on Windows, MPRIS on Linux, Now Playing on macOS) via souvlaki.
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig};
-use std::ffi::c_void;
 use std::path::Path;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -9,8 +8,11 @@ use tauri::{Emitter, Manager, State, WebviewWindow};
 pub struct Media(pub Mutex<Option<MediaControls>>);
 
 pub fn init(window: &WebviewWindow) -> Option<MediaControls> {
-    let hwnd = window.hwnd().ok()?.0 as *mut c_void;
-    let mut c = MediaControls::new(PlatformConfig { display_name: "Qistara", dbus_name: "qistara", hwnd: Some(hwnd) })
+    #[cfg(windows)]
+    let hwnd = Some(window.hwnd().ok()?.0 as *mut std::ffi::c_void);
+    #[cfg(not(windows))]
+    let hwnd = None;
+    let mut c = MediaControls::new(PlatformConfig { display_name: "Qistara", dbus_name: "qistara", hwnd })
         .map_err(|e| log::warn!("media controls unavailable: {e:?}"))
         .ok()?;
     let app = window.app_handle().clone();
