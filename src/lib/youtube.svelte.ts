@@ -3,7 +3,9 @@
 import { invoke } from '@tauri-apps/api/core'
 import { remoteTrack } from './radio.svelte'
 import { ytCookies } from './downloads.svelte'
-import { mpv } from './player.svelte'
+import { mpv, onMpvEvent } from './player.svelte'
+import { queue } from './queue.svelte'
+import { toast } from './nav.svelte'
 import { settings } from './settings.svelte'
 import type { Track } from './library.svelte'
 
@@ -42,4 +44,10 @@ $effect.root(() => {
     if (!mpv.ready) return
     invoke('mpv_ytdl_sign_in', { cookies: c }).catch((e) => console.warn('YouTube playback sign-in:', e))
   })
+})
+
+// a YouTube track that fails to open would otherwise just go silent
+onMpvEvent((e) => {
+  if (e.event !== 'end-file' || String(e.reason) !== 'error' || !queue.current?.path.startsWith('ytdl://')) return
+  toast(`Couldn't play this YouTube video${e.file_error ? ` (${e.file_error})` : ''}. Check for a yt-dlp update in Downloads.`)
 })

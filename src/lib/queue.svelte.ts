@@ -5,6 +5,8 @@ import { cmd, load, mpv, seek, set } from './player.svelte'
 import { autoplayPicks, indexAfterMove, insertAfter, move, nextIndex, shuffleRest, type Repeat } from './queue'
 import { lib, type Track } from './library.svelte'
 import { kvGet, kvSet } from './persist'
+import { invoke } from '@tauri-apps/api/core'
+import { toast } from './nav.svelte'
 
 class Queue {
   items = $state.raw<Track[]>([])
@@ -166,6 +168,11 @@ class Queue {
   async #start(paused = false) {
     const t = this.current
     if (!t) return
+    // YouTube needs yt-dlp and a JavaScript runtime: say what's missing rather than fail without a sound
+    if (t.path.startsWith('ytdl://')) {
+      const missing = await invoke('youtube_ready').then(() => '', String)
+      if (missing) return toast(missing)
+    }
     await resumePoint()
     if (paused) {
       await set('pause', true)

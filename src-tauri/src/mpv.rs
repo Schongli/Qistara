@@ -11,8 +11,27 @@ use tauri_plugin_libmpv::{MpvConfig, MpvExt};
 
 use crate::ytdlp;
 
-/// yt-dlp needs a JavaScript runtime for YouTube; `mpv_ytdl_sign_in` appends the sign-in.
-const YTDL_RAW: &str = "js-runtimes=node";
+/// The ytdl hook's yt-dlp options: never a config file or cache of its own (the same as ytdlp.rs runs it), our
+/// JavaScript runtime by path, and the sign-in: Firefox's cookies, or the hook's copy of a cookies.txt.
+fn ytdl_raw(app: &tauri::AppHandle, cookies: &str) -> String {
+    let mut o = vec!["ignore-config=".to_string(), "no-cache-dir=".to_string()];
+    if let Ok(js) = ytdlp::js_runtime(app) {
+        o.push(format!("js-runtimes={}", quote(&js)));
+    }
+    match cookies {
+        "firefox" => o.push("cookies-from-browser=firefox".into()),
+        "" => {}
+        path => match ytdlp::hook_cookies(app, Some(path)) {
+            Ok(Some(copy)) => o.push(format!("cookies={}", quote(&copy.to_string_lossy()))),
+            // a file that's gone plays as a guest
+            _ => log::warn!("YouTube plays as a guest: the cookies file can't be read"),
+        },
+    }
+    if matches!(cookies, "" | "firefox") {
+        let _ = ytdlp::hook_cookies(app, None);
+    }
+    o.join(",")
+}
 
 #[derive(Clone, Copy)]
 enum Kind {
@@ -222,11 +241,13 @@ pub async fn mpv_init(window: WebviewWindow, mut mpv_config: MpvConfig) -> Resul
         check_prop(name, value)?;
     }
     let data = window.path().app_local_data_dir().map_err(|e| e.to_string())?;
-    let ytdlp = ytdlp::bin_dir(window.app_handle())?.join("yt-dlp.exe");
+    let ytdlp = ytdlp::bin_dir(window.app_handle())?.join(ytdlp::exe("yt-dlp"));
+    let raw = ytdl_raw(window.app_handle(), "");
     let o = &mut mpv_config.initial_options;
-    o.insert("ytdl-raw-options".into(), json!(YTDL_RAW));
-    // ytdl:// tracks (youtube.svelte.ts) play through our own yt-dlp (ytdlp.rs)
-    let hook = format!("ytdl_hook-ytdl_path={},ytdl_hook-all_formats=no", quote(&ytdlp.to_string_lossy()));
+    o.insert("ytdl-raw-options".into(), json!(raw));
+    // ytdl:// tracks (youtube.svelte.ts) play through our own yt-dlp (ytdlp.rs). A listening session's
+    // loopback stream (session.rs) is never handed to yt-dlp, even when it fails to open.
+    let hook = format!("ytdl_hook-ytdl_path={},ytdl_hook-all_formats=no,ytdl_hook-exclude=^127%.0%.0%.1[:/]", quote(&ytdlp.to_string_lossy()));
     o.insert("script-opts".into(), json!(hook));
     o.insert("watch-later-dir".into(), json!(data.join("resume").to_string_lossy()));
     // dev builds keep mpv's own log (format negotiation, device errors) next to the library
@@ -256,19 +277,12 @@ pub async fn mpv_set(window: WebviewWindow, name: String, value: Value) -> Resul
     on_mpv(window, move |w| w.mpv().set_property(&name, &value, w.label())).await
 }
 
-/// YouTube playback signs in like search and downloads: as a guest, with Firefox's cookies, or with a
-/// checked copy of a cookies.txt export (ytdlp.rs cookie_file). A file that's gone plays as a guest.
+/// YouTube playback signs in like search and downloads: as a guest, with Firefox's cookies, or with the
+/// hook's checked copy of a cookies.txt export (ytdlp.rs hook_cookies). Also called after Deno is installed.
 #[tauri::command]
 pub async fn mpv_ytdl_sign_in(window: WebviewWindow, cookies: String) -> Result<(), String> {
     on_mpv(window, move |w| {
-        let raw = match cookies.as_str() {
-            "" => YTDL_RAW.to_string(),
-            "firefox" => format!("{YTDL_RAW},cookies-from-browser=firefox"),
-            path => match ytdlp::youtube_cookies(w.app_handle().clone(), path.into()) {
-                Ok(copy) => format!("{YTDL_RAW},cookies={}", quote(&copy)),
-                Err(_) => YTDL_RAW.to_string(),
-            },
-        };
+        let raw = ytdl_raw(w.app_handle(), &cookies);
         w.mpv().set_property("ytdl-raw-options", &json!(raw), w.label())
     })
     .await
