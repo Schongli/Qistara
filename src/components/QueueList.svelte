@@ -5,12 +5,19 @@
   import { queue } from '../lib/queue.svelte'
   import { mpv } from '../lib/player.svelte'
   import { openMenu, trackMenu } from '../lib/menu.svelte'
+  import VirtualList from './VirtualList.svelte'
+  import type { Track } from '../lib/library.svelte'
 
   let { dark = false }: { dark?: boolean } = $props()
   let dragFrom = $state<number | null>(null)
   let over = $state<number | null>(null)
   const base = $derived(queue.index + 1)
+  // Up Next can be the whole library (play from Songs): only the rows on screen are made
+  const ROW = 52
+  const reset = () => (dragFrom = over = null)
 </script>
+
+<svelte:window ondragend={reset} ondrop={reset} />
 
 <div class="q" class:dark>
   {#if queue.current}
@@ -31,7 +38,9 @@
       {#if queue.upNext.length}<button class="clear" onclick={() => queue.clearUpNext()}>Clear</button>{/if}
     </span>
   </div>
-  {#each queue.upNext as t, i (base + i + ':' + t.id)}
+  <VirtualList items={queue.upNext} rowHeight={ROW} page overscan={6}>
+    {#snippet empty()}<p class="sub empty">{queue.current ? 'Nothing up next. Use Play Next or Play Later on any song or album.' : 'Play something to fill Up Next.'}</p>{/snippet}
+    {#snippet row(t: Track, i: number)}
     {@const at = base + i}
     <div
       class="item"
@@ -51,9 +60,8 @@
       <span class="txt"><span class="ellipsis">{t.title}</span><span class="sub ellipsis">{t.artist}</span></span>
       <button class="rm" aria-label="Remove {t.title}" onclick={() => queue.remove(at)}><Icon name="X" size={12} weight="bold" /></button>
     </div>
-  {:else}
-    <p class="sub empty">{queue.current ? 'Nothing up next. Use Play Next or Play Later on any song or album.' : 'Play something to fill Up Next.'}</p>
-  {/each}
+    {/snippet}
+  </VirtualList>
 </div>
 
 <style>
@@ -64,7 +72,7 @@
   .acts { display: flex; align-items: center; gap: 12px; }
   .auto { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 11px; font-size: 11.5px; font-weight: 600; color: var(--text-2); background: var(--fill); }
   .auto.on { color: var(--on-accent); background: var(--accent); }
-  .item { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--r); min-width: 0; border-top: 2px solid transparent; }
+  .item { display: flex; align-items: center; gap: 10px; height: 52px; box-sizing: border-box; padding: 6px 8px; border-radius: var(--r); min-width: 0; border-top: 2px solid transparent; }
   .item:hover { background: var(--fill); }
   .item.over { border-top-color: var(--accent); }
   .txt { flex: 1; min-width: 0; display: grid; line-height: 17px; }

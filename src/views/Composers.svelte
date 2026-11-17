@@ -42,7 +42,7 @@
 <style>
   .split { position: absolute; inset: 0; display: grid; grid-template-columns: 250px 1fr; }
   .list { overflow-y: auto; padding: calc(var(--bar-h) + 12px) 8px 16px 14px; border-right: 1px solid var(--sep); }
-  .item { display: flex; justify-content: space-between; gap: 10px; width: 100%; height: 34px; align-items: center; padding: 0 10px; border-radius: var(--r); text-align: left; }
+  .item { display: flex; justify-content: space-between; gap: 10px; width: 100%; height: 34px; align-items: center; padding: 0 10px; border-radius: var(--r); text-align: left; content-visibility: auto; contain-intrinsic-size: auto 34px; }
   .item:hover { background: var(--fill); }
   .item.sel { background: var(--fill-2); font-weight: 550; }
   .empty { padding: 8px; line-height: 1.5; }

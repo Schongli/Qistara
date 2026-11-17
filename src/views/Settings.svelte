@@ -22,6 +22,7 @@
   import { LANGUAGES, languageName, targetFor } from '../lib/translate'
   import { installDictionary, learn } from '../lib/learn.svelte'
   import { forgetCovers } from '../lib/subsonic.svelte'
+  import { usePack } from '../lib/icons.svelte'
   import { mb } from '../lib/format'
 
   let { tab = 'general' }: { tab?: string } = $props()
@@ -75,6 +76,10 @@
   }
 
   // ---- appearance ----
+  // the icon-pack previews need every pack, so they load once Appearance is open
+  $effect(() => {
+    if (shown('appearance')) for (const [p] of PACKS) usePack(p)
+  })
   const preset = $derived(presetOf(settings.theme))
   const accent = $derived(settings.accent || preset?.accent || ACCENTS[0][1])
   // live while the picker is dragged; saved (and made readable) when it closes
