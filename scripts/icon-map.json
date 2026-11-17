@@ -78,5 +78,7 @@
   "WarningCircle": { "lucide": "circle-alert|*", "iconoir": "warning-circle|warning-circle-solid", "ri": "error-warning-line|error-warning-fill", "solar": "danger-circle-linear|danger-circle-bold" },
   "Waveform": { "lucide": "audio-waveform", "iconoir": "sound-high", "ri": "voiceprint-line", "solar": "soundwave-linear" },
   "Waves": { "lucide": "waves", "iconoir": "sea-waves", "ri": "rhythm-line", "solar": "soundwave-circle-linear" },
-  "X": { "lucide": "x", "iconoir": "xmark", "ri": "close-line", "solar": "close-square-linear" }
+  "X": { "lucide": "x", "iconoir": "xmark", "ri": "close-line", "solar": "close-square-linear" },
+  "Users": { "lucide": "users", "iconoir": "community", "ri": "group-line|group-fill", "solar": "users-group-rounded-linear|users-group-rounded-bold" },
+  "ChatCircle": { "lucide": "message-circle|*", "iconoir": "chat-bubble|chat-bubble-solid", "ri": "chat-1-line|chat-1-fill", "solar": "chat-round-linear|chat-round-bold" }
 }

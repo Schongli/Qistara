@@ -3,6 +3,7 @@
   // blurred cover like Now Playing, so the same views read well in light and dark mode alike.
   import Icon from './Icon.svelte'
   import PanelContent from './PanelContent.svelte'
+  import SessionPanel from './SessionPanel.svelte'
   import { ui } from '../lib/nav.svelte'
   import { queue } from '../lib/queue.svelte'
   import { artUrl, largeCover } from '../lib/library.svelte'
@@ -14,10 +15,10 @@
     if (path && queue.current?.id && queue.current.id > 0) largeCover(path).then((c) => path === queue.current?.path && (cover = c))
   })
   const bg = $derived(cover ?? artUrl(queue.current?.art))
-  const tabs = [['lyrics', 'Lyrics'], ['queue', 'Up Next']] as const
+  const tabs = [['lyrics', 'Lyrics'], ['queue', 'Up Next'], ['session', 'Session']] as const
 </script>
 
-<aside class="panel" aria-label={ui.panel === 'queue' ? 'Up Next' : 'Lyrics'}>
+<aside class="panel" aria-label={ui.panel === 'queue' ? 'Up Next' : ui.panel === 'session' ? 'Session' : 'Lyrics'}>
   <div class="backdrop" aria-hidden="true">{#if bg}<img src={bg} alt="" />{/if}</div>
   <header>
     <div class="tabs" role="tablist" aria-label="Pane">
@@ -28,7 +29,9 @@
     <button class="icon-btn press close" aria-label="Close pane" onclick={() => (ui.panel = '')}><Icon name="X" size={14} weight="bold" /></button>
   </header>
   <div class="body">
-    {#if queue.current || ui.panel === 'queue'}
+    {#if ui.panel === 'session'}
+      <SessionPanel />
+    {:else if queue.current || ui.panel === 'queue'}
       <PanelContent mode={ui.panel === 'queue' ? 'queue' : 'lyrics'} />
     {:else}
       <p class="empty">Lyrics show here while a song plays.</p>

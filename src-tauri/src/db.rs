@@ -1,3 +1,4 @@
+use rusqlite::OptionalExtension;
 use rusqlite::{params, Connection, Row};
 use serde::Serialize;
 use std::path::Path;
@@ -114,6 +115,11 @@ fn row(r: &Row) -> rusqlite::Result<Track> {
 pub fn tracks(c: &Connection) -> rusqlite::Result<Vec<Track>> {
     let mut s = c.prepare(&format!("SELECT {COLS} FROM tracks"))?;
     s.query_map([], row)?.collect()
+}
+
+/// A library track's file, by id: the only way a listening session reaches a file (session.rs).
+pub fn path_of(c: &Connection, id: i64) -> rusqlite::Result<Option<String>> {
+    c.query_row("SELECT path FROM tracks WHERE id = ?1", [id], |r| r.get(0)).optional()
 }
 
 pub fn folders(c: &Connection) -> rusqlite::Result<Vec<String>> {

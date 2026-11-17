@@ -170,8 +170,11 @@ export async function load(path: string, mode: 'replace' | 'append' | 'append-pl
   // keep-open pauses at end of file and the pause carries over to the next load
   if (mode === 'replace') await set('pause', false)
 }
-export const togglePause = () => set('pause', !mpv.pause)
-export const seek = (t: number) => cmd('seek', t, 'absolute')
+/** A listening session's guest follows the host: buttons, keys and lyric taps leave playback alone while it does
+ *  (session.svelte.ts moves mpv itself). */
+export const lock = $state({ following: false })
+export const togglePause = () => (lock.following ? Promise.resolve() : set('pause', !mpv.pause))
+export const seek = (t: number) => (lock.following ? Promise.resolve() : cmd('seek', t, 'absolute'))
 export const stop = () => cmd('stop')
 // a new command or property must also be allowed in mpv.rs
 export const set = (name: string, value: string | number | boolean) => invoke<void>('mpv_set', { name, value })

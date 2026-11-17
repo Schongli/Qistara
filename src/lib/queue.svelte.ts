@@ -1,7 +1,7 @@
 // Up Next. The queue here is the truth; mpv's playlist only ever holds [current, next] so
 // track changes are gapless, and every queue edit re-syncs the "next" slot.
 import { untrack } from 'svelte'
-import { cmd, load, mpv, seek, set } from './player.svelte'
+import { cmd, load, lock, mpv, seek, set } from './player.svelte'
 import { autoplayPicks, indexAfterMove, insertAfter, move, nextIndex, shuffleRest, type Repeat } from './queue'
 import { lib, type Track } from './library.svelte'
 import { kvGet, kvSet } from './persist'
@@ -18,6 +18,9 @@ class Queue {
   #order: number[] = [] // track ids in pre-shuffle order
   #restored = false // saving before restore() would overwrite the last session with an empty queue
 
+  /** What mpv really has lined up after the current song (repeat-one, stop-after and autoplay included). */
+  appended = $state.raw<Track | null>(null)
+
   current = $derived(this.items[this.index] ?? null)
   upNext = $derived(this.items.slice(this.index + 1))
 
@@ -29,13 +32,46 @@ class Queue {
       })
       $effect(() => {
         const { items, index, shuffle, repeat, autoplay } = this
-        if (this.#restored) untrack(() => save(items, index, shuffle, repeat, autoplay))
+        // a guest's own queue waits, saved as it was, while it follows a listening session
+        if (this.#restored && !lock.following) untrack(() => save(items, index, shuffle, repeat, autoplay))
       })
     })
   }
 
+  /** True (and says so) while this player follows a listening session's host. */
+  #following() {
+    if (lock.following) toast("You're listening along. Leave the session to choose what plays.")
+    return lock.following
+  }
+
+  /** A listening session: play the host's song from `at`, with the host's next one lined up. */
+  async follow(cur: Track, next: Track | null, at: number) {
+    this.items = next ? [cur, next] : [cur]
+    this.index = 0
+    await cmd('loadfile', cur.path, 'replace', -1, `start=${Math.max(0, at)}`)
+    await set('pause', false)
+    await this.#syncNext()
+  }
+
+  /** A listening session changed what comes after the current song. */
+  followNext(next: Track | null) {
+    const cur = this.current
+    if (!cur) return
+    this.items = next ? [cur, next] : [cur]
+    return this.#syncNext()
+  }
+
+  /** Leaving a session: back to your own queue, paused where you left it. */
+  async unfollow() {
+    lock.following = false
+    await cmd('stop').catch(() => {})
+    this.items = []
+    this.index = -1
+    await this.#restore(new Map(lib.tracks.map((t) => [t.id, t])))
+  }
+
   async play(tracks: Track[], start = 0, shuffle = false) {
-    if (!tracks.length) return
+    if (!tracks.length || this.#following()) return
     this.#order = tracks.map((t) => t.id)
     this.shuffle = shuffle
     this.items = shuffle ? shuffleRest([tracks[start], ...tracks.filter((_, i) => i !== start)], 0) : tracks
@@ -44,12 +80,14 @@ class Queue {
   }
 
   playNext(tracks: Track[]) {
+    if (this.#following()) return
     if (this.index < 0) return this.play(tracks)
     this.items = insertAfter(this.items, this.index, tracks)
     return this.#syncNext()
   }
 
   playLater(tracks: Track[]) {
+    if (this.#following()) return
     if (this.index < 0) return this.play(tracks)
     this.items = [...this.items, ...tracks]
     return this.#syncNext()
@@ -57,6 +95,7 @@ class Queue {
 
   /** `paused`: load the next song without starting it (the sleep timer ends this way). */
   async next(paused = false) {
+    if (this.#following()) return
     const n = nextIndex(this.items.length, this.index, this.repeat, true)
     if (n < 0) return
     this.index = n
@@ -64,17 +103,20 @@ class Queue {
   }
 
   async prev() {
+    if (this.#following()) return
     if (mpv.time > 3 || this.index <= 0) return seek(0)
     this.index--
     await this.#start()
   }
 
   async jump(i: number) {
+    if (this.#following()) return
     this.index = i
     await this.#start()
   }
 
   remove(i: number) {
+    if (this.#following()) return
     if (i === this.index) return
     this.items = this.items.filter((_, j) => j !== i)
     if (i < this.index) this.index--
@@ -82,17 +124,20 @@ class Queue {
   }
 
   reorder(from: number, to: number) {
+    if (this.#following()) return
     this.items = move(this.items, from, to)
     this.index = indexAfterMove(this.index, from, to)
     return this.#syncNext()
   }
 
   clearUpNext() {
+    if (this.#following()) return
     this.items = this.items.slice(0, this.index + 1)
     return this.#syncNext()
   }
 
   toggleShuffle() {
+    if (this.#following()) return
     this.shuffle = !this.shuffle
     if (this.shuffle) {
       this.#order = this.items.map((t) => t.id)
@@ -117,6 +162,7 @@ class Queue {
   }
 
   cycleRepeat() {
+    if (this.#following()) return
     this.repeat = this.repeat === 'off' ? 'all' : this.repeat === 'all' ? 'one' : 'off'
     return this.#syncNext()
   }
@@ -182,7 +228,8 @@ class Queue {
   }
 
   async #advanced() {
-    this.index = nextIndex(this.items.length, this.index, this.repeat, false)
+    // following a session, the next item is simply the next one: the guest's own repeat mode doesn't apply
+    this.index = lock.following ? Math.min(this.index + 1, this.items.length - 1) : nextIndex(this.items.length, this.index, this.repeat, false)
     await cmd('playlist-remove', 0)
     await this.#syncNext()
   }
@@ -209,6 +256,14 @@ class Queue {
   async #syncNext() {
     const t = this.current
     if (!t) return
+    if (lock.following) {
+      // the host decides what's next: no repeat, autoplay or stop-after of our own
+      await set('loop-file', 'no')
+      await cmd('playlist-clear')
+      this.appended = this.items[this.index + 1] ?? null
+      if (this.appended) await load(this.appended.path, 'append')
+      return
+    }
     await set('loop-file', this.repeat === 'one' ? 'inf' : 'no')
     await cmd('playlist-clear') // drops everything but the playing entry
     let n = nextIndex(this.items.length, this.index, this.repeat, false)
@@ -220,7 +275,8 @@ class Queue {
       }
     }
     if (n < 0 && this.autoplay && this.repeat === 'off' && t.id <= 0) this.#extend(t)
-    if (n >= 0 && this.repeat !== 'one' && !this.stopAfterCurrent) await load(this.items[n].path, 'append')
+    this.appended = n >= 0 && this.repeat !== 'one' && !this.stopAfterCurrent ? this.items[n] : null
+    if (this.appended) await load(this.appended.path, 'append')
   }
 }
 
@@ -244,7 +300,7 @@ export const queue = new Queue()
 
 // position survives a restart: save it every few seconds while playing
 setInterval(() => {
-  if (mpv.pause || !queue.current || queue.index < 0) return
+  if (mpv.pause || !queue.current || queue.index < 0 || lock.following) return
   save(queue.items, queue.index, queue.shuffle, queue.repeat, queue.autoplay)
   if (queue.current.kind === 'video') resumePoint() // survives a crash or a closed window
 }, 5000)

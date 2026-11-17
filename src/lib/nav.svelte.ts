@@ -93,7 +93,7 @@ export const ui = $state({
   queue: false,
   lyrics: false,
   // the docked pane beside the library
-  panel: '' as '' | 'lyrics' | 'queue',
+  panel: '' as '' | 'lyrics' | 'queue' | 'session',
   // bumped to focus the search field (Ctrl+F, the sidebar's Search); Ctrl+F in Settings searches settings
   search: 0,
   settingsSearch: 0,

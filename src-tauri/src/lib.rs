@@ -9,6 +9,7 @@ mod media_keys;
 mod mpv;
 mod quran;
 mod scan;
+mod session;
 mod spotify;
 mod subsonic;
 mod tags;
@@ -38,6 +39,13 @@ pub struct Lib {
   scanning: AtomicBool,
   again: AtomicBool,
   watcher: Mutex<Option<Debouncer<RecommendedWatcher>>>,
+}
+
+impl Lib {
+  /// A library track's path by id (a listening session shares files only this way).
+  pub fn path_of(&self, id: i64) -> Res<Option<String>> {
+    db::path_of(&self.db.lock().unwrap(), id).map_err(err)
+  }
 }
 
 type Res<T> = Result<T, String>;
@@ -105,7 +113,7 @@ fn screenshot_dir(app: AppHandle) -> Res<String> {
 /// Lyrics found online for a library song stay with the library; those for a server song ("sub:<id>"), a
 /// YouTube video or a stream go to streaming/lyrics, which Settings › Storage can clear on its own.
 fn lyrics_dir(lib: &Lib, key: &str) -> std::path::PathBuf {
-  if ["sub:", "ytdl://", "http://", "https://"].iter().any(|p| key.starts_with(p)) {
+  if ["sub:", "session:", "ytdl://", "http://", "https://"].iter().any(|p| key.starts_with(p)) {
     lib.stream_art.dir.with_file_name("lyrics")
   } else {
     lib.art.dir.with_file_name("lyrics")
@@ -399,6 +407,17 @@ fn art_color(lib: State<Lib>, art: String) -> Option<String> {
   vivid(&image::open(art_file(&lib, &art)?).ok()?)
 }
 
+/// A listening session shows guests the host's cover of a library song: a 160 px JPEG small enough to send
+/// with the song's details (64 KB at most).
+#[tauri::command]
+fn session_art(lib: State<Lib>, art: String) -> Option<String> {
+  use base64::Engine;
+  let img = image::open(art_file(&lib, &art)?).ok()?.thumbnail(160, 160).to_rgb8();
+  let mut out = Vec::new();
+  image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 75).encode_image(&img).ok()?;
+  (out.len() <= 64 * 1024).then(|| format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(out)))
+}
+
 /// Settings › Storage: what each part of app data takes, in bytes.
 #[derive(serde::Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -597,6 +616,7 @@ pub fn run() {
     .manage(spotify::Token::default())
     .manage(ytdlp::Downloads::default())
     .manage(tidal::TidalToken::default())
+    .manage(session::Session::default())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -652,6 +672,8 @@ pub fn run() {
       translate::google_translate,
       quran::quran_fetch, quran::quran_pauses, ytdlp::tools_status, ytdlp::tool_install, ytdlp::ytdlp_update,
       ytdlp::download_add, ytdlp::download_cancel, ytdlp::youtube_search, ytdlp::youtube_list, ytdlp::youtube_ready, ytdlp::download_probe,
+      session::session_host, session::session_share, session::session_state, session::session_chat, session::session_kick,
+      session::session_join, session::session_leave, session_art,
       ytmusic::ytm_home, ytmusic::ytm_search, ytmusic::ytm_album, ytmusic::ytm_artist, ytmusic::ytm_playlist, ytmusic::ytm_radio,
       japanese::japanese_status,
       subsonic::subsonic_status, subsonic::subsonic_connect, subsonic::subsonic_logout, subsonic::subsonic_call,

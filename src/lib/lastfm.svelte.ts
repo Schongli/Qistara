@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { untrack } from 'svelte'
 import { queue } from './queue.svelte'
 import { whenPlayed } from './stats.svelte'
+import { lock } from './player.svelte'
 import type { Track } from './library.svelte'
 
 export const lastfm = $state({ configured: false, user: null as string | null, waiting: false, error: '', pending: 0 })
@@ -13,8 +14,9 @@ export async function refresh() {
 }
 refresh()
 
-// Last.fm only accepts tracks over 30 s with an artist and title
-const eligible = (t: Track) => t.kind === 'audio' && !!t.artist && !!t.title && (t.duration === 0 || t.duration > 30)
+// Last.fm only accepts tracks over 30 s with an artist and title; listening along to someone else's session isn't
+// your listening (their Last.fm scrobbles it)
+const eligible = (t: Track) => !lock.following && t.kind === 'audio' && !!t.artist && !!t.title && (t.duration === 0 || t.duration > 30)
 const payload = (t: Track, timestamp = 0) => ({
   s: { artist: t.artist, track: t.title, album: t.album, duration: Math.round(t.duration), timestamp },
 })

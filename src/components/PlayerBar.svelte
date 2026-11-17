@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { session } from '../lib/session.svelte'
   // The player along the bottom: what's playing, transport and progress, then the panes and volume.
   import Icon from './Icon.svelte'
   import Artwork from './Artwork.svelte'
@@ -23,7 +24,7 @@
   // radio and URL streams; mpv reports a buffer length as their "duration"
   const live = $derived(t?.codec === 'Stream')
   const vol = $derived(volume())
-  const toggle = (p: 'lyrics' | 'queue') => (ui.panel = ui.panel === p ? '' : p)
+  const toggle = (p: 'lyrics' | 'queue' | 'session') => (ui.panel = ui.panel === p ? '' : p)
   let signalOpen = $state(false)
   let badge = $state<HTMLButtonElement | null>(null)
 </script>
@@ -71,6 +72,9 @@
     {/if}
     <button class="icon-btn press" class:on={ui.panel === 'lyrics'} aria-label="Lyrics" aria-pressed={ui.panel === 'lyrics'} onclick={() => toggle('lyrics')}><Icon name="Quotes" size={17} weight="fill" /></button>
     <button class="icon-btn press" class:on={ui.panel === 'queue'} aria-label="Up Next" aria-pressed={ui.panel === 'queue'} onclick={() => toggle('queue')}><Icon name="ListBullets" size={18} weight="bold" /></button>
+    <button class="icon-btn press sess" class:on={ui.panel === 'session' || !!session.role} aria-label={session.role ? `Listening together, ${session.guests.length} ${session.guests.length === 1 ? 'guest' : 'guests'}` : 'Listen together'} aria-pressed={ui.panel === 'session'} title="Listen together" onclick={() => toggle('session')}>
+      <Icon name="Users" size={18} weight={session.role ? 'fill' : 'regular'} />{#if session.role && session.guests.length}<span class="count">{session.guests.length}</span>{/if}
+    </button>
     <button class="icon-btn press" class:on={eq.enabled} aria-label="Equalizer" title="Equalizer" onclick={() => nav.root({ name: 'eq' })}><Icon name="SlidersHorizontal" size={17} weight="bold" /></button>
     <div class="vol">
       {#if vol === 0}<Icon name="SpeakerNone" size={16} />{:else}<Icon name="SpeakerHigh" size={16} />{/if}
@@ -115,4 +119,6 @@
   .vol :global(.slider) { flex: 1; }
   @media (max-width: 1100px) { .sig { display: none; } }
   @media (prefers-reduced-transparency: reduce) { .player { backdrop-filter: none; } }
+  .sess { position: relative; }
+  .count { position: absolute; top: 2px; right: 1px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; background: var(--accent); color: var(--on-accent); font-size: 9.5px; font-weight: 700; line-height: 14px; }
 </style>
