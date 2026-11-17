@@ -515,6 +515,13 @@ pub struct Downloads {
     jobs: Mutex<HashMap<u64, Option<Arc<Mutex<Child>>>>>,
 }
 
+impl Downloads {
+    /// A job is queued or running (its partial files are in streaming/tmp).
+    pub fn busy(&self) -> bool {
+        !self.jobs.lock().unwrap().is_empty()
+    }
+}
+
 #[tauri::command]
 pub fn download_add(app: AppHandle, dl: State<Downloads>, urls: Vec<String>, choice: Choice, dest: String, cookies: Option<Cookies>) -> Result<u64, String> {
     let urls: Vec<String> = urls.into_iter().map(|u| u.trim().to_string()).filter(|u| !u.is_empty()).collect();

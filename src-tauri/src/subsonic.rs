@@ -223,7 +223,8 @@ pub fn subsonic_stream(id: String) -> Result<String, String> {
     Ok(signed(&creds()?, "stream", &[("id", id), ("format", "raw".into())], &salt()?)?.to_string())
 }
 
-/// A cover, saved into the art cache (the page may only show pictures from there); returns its cache name.
+/// A cover, saved into the streaming art cache (the page may only show pictures from there); returns its
+/// name as artUrl (library.svelte.ts) reads it: "stream:<hash>.jpg".
 #[tauri::command]
 pub async fn subsonic_cover(lib: State<'_, Lib>, id: String) -> Result<Option<String>, String> {
     if !valid_id(&id) {
@@ -238,7 +239,7 @@ pub async fn subsonic_cover(lib: State<'_, Lib>, id: String) -> Result<Option<St
     if bytes.len() > 20 * 1024 * 1024 {
         return Ok(None);
     }
-    Ok(lib.art.thumb(&bytes))
+    Ok(lib.stream_art.thumb(&bytes).map(|n| format!("stream:{n}")))
 }
 
 #[cfg(test)]

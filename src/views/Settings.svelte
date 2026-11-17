@@ -21,6 +21,7 @@
   import { plural } from '../lib/format'
   import { LANGUAGES, languageName, targetFor } from '../lib/translate'
   import { installDictionary, learn } from '../lib/learn.svelte'
+  import { forgetCovers } from '../lib/subsonic.svelte'
   import { mb } from '../lib/format'
 
   let { tab = 'general' }: { tab?: string } = $props()
@@ -92,6 +93,23 @@
   async function pickDownloads() {
     const d = await open({ directory: true, multiple: false, title: 'Save downloads in' })
     if (typeof d === 'string') settings.downloadFolder = d
+  }
+
+  // ---- storage: the library's own data apart from what streaming leaves behind (lib.rs storage_usage) ----
+  type Usage = { libraryArt: number; lyrics: number; streaming: number; tools: number; dictionary: number }
+  let usage = $state<Usage | null>(null)
+  const refreshUsage = () => invoke<Usage>('storage_usage').then((u) => (usage = u), () => (usage = null))
+  $effect(() => {
+    if (shown('general')) refreshUsage()
+  })
+  async function clearStreaming() {
+    await invoke('clear_streaming_cache')
+    forgetCovers()
+    refreshUsage()
+  }
+  async function clearLyrics() {
+    await invoke('clear_lyrics_cache')
+    refreshUsage()
   }
 
   // ---- Japanese dictionary (optional download, japanese.rs) ----
@@ -183,6 +201,23 @@
           </span>
         </div>
         <Toggle bind:checked={settings.downloadToLibrary} label="Add downloads to the library" hint="New downloads appear with the rest of your music." />
+      </div>
+    </section>
+
+    <section>
+      <h2 class="t-h2">Storage</h2>
+      <p class="t-sub">What streaming leaves behind is kept apart from your library, so it can be cleared without touching your music, playlists or settings.</p>
+      <div class="group">
+        <div class="line">
+          <span class="txt"><span>Streaming cache</span><span class="hint">Covers and lyrics from your server and YT Music{usage ? ` · ${mb(usage.streaming)}` : ''}</span></span>
+          <button class="btn press" onclick={clearStreaming}>Clear</button>
+        </div>
+        <div class="line">
+          <span class="txt"><span>Lyrics found online</span><span class="hint">For songs in your library; looked up again on the next play{usage ? ` · ${mb(usage.lyrics)}` : ''}</span></span>
+          <button class="btn press" onclick={clearLyrics}>Clear</button>
+        </div>
+        <div class="line"><span class="txt"><span>Library artwork</span><span class="hint">Rebuilt from your files when needed{usage ? ` · ${mb(usage.libraryArt)}` : ''}</span></span></div>
+        <div class="line"><span class="txt"><span>Tools and dictionary</span><span class="hint">yt-dlp, ffmpeg, Deno; the Japanese dictionary{usage ? ` · ${mb(usage.tools + usage.dictionary)}` : ''}</span></span></div>
       </div>
     </section>
   {/if}
