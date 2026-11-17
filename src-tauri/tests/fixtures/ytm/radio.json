@@ -1,0 +1,111 @@
+{
+ "contents": {
+  "singleColumnMusicWatchNextResultsRenderer": {
+   "tabbedRenderer": {
+    "watchNextTabbedResultsRenderer": {
+     "tabs": [
+      {
+       "tabRenderer": {
+        "content": {
+         "musicQueueRenderer": {
+          "content": {
+           "playlistPanelRenderer": {
+            "contents": [
+             {
+              "playlistPanelVideoRenderer": {
+               "videoId": "dQw4w9WgXcQ",
+               "title": {
+                "runs": [
+                 {
+                  "text": "Never Gonna Give You Up"
+                 }
+                ]
+               },
+               "longBylineText": {
+                "runs": [
+                 {
+                  "text": "Rick Astley",
+                  "navigationEndpoint": {
+                   "browseEndpoint": {
+                    "browseId": "UCuAXFkgsw1L7xaCfnd5JJOw"
+                   }
+                  }
+                 },
+                 {
+                  "text": " • "
+                 },
+                 {
+                  "text": "1987"
+                 }
+                ]
+               },
+               "lengthText": {
+                "runs": [
+                 {
+                  "text": "3:34"
+                 }
+                ]
+               },
+               "thumbnail": {
+                "thumbnails": [
+                 {
+                  "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/sddefault.jpg",
+                  "width": 640,
+                  "height": 480
+                 }
+                ]
+               }
+              }
+             },
+             {
+              "playlistPanelVideoWrapperRenderer": {
+               "primaryRenderer": {
+                "playlistPanelVideoRenderer": {
+                 "videoId": "yPYZpwSpKmA",
+                 "title": {
+                  "runs": [
+                   {
+                    "text": "Together Forever"
+                   }
+                  ]
+                 },
+                 "longBylineText": {
+                  "runs": [
+                   {
+                    "text": "Rick Astley"
+                   },
+                   {
+                    "text": " • "
+                   },
+                   {
+                    "text": "Whenever You Need Somebody"
+                   }
+                  ]
+                 },
+                 "lengthText": {
+                  "runs": [
+                   {
+                    "text": "3:21"
+                   }
+                  ]
+                 }
+                }
+               }
+              }
+             },
+             {
+              "automixPreviewVideoRenderer": {}
+             }
+            ]
+           }
+          }
+         }
+        }
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+}

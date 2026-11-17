@@ -187,6 +187,25 @@ class Queue {
     await this.#syncNext()
   }
 
+  /** Autoplay ∞ for streamed songs (YT Music radio): more songs that follow on from `t`. Set by ytmusic.svelte.ts. */
+  remoteAutoplay: ((t: Track) => Promise<Track[]>) | null = null
+  #extending = 0
+
+  /** Up Next ran out on a streamed song: fetch its radio in the background, then line the next one up. */
+  #extend(t: Track) {
+    if (!this.remoteAutoplay || this.#extending === t.id) return
+    this.#extending = t.id
+    this.remoteAutoplay(t)
+      .then((picks) => {
+        if (this.current?.id !== t.id || this.index !== this.items.length - 1) return
+        const have = new Set(this.items.map((x) => x.id))
+        const fresh = picks.filter((p) => !have.has(p.id)).slice(0, 25)
+        if (fresh.length) (this.items = [...this.items, ...fresh]), this.#syncNext()
+      })
+      .catch((e) => console.warn('autoplay:', e))
+      .finally(() => (this.#extending = 0))
+  }
+
   async #syncNext() {
     const t = this.current
     if (!t) return
@@ -200,6 +219,7 @@ class Queue {
         n = this.index + 1
       }
     }
+    if (n < 0 && this.autoplay && this.repeat === 'off' && t.id <= 0) this.#extend(t)
     if (n >= 0 && this.repeat !== 'one' && !this.stopAfterCurrent) await load(this.items[n].path, 'append')
   }
 }

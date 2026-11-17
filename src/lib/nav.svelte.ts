@@ -25,6 +25,10 @@ export type Route =
   | { name: 'vocabulary' }
   | { name: 'downloads' }
   | { name: 'youtube' }
+  | { name: 'ytm' }
+  | { name: 'ytmAlbum'; id: string }
+  | { name: 'ytmArtist'; id: string }
+  | { name: 'ytmPlaylist'; id: string }
   | { name: 'providers' }
   | { name: 'server' }
   | { name: 'apple' }

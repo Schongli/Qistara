@@ -31,7 +31,7 @@
       { id: 'videos', label: 'Videos', route: { name: 'videos' }, icon: 'FilmStrip' },
     ] },
     { group: 'Sources', items: [
-      { id: 'youtube', label: 'YouTube', route: { name: 'youtube' }, icon: 'YoutubeLogo' },
+      { id: 'youtube', label: 'YT Music', route: { name: 'ytm' }, icon: 'YoutubeLogo' },
       { id: 'server', label: 'Server', route: { name: 'server' }, icon: 'HardDrives', when: () => !!server.account },
       { id: 'spotify', label: 'Spotify', route: { name: 'spotify' }, icon: 'SpotifyLogo', when: () => !!spotify.user },
       { id: 'apple', label: 'Apple Music', route: { name: 'apple' }, icon: 'AppleLogo', when: () => !!apple.s.user },
@@ -60,8 +60,8 @@
       'sep',
       { label: 'Import Playlist (M3U)…', action: importPlaylist },
     ])
-  // album pages belong to the Albums destination, etc.
-  const section = $derived(nav.route.name === 'album' ? 'albums' : nav.route.name)
+  // album pages belong to the Albums destination, YT Music's pages and its Links & Videos view to YT Music
+  const section = $derived(nav.route.name === 'album' ? 'albums' : /^(ytm|youtube)/.test(nav.route.name) ? 'ytm' : nav.route.name)
   const selected = (r: Route) => section === r.name
   let closed = $state<Record<string, boolean>>({})
 </script>

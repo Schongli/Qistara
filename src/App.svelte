@@ -8,6 +8,8 @@
   import Home from './views/Home.svelte'
   import Downloads from './views/Downloads.svelte'
   import YouTube from './views/YouTube.svelte'
+  import YtMusic from './views/YtMusic.svelte'
+  import YtmPage from './views/YtmPage.svelte'
   import Providers from './views/Providers.svelte'
   import Server from './views/Server.svelte'
   import ServiceView from './views/ServiceView.svelte'
@@ -157,6 +159,10 @@
         <Downloads />
       {:else if r.name === 'youtube'}
         <YouTube />
+      {:else if r.name === 'ytm'}
+        <YtMusic />
+      {:else if r.name === 'ytmAlbum' || r.name === 'ytmArtist' || r.name === 'ytmPlaylist'}
+        {#key r.id}<YtmPage kind={r.name === 'ytmAlbum' ? 'album' : r.name === 'ytmArtist' ? 'artist' : 'playlist'} id={r.id} />{/key}
       {:else if r.name === 'providers'}
         <Providers />
       {:else if r.name === 'server'}
