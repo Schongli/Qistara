@@ -280,6 +280,9 @@ impl Host {
             while !h.stop.load(SeqCst) {
                 match listener.accept() {
                     Ok((s, addr)) => {
+                        // on Windows an accepted socket inherits the listener's non-blocking mode, and the
+                        // handshake's first read would fail at once
+                        let _ = s.set_nonblocking(false);
                         let h = h.clone();
                         std::thread::spawn(move || h.serve(s, addr.ip()));
                     }
