@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { QURAN_TEXT, quranLang } from '../lib/qurantext'
   // The lyrics pane for a Qur'an recitation: each ayah in Uthmani script with transliteration and
   // translations, the ayah being recited kept in view, and a card for any word you tap.
   import { Spring } from 'svelte/motion'
@@ -54,12 +55,16 @@
     timer = setTimeout(() => (manual = false), 3000)
   }
 
+  const lang = $derived(quranLang(settings.quranLang))
+  const T = $derived(QURAN_TEXT[lang])
+  /** A surah's name as this language writes it: Kemenag's spelling in Indonesian. */
+  const nameOf = (n: number) => (lang === 'id' ? SURAHS[n - 1].id : SURAHS[n - 1].en)
   const rec = $derived(quran.rec)
   const surahs = $derived(rec?.surahs.map((n) => SURAHS[n - 1]) ?? [])
   const title = $derived(
-    !rec ? '' : rec.surahs.length > 1 ? (rec.surahs[0] === 78 ? "Juz 'Amma" : 'Juz Tabarak') : `${surahs[0].en}`,
+    !rec ? '' : rec.surahs.length > 1 ? (rec.surahs[0] === 78 ? T.juzAmma : T.juzTabarak) : nameOf(surahs[0].n),
   )
-  const riwayah = $derived(rec?.riwayah === 'shubah' ? "Shu'bah 'an 'Asim" : "Hafs 'an 'Asim")
+  const riwayah = $derived(rec?.riwayah === 'shubah' ? (lang === 'id' ? "Syu'bah 'an 'Asim" : "Shu'bah 'an 'Asim") : "Hafs 'an 'Asim")
   const shown = $derived(TRANSLATIONS.filter((t) => settings.quranTranslations.includes(t.id)))
   const toggleTr = (id: string) =>
     (settings.quranTranslations = settings.quranTranslations.includes(id) ? settings.quranTranslations.filter((x) => x !== id) : [...settings.quranTranslations, id])
@@ -94,7 +99,7 @@
     saveWord({
       id: cardId, word: word.ar, reading: '', romaji: word.tr, pos: '', meanings: [word.mean].filter(Boolean), lang: 'ar',
       line: ayah.ar, translation: shown.map((s) => ayah.tr[s.id]).find(Boolean) ?? '',
-      path: t?.path ?? '', title: `${SURAHS[ayah.surah - 1].en} ${ayah.surah}:${ayah.n}`, artist: t?.artist ?? '', t: word.seg?.[0] ?? startOf(unit) ?? 0,
+      path: t?.path ?? '', title: `${nameOf(ayah.surah)} ${ayah.surah}:${ayah.n}`, artist: t?.artist ?? '', t: word.seg?.[0] ?? startOf(unit) ?? 0,
     })
   }
   function keys(e: KeyboardEvent) {
@@ -117,24 +122,24 @@
       {#each TRANSLATIONS as t (t.id)}
         <button class="chip press" class:on={settings.quranTranslations.includes(t.id)} aria-pressed={settings.quranTranslations.includes(t.id)} title={t.name} onclick={() => toggleTr(t.id)}>{t.short}</button>
       {/each}
-      <button class="chip press" class:on={settings.quranTranslit} aria-pressed={settings.quranTranslit} title="Transliteration" onclick={() => (settings.quranTranslit = !settings.quranTranslit)}>Latin</button>
-      <button class="chip press fix" class:on={quran.fixing} aria-pressed={quran.fixing} title="Tap the ayah being recited to sync it" onclick={() => (quran.fixing = !quran.fixing)}><Icon name="Crosshair" size={13} weight="bold" />Fix sync</button>
+      <button class="chip press" class:on={settings.quranTranslit} aria-pressed={settings.quranTranslit} title={T.translit} onclick={() => (settings.quranTranslit = !settings.quranTranslit)}>{T.latin}</button>
+      <button class="chip press fix" class:on={quran.fixing} aria-pressed={quran.fixing} title={T.fixHint} onclick={() => (quran.fixing = !quran.fixing)}><Icon name="Crosshair" size={13} weight="bold" />{T.fix}</button>
       {#if Object.keys(quran.anchors).length}
-        <button class="chip press" title="Forget the ayahs you tapped" onclick={clearMarks}><Icon name="ArrowCounterClockwise" size={13} weight="bold" /></button>
+        <button class="chip press" title={T.forget} onclick={clearMarks}><Icon name="ArrowCounterClockwise" size={13} weight="bold" /></button>
       {/if}
     </div>
     {#if quran.fixing}
-      <p class="note on">Tap the ayah being recited right now. Esc cancels.</p>
+      <p class="note on">{T.tapNow}</p>
     {:else if quran.status === 'loading'}
-      <p class="note">Loading the surah…</p>
+      <p class="note">{T.loading}</p>
     {:else if quran.status === 'analysing'}
-      <p class="note">Finding the ayahs in this recording (once per surah)…</p>
+      <p class="note">{T.analysing}</p>
     {:else if quran.status === 'error'}
       <p class="note err">{quran.error}</p>
     {:else if (rec?.partial || quran.stream) && !Object.keys(quran.anchors).length}
-      <p class="note">{quran.stream ? "A stream can't be scanned for the pauses between ayahs" : "This is a selection of ayahs, so it can't be synced on its own"}: use Fix sync on the ayah being recited.</p>
+      <p class="note">{quran.stream ? T.stream : T.selection}: {T.useFix}</p>
     {:else if rec?.riwayah === 'shubah'}
-      <p class="note">Shu'bah text from the King Fahd Complex; word meanings follow Hafs where the words match.</p>
+      <p class="note">{T.shubah}</p>
     {/if}
   </header>
 
@@ -148,7 +153,7 @@
           </button>
         {:else if u.kind === 'basmala'}
           <button bind:this={els[i]} class="unit basmala press" class:on={i === idx} style:--d={d} onclick={() => tapUnit(i)}>
-            {#if rec && rec.surahs.length > 1}<span class="surah"><span lang="ar">سورة {SURAHS[u.surah - 1].ar}</span> · {SURAHS[u.surah - 1].en}</span>{/if}
+            {#if rec && rec.surahs.length > 1}<span class="surah"><span lang="ar">سورة {SURAHS[u.surah - 1].ar}</span> · {nameOf(u.surah)}</span>{/if}
             <span lang="ar" dir="rtl">{BASMALA}</span>
           </button>
         {:else}
@@ -181,7 +186,7 @@
       <div class="head" lang="ar" dir="rtl">{card.word.ar}</div>
       {#if card.word.tr}<div class="say">{card.word.tr}</div>{/if}
       <div class="meaning">{card.word.mean || '—'}</div>
-      <div class="from">{SURAHS[card.ayah.surah - 1].en} {card.ayah.surah}:{card.ayah.n}</div>
+      <div class="from">{nameOf(card.ayah.surah)} {card.ayah.surah}:{card.ayah.n}</div>
       <div class="actions">
         <button class="btn press" onclick={() => card && go(card.word.seg?.[0] ?? startOf(card.unit))}><Icon name="Play" size={13} weight="fill" />{card.word.seg ? 'Hear it' : 'Hear the ayah'}</button>
         <button class="btn press" class:primary={!saved} onclick={toggleSave}><Icon name="Star" size={13} weight={saved ? 'fill' : 'bold'} />{saved ? 'Saved' : 'Save to Vocabulary'}</button>

@@ -11,7 +11,8 @@ import { RENAMED, type ThemeId } from './themes'
 // quranTranslations: ids from quran.svelte.ts TRANSLATIONS, shown under each ayah
 const defaults = {
   bitPerfect: true, soundCheck: false, passthrough: false, hwdec: true, translateLyrics: false, lyricsLanguage: '', learnLyrics: false,
-  quranTranslations: ['kemenag'] as string[], quranTranslit: true,
+  // quranLang: what Qur'an mode speaks and the language of word meanings ('auto' = the system's)
+  quranTranslations: ['kemenag'] as string[], quranTranslit: true, quranLang: 'auto' as 'auto' | 'en' | 'id',
   // Settings › Lyrics: where lyrics come from, in order; preferWordSync keeps asking for word timing
   lyricsSources: normalizeSources(undefined), preferWordSync: false,
   // Appearance (appearance.svelte.ts): accent '' = the default brass; zoom scales the whole UI

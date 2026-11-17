@@ -410,6 +410,20 @@
     </section>
 
     <section>
+      <h2 class="t-h2">Qur'an</h2>
+      <div class="group">
+        <label class="line">
+          <span class="txt"><span>Language</span><span class="hint">Qur'an mode's labels, surah names (Kemenag spelling in Indonesian) and word meanings</span></span>
+          <select bind:value={settings.quranLang}>
+            <option value="auto">Automatic ({SYSTEM})</option>
+            <option value="en">English</option>
+            <option value="id">Bahasa Indonesia</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section>
       <h2 class="t-h2">Learn mode</h2>
       <div class="group">
         <div class="line">
