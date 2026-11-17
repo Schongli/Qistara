@@ -11,42 +11,50 @@ A release has two signatures, and they do different jobs:
 you can release before either is set up.
 
 **Order that works:** updater key (1), Discord (2), first release (3), then SignPath (4), which wants a release to
-exist already. The commands below are for Windows Command Prompt; PowerShell variants are given where they differ.
+exist already. Commands are given for PowerShell (VS Code's terminal) first, then Command Prompt where they differ.
 
 ## 1. Updater key (once, about 5 minutes)
 
-Run these **inside the Qistara folder** (the one with `package.json`), after `npm install`. `npx tauri` finds the
-Tauri CLI in the project's `node_modules`. Run anywhere else, npx looks for an npm package named `tauri` instead and
-fails with "could not determine executable to run".
+Run these **inside your Qistara folder** (the one with `package.json`, for example `D:\Qistara`). `npx tauri` finds
+the Tauri CLI in the project's `node_modules`. Run anywhere else, npx looks for an npm package named `tauri` instead
+and fails with "could not determine executable to run".
 
-1. Open Command Prompt in the project and install its packages:
+1. Open a terminal in your Qistara folder:
+   - **VS Code:** with the Qistara folder open, choose **Terminal › New Terminal**. It already starts there: the
+     prompt reads `PS D:\Qistara>` (your own folder's path).
+   - **Command Prompt:** go to the folder with `cd /d` and your folder's path. `/d` also switches drives; typing a
+     path on its own isn't a command.
 
-   ```bash
-   cd C:\path\to\Qistara
-   ```
+     ```bash
+     cd /d D:\Qistara
+     ```
+
+   If there's no `node_modules` folder yet, install the project's packages once:
 
    ```bash
    npm install
    ```
 
-2. Make a folder for the key, outside the project:
+2. Make a folder for the key, outside the project (if it already exists, that's fine):
 
    ```bash
-   mkdir "%USERPROFILE%\.tauri"
+   mkdir "$env:USERPROFILE\.tauri"
    ```
 
-3. Generate the key pair. It asks for a password twice, and nothing shows while you type. Choose a strong one and
-   keep it in a password manager.
+   In Command Prompt: `mkdir "%USERPROFILE%\.tauri"`.
+
+3. Generate the key pair. It asks for a password, then again to confirm, and **nothing shows while you type**. Choose
+   a strong one and keep it in a password manager.
 
    ```bash
-   npx tauri signer generate -w "%USERPROFILE%\.tauri\qistara.key"
+   npx tauri signer generate -w "$env:USERPROFILE\.tauri\qistara.key"
    ```
 
-   In PowerShell the path is `"$env:USERPROFILE\.tauri\qistara.key"`. From outside the project, this works too
+   In Command Prompt the path is `"%USERPROFILE%\.tauri\qistara.key"`. From outside the project, this works too
    (the same CLI version the project uses):
 
    ```bash
-   npx @tauri-apps/cli@2.12.4 signer generate -w "%USERPROFILE%\.tauri\qistara.key"
+   npx @tauri-apps/cli@2.12.4 signer generate -w "$env:USERPROFILE\.tauri\qistara.key"
    ```
 
    This makes two files:
@@ -56,16 +64,18 @@ fails with "could not determine executable to run".
 4. Put the public key in the app. Open it:
 
    ```bash
-   notepad "%USERPROFILE%\.tauri\qistara.key.pub"
+   notepad "$env:USERPROFILE\.tauri\qistara.key.pub"
    ```
 
-   Copy the whole line (it starts with `dW50cnVzdGVk`) and paste it between the quotes of `"pubkey": ""` in
-   `src-tauri\tauri.conf.json`. Commit and push that change.
+   (Command Prompt: `notepad "%USERPROFILE%\.tauri\qistara.key.pub"`.) Copy the whole line (it starts with
+   `dW50cnVzdGVk`) and paste it between the quotes of `"pubkey": ""` in `src-tauri\tauri.conf.json`. Commit and
+   push that change.
 
 5. Give the release workflow the private key. On GitHub, open the repository's **Settings › Secrets and variables ›
    Actions** and choose **New repository secret** twice:
    - Name `TAURI_SIGNING_PRIVATE_KEY`. For the value, open the key with
-     `notepad "%USERPROFILE%\.tauri\qistara.key"`, select all and copy.
+     `notepad "$env:USERPROFILE\.tauri\qistara.key"` (Command Prompt: `notepad "%USERPROFILE%\.tauri\qistara.key"`),
+     select all and copy.
    - Name `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, with the password from step 3.
 
 6. Back up `qistara.key` and its password, for example in a password manager or on a USB stick.
@@ -88,14 +98,14 @@ The updater only accepts a file whose signature is bound to the version `latest.
 5. To try it in your own build, set it in the same window before starting the app (it's read when Rust compiles):
 
    ```bash
-   set QISTARA_DISCORD_ID=your_application_id
+   $env:QISTARA_DISCORD_ID="your_application_id"
    ```
 
    ```bash
    npm run tauri dev
    ```
 
-   In PowerShell: `$env:QISTARA_DISCORD_ID="your_application_id"`. Then turn on **Settings › Integrations ›
+   In Command Prompt: `set QISTARA_DISCORD_ID=your_application_id`. Then turn on **Settings › Integrations ›
    Discord › Show on Discord**, with the Discord desktop app open and Discord's own activity sharing turned on
    (Discord's **User Settings › Activity Privacy**).
 
