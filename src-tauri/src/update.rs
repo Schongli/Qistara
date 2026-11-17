@@ -108,4 +108,17 @@ mod tests {
     assert!(c.endpoints[0].as_str().starts_with("https://github.com/Schongli/Qistara/releases/"));
     assert!(c.windows.is_some());
   }
+
+  /// The key in the app is a minisign *public* key (never the secret key from the same folder).
+  #[test]
+  fn pubkey_is_a_public_key() {
+    use base64::Engine;
+    let conf: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+    let key = conf["plugins"]["updater"]["pubkey"].as_str().unwrap();
+    let text = String::from_utf8(base64::engine::general_purpose::STANDARD.decode(key).unwrap()).unwrap();
+    let mut lines = text.lines();
+    assert!(lines.next().unwrap().starts_with("untrusted comment: minisign public key: "));
+    let raw = base64::engine::general_purpose::STANDARD.decode(lines.next().unwrap()).unwrap();
+    assert_eq!((raw.len(), &raw[..2]), (42, &b"Ed"[..]));
+  }
 }
