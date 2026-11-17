@@ -23,6 +23,9 @@
   import { installDictionary, learn } from '../lib/learn.svelte'
   import { forgetCovers } from '../lib/subsonic.svelte'
   import { usePack } from '../lib/icons.svelte'
+  import { discord } from '../lib/discord.svelte'
+  import { queue } from '../lib/queue.svelte'
+  import Artwork from '../components/Artwork.svelte'
   import { mb } from '../lib/format'
 
   let { tab = 'general' }: { tab?: string } = $props()
@@ -424,6 +427,31 @@
 
   {#if shown('integrations')}
     <section>
+      <h2 class="t-h2">Discord</h2>
+      <div class="dc-wrap">
+        <div class="dc" aria-label="How it looks on Discord">
+          <span class="dc-head">Listening to Qistara</span>
+          <div class="dc-body">
+            <Artwork art={discord.cover ?? queue.current?.art} size="76px" radius="8px" shadow={false} />
+            <div class="dc-txt">
+              <b class="ellipsis">{queue.current?.title ?? 'Song title'}</b>
+              <span class="ellipsis">{queue.current ? `by ${queue.current.artist || 'Unknown artist'}` : 'by Artist'}</span>
+              <span class="ellipsis">{queue.current?.album || 'Album'}</span>
+            </div>
+          </div>
+          <span class="dc-btn">Get Qistara</span>
+        </div>
+      </div>
+      <div class="group">
+        <Toggle bind:checked={settings.discord} disabled={!discord.ready} label="Show on Discord" hint={discord.ready ? 'Your Discord profile says what you play, while it plays. Only the title, artist, album and times go to the Discord app on this PC.' : "Discord isn't set up in this build: release builds carry Qistara's Discord application."} />
+      </div>
+      <p class="t-sub sub2">Local files</p>
+      <div class="group">
+        <Toggle bind:checked={settings.discordLocalArt} disabled={!settings.discord} label="Artwork for local files" hint="Discord can't see your files, so this looks the album up on MusicBrainz (artist and album only) and shows its Cover Art Archive picture. Off: the Qistara logo." />
+      </div>
+    </section>
+
+    <section>
       <h2 class="t-h2">Last.fm</h2>
       {#if lastfm.user}
         <div class="line group"><span>Scrobbling as <b>{lastfm.user}</b>{#if lastfm.pending} · {lastfm.pending} waiting to send{/if}</span><button class="btn press" onclick={logout}>Disconnect</button></div>
@@ -507,6 +535,13 @@
   [aria-checked='true'] > .p-box { box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
   .themes, .corners { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 14px 12px; margin-bottom: 14px; }
   .theme, .corner { display: grid; gap: 7px; justify-items: center; }
+  .dc-wrap { display: grid; place-items: center; padding: 18px; border-radius: var(--r-lg); border: 1px solid var(--sep); margin: 10px 0 12px; }
+  .dc { display: grid; gap: 8px; width: min(360px, 100%); padding: 12px; border-radius: 10px; background: #232428; color: #dbdee1; }
+  .dc-head { font-size: 12px; color: #b5bac1; }
+  .dc-body { display: flex; gap: 12px; align-items: center; min-width: 0; }
+  .dc-txt { display: grid; gap: 2px; min-width: 0; font-size: 12.5px; color: #b5bac1; }
+  .dc-txt b { color: #f2f3f5; font-size: 14px; }
+  .dc-btn { display: grid; place-items: center; height: 32px; border-radius: 4px; background: #4e5058; color: #fff; font-size: 13px; font-weight: 600; }
   .pick { display: block; width: 100%; border-radius: var(--r); }
   .variant { max-width: 100%; height: 22px; padding: 0 4px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-2); font: inherit; font-size: 12px; text-align: center; cursor: pointer; }
   .variant:hover, .variant:focus-visible { background: var(--fill); color: var(--text); }

@@ -21,6 +21,8 @@ const defaults = {
   iconPack: 'phosphor' as 'phosphor' | 'lucide' | 'iconoir' | 'remix' | 'solar',
   density: 'comfortable' as 'comfortable' | 'compact', solidChrome: false, font: 'inter' as 'inter' | 'system',
   hiddenNav: [] as string[],
+  // Discord Rich Presence (discord.svelte.ts): off until turned on; local covers looked up on MusicBrainz
+  discord: false, discordLocalArt: false,
   // YouTube sign-in for yt-dlp: '' guest, 'firefox' (its cookies), or the path of a cookies.txt file
   ytCookies: '',
   // Downloads: the folder ('' = Music/Qistara Downloads), video or audio and the quality of each, and whether

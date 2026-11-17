@@ -53,6 +53,8 @@
   import './lib/lastfm.svelte'
   import './lib/sleep.svelte'
   import './lib/appearance.svelte'
+  import './lib/discord.svelte'
+  import './lib/session.svelte'
   import { capture, restore } from './lib/scrollmemo'
 
   startMpv().then(() => lib.load()).then(() => queue.restore(lib.byId))
