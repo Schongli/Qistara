@@ -91,7 +91,7 @@
             <button class="btn press" onclick={serverSignOut}>Sign Out</button>
           </div>
         {:else}
-          <p class="t-sub">Navidrome, Gonic, Airsonic, Ampache and others that speak the Subsonic API. Without https:// the address is used as http://, so type https:// if your server has TLS. The password is kept in Windows Credential Manager and only ever sent to that server, as a salted hash.</p>
+          <p class="t-sub">Navidrome, Gonic, Airsonic, Ampache and others that speak the Subsonic API. Without https:// the address is used as http://, so type https:// if your server has TLS. The password is kept in {KEY_STORE} and only ever sent to that server, as a salted hash.</p>
           <form class="form" onsubmit={(e) => (e.preventDefault(), connectServer())}>
             <input bind:value={address} placeholder="Server address, e.g. 192.168.1.5:4533" aria-label="Server address" spellcheck="false" />
             <input bind:value={user} placeholder="User name" aria-label="User name" spellcheck="false" autocomplete="username" />

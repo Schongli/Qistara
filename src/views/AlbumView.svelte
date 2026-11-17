@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { activate } from '../lib/touch'
   import Icon from '../components/Icon.svelte'
   import Artwork from '../components/Artwork.svelte'
   import Playing from '../components/Playing.svelte'
@@ -43,7 +44,7 @@
         class="row"
         class:on
         role="listitem"
-        ondblclick={() => queue.play(a.tracks, i)}
+        {...activate(() => queue.play(a.tracks, i))}
         oncontextmenu={(e) => openMenu(e, trackMenu([t]))}
       >
         <span class="num">{#if on}<Playing paused={mpv.pause} />{:else}{t.track ?? ''}{/if}</span>
@@ -59,7 +60,8 @@
 {/if}
 
 <style>
-  .head { display: flex; gap: 28px; align-items: flex-end; margin-bottom: 26px; }
+  .head { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-end; margin-bottom: 26px; }
+  @media (max-width: 600px) { .head { gap: 16px; } .head > :first-child { width: min(200px, 60vw); } }
   .info { min-width: 0; padding-bottom: 4px; }
   .kicker { display: flex; gap: 8px; align-items: center; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); }
   .kicker .badge { letter-spacing: 0.02em; }

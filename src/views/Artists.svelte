@@ -38,6 +38,8 @@
 
 <style>
   .split { position: absolute; inset: 0; display: grid; grid-template-columns: 250px 1fr; }
+  /* a phone-width window: the list on top, what's chosen below */
+  @media (max-width: 600px) { .split { grid-template-columns: 1fr; grid-template-rows: minmax(0, 38%) 1fr; } .list { border-right: 0; border-bottom: 1px solid var(--sep); } .detail { padding: 16px; } }
   .list { overflow-y: auto; padding: calc(var(--bar-h) + 12px) 8px 16px 14px; border-right: 1px solid var(--sep); }
   .item { display: flex; align-items: center; gap: 10px; width: 100%; height: 44px; padding: 0 8px; border-radius: var(--r); text-align: left; content-visibility: auto; contain-intrinsic-size: auto 44px; }
   .item:hover { background: var(--fill); }

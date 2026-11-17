@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { activate } from '../lib/touch'
   // Song list for playlists, Loved, Recently Played and Your Top. Manual playlists can reorder and remove.
   import Icon from './Icon.svelte'
   import Artwork from './Artwork.svelte'
@@ -45,7 +46,7 @@
       ondragover={(e) => { if (onreorder) { e.preventDefault(); over = i } }}
       ondrop={(e) => { e.preventDefault(); if (dragFrom !== null && dragFrom !== i) onreorder?.(dragFrom, i); dragFrom = over = null }}
       ondragend={() => (dragFrom = over = null)}
-      ondblclick={() => queue.play(tracks, i)}
+      {...activate(() => queue.play(tracks, i))}
       oncontextmenu={(e) => openMenu(e, trackMenu([t]))}
     >
       <span class="num">{#if on}<Playing paused={mpv.pause} />{:else}{counts ? i + 1 : ''}{/if}</span>
@@ -92,4 +93,9 @@
   .row:hover .rm { opacity: 1; }
   .rm:hover { background: var(--fill-2); }
   .empty { padding: 16px 8px; }
+  @media (hover: none) { .rate, .heart, .rm { opacity: 1; } }
+  @media (max-width: 600px) {
+    .row { grid-template-columns: 22px 34px minmax(0, 1fr) auto auto; gap: 10px; padding: 0 4px; }
+    .album, .plays, .rate, .heart, .row > span:empty:not(.num) { display: none; }
+  }
 </style>

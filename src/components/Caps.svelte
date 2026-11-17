@@ -3,6 +3,7 @@
   // lights: tauri.macos.conf.json). Drawn as SVG: the Segoe glyph font only exists on Windows.
   import { getCurrentWindow } from '@tauri-apps/api/window'
   import { OS } from '../lib/player.svelte'
+  import { PHONE } from '../lib/os'
 
   let { light = false }: { light?: boolean } = $props()
   const win = getCurrentWindow()
@@ -11,7 +12,7 @@
   win.onResized(async () => (maximized = await win.isMaximized()))
 </script>
 
-{#if OS !== 'macos'}
+{#if OS !== 'macos' && !PHONE}
   <div class="caps" class:light>
     <button aria-label="Minimize" onclick={() => win.minimize()}><svg viewBox="0 0 10 10"><path d="M0 5.5h10" /></svg></button>
     <button aria-label={maximized ? 'Restore' : 'Maximize'} onclick={() => win.toggleMaximize()}>
@@ -27,6 +28,7 @@
   svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1; shape-rendering: crispEdges; }
   .close svg { shape-rendering: auto; }
   button:hover { background: var(--fill-2); }
+  @media (max-width: 600px) { button { width: 36px; } }
   .light button { color: #fff; }
   .light button:hover { background: rgba(255, 255, 255, 0.16); }
   .close:hover, .light .close:hover { background: #c42b1c; color: #fff; }

@@ -49,13 +49,13 @@
 
   <div class="center">
     <div class="transport">
-      <button class="icon-btn press" class:on={queue.shuffle} aria-label="Shuffle" aria-pressed={queue.shuffle} onclick={() => queue.toggleShuffle()}><Icon name="Shuffle" size={16} weight="bold" /></button>
-      <button class="icon-btn press" aria-label="Previous" onclick={() => queue.prev()} disabled={!t}><Icon name="SkipBack" size={18} weight="fill" /></button>
+      <button class="icon-btn press shuf" class:on={queue.shuffle} aria-label="Shuffle" aria-pressed={queue.shuffle} onclick={() => queue.toggleShuffle()}><Icon name="Shuffle" size={16} weight="bold" /></button>
+      <button class="icon-btn press prev" aria-label="Previous" onclick={() => queue.prev()} disabled={!t}><Icon name="SkipBack" size={18} weight="fill" /></button>
       <button class="play press" aria-label={mpv.pause || !t ? 'Play' : 'Pause'} onclick={togglePause} disabled={!t}>
         {#if mpv.pause || !t}<Icon name="Play" size={18} weight="fill" />{:else}<Icon name="Pause" size={18} weight="fill" />{/if}
       </button>
       <button class="icon-btn press" aria-label="Next" onclick={() => queue.next()} disabled={!t}><Icon name="SkipForward" size={18} weight="fill" /></button>
-      <button class="icon-btn press" class:on={queue.repeat !== 'off'} aria-label="Repeat {queue.repeat}" onclick={() => queue.cycleRepeat()}>
+      <button class="icon-btn press rep" class:on={queue.repeat !== 'off'} aria-label="Repeat {queue.repeat}" onclick={() => queue.cycleRepeat()}>
         {#if queue.repeat === 'one'}<Icon name="RepeatOnce" size={16} weight="bold" />{:else}<Icon name="Repeat" size={16} weight="bold" />{/if}
       </button>
     </div>
@@ -75,13 +75,13 @@
     <button class="icon-btn press sess" class:on={ui.panel === 'session' || !!session.role} aria-label={session.role ? `Listening together, ${session.guests.length} ${session.guests.length === 1 ? 'guest' : 'guests'}` : 'Listen together'} aria-pressed={ui.panel === 'session'} title="Listen together" onclick={() => toggle('session')}>
       <Icon name="Users" size={18} weight={session.role ? 'fill' : 'regular'} />{#if session.role && session.guests.length}<span class="count">{session.guests.length}</span>{/if}
     </button>
-    <button class="icon-btn press" class:on={eq.enabled} aria-label="Equalizer" title="Equalizer" onclick={() => nav.root({ name: 'eq' })}><Icon name="SlidersHorizontal" size={17} weight="bold" /></button>
+    <button class="icon-btn press eqb" class:on={eq.enabled} aria-label="Equalizer" title="Equalizer" onclick={() => nav.root({ name: 'eq' })}><Icon name="SlidersHorizontal" size={17} weight="bold" /></button>
     <div class="vol">
       {#if vol === 0}<Icon name="SpeakerNone" size={16} />{:else}<Icon name="SpeakerHigh" size={16} />{/if}
       <Slider label="Volume" value={vol} max={100} live wheel={5} onchange={setVolume} />
     </div>
-    <button class="icon-btn press" aria-label="MiniPlayer" title="MiniPlayer (Ctrl+Shift+M)" onclick={enterMini}><Icon name="PictureInPicture" size={17} /></button>
-    <button class="icon-btn press" aria-label="Open Now Playing" title="Now Playing" onclick={() => (ui.nowPlaying = true)} disabled={!t}><Icon name="ArrowsOutSimple" size={16} weight="bold" /></button>
+    <button class="icon-btn press minib" aria-label="MiniPlayer" title="MiniPlayer (Ctrl+Shift+M)" onclick={enterMini}><Icon name="PictureInPicture" size={17} /></button>
+    <button class="icon-btn press bigb" aria-label="Open Now Playing" title="Now Playing" onclick={() => (ui.nowPlaying = true)} disabled={!t}><Icon name="ArrowsOutSimple" size={16} weight="bold" /></button>
   </div>
 </footer>
 <SignalPath bind:open={signalOpen} anchor={badge} />
@@ -120,5 +120,17 @@
   @media (max-width: 1100px) { .sig { display: none; } }
   @media (prefers-reduced-transparency: reduce) { .player { backdrop-filter: none; } }
   .sess { position: relative; }
+  /* narrower windows keep what's needed most; tap the cover for Now Playing and everything else */
+  @media (max-width: 900px) {
+    .player { grid-template-columns: minmax(140px, 1fr) minmax(220px, 420px) auto; gap: 10px; }
+    .minib, .eqb, .vol { display: none; }
+  }
+  @media (max-width: 600px) {
+    .player { grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; padding: 0 8px; }
+    .scrub, .shuf, .prev, .rep, .sig, .bigb, .love { display: none; }
+    .center { order: 2; }
+    .right { order: 3; }
+  }
+  @media (pointer: coarse) { .icon-btn { width: 44px; height: 44px; } .play { width: 44px; height: 44px; } }
   .count { position: absolute; top: 2px; right: 1px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; background: var(--accent); color: var(--on-accent); font-size: 9.5px; font-weight: 700; line-height: 14px; }
 </style>

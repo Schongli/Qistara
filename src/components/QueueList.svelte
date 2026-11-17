@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { activate } from '../lib/touch'
   import Icon from './Icon.svelte'
   import Artwork from './Artwork.svelte'
   import Playing from './Playing.svelte'
@@ -52,7 +53,7 @@
       ondragleave={() => over === at && (over = null)}
       ondrop={(e) => { e.preventDefault(); if (dragFrom !== null && dragFrom !== at) queue.reorder(dragFrom, at); dragFrom = over = null }}
       ondragend={() => (dragFrom = over = null)}
-      ondblclick={() => queue.jump(at)}
+      {...activate(() => queue.jump(at))}
       oncontextmenu={(e) => openMenu(e, trackMenu([t]))}
     >
       <span class="grip"><Icon name="DotsSixVertical" size={14} weight="bold" /></span>
@@ -82,6 +83,7 @@
   .rm { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: var(--text-2); opacity: 0; }
   .item:hover .rm, .rm:focus-visible { opacity: 1; }
   .rm:hover { background: var(--fill-2); }
+  @media (hover: none) { .grip, .rm { opacity: 1; } }
   .empty { padding: 4px 8px; margin: 0; line-height: 1.5; }
   .dark { --fill: rgba(255, 255, 255, 0.08); --fill-2: rgba(255, 255, 255, 0.14); --text: #fff; --text-2: rgba(255, 255, 255, 0.62); --text-3: rgba(255, 255, 255, 0.4); color: #fff; }
 </style>

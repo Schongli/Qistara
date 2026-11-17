@@ -607,8 +607,11 @@ fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  tauri::Builder::default()
-    .plugin(tauri_plugin_libmpv::init())
+  let builder = tauri::Builder::default();
+  // playback: libmpv on desktop; phones don't have it yet (mpv.rs answers for it)
+  #[cfg(desktop)]
+  let builder = builder.plugin(tauri_plugin_libmpv::init());
+  builder
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_http::init())
     .plugin(tauri_plugin_opener::init())

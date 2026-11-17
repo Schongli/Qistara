@@ -23,7 +23,6 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.12.5", features = ["protocol-asset"] }
 tauri-plugin-log = "2"
-tauri-plugin-libmpv = "0.3.2"
 tauri-plugin-dialog = "2.8.4"
 tauri-plugin-http = "2.9.0"
 rusqlite = { version = "0.42.0", features = ["bundled"] }
@@ -32,11 +31,8 @@ walkdir = "2.5.0"
 rayon = "1.12.0"
 notify-debouncer-mini = "0.7.0"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
-souvlaki = "0.9.3"
 md5 = "0.8.1"
 tauri-plugin-opener = "2.7.3"
-# v1 picks the native store per OS: Credential Manager, macOS Keychain, Secret Service
-keyring = { version = "4.2.0", default-features = false, features = ["v1"] }
 # Spotify sign-in (PKCE); all four were already in the build as dependencies of other crates
 sha2 = "0.10"
 base64 = "0.22"
@@ -52,6 +48,14 @@ ring = "0.17"
 lindera = "6.2"
 # decoding recitations to find the pauses between ayahs (pure Rust)
 symphonia = { version = "0.5", default-features = false, features = ["aac", "alac", "flac", "isomp4", "mp3", "wav", "pcm", "ogg", "vorbis"] }
+
+# Desktop only: libmpv playback, media keys and the OS secret store. Phones (Tauri mobile) build without them and
+# say what isn't ready yet (docs/mobile.md).
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-libmpv = "0.3.2"
+souvlaki = "0.9.3"
+# v1 picks the native store per OS: Credential Manager, macOS Keychain, Secret Service
+keyring = { version = "4.2.0", default-features = false, features = ["v1"] }
 
 [dev-dependencies]
 tempfile = "3.27.0"

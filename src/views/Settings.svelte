@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SYSTEM } from '../lib/os'
+  import { KEY_STORE, SYSTEM } from '../lib/os'
   import { tick } from 'svelte'
   import { open } from '@tauri-apps/plugin-dialog'
   import { invoke } from '@tauri-apps/api/core'
@@ -478,7 +478,7 @@
         </div>
       {:else}
         <p class="t-sub">Scrobbles each song once you've heard half of it (or 4 minutes). Uses your own free API account:
-          <button class="link" onclick={() => openUrl('https://www.last.fm/api/account/create')}>create one at last.fm/api</button>, then paste the key and shared secret. They're stored in Windows Credential Manager.</p>
+          <button class="link" onclick={() => openUrl('https://www.last.fm/api/account/create')}>create one at last.fm/api</button>, then paste the key and shared secret. They're stored in {KEY_STORE}.</p>
         <div class="keys">
           <input bind:value={key} placeholder="API key" aria-label="Last.fm API key" spellcheck="false" />
           <input bind:value={secret} type="password" placeholder="Shared secret" aria-label="Last.fm shared secret" spellcheck="false" />

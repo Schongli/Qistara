@@ -6,11 +6,39 @@
 //! path are set here, never by the page.
 
 use serde_json::{json, Value};
-use tauri::{Manager, WebviewWindow};
+#[cfg(desktop)]
+use tauri::Manager;
+use tauri::WebviewWindow;
+#[cfg(desktop)]
 use tauri_plugin_libmpv::{MpvConfig, MpvExt};
+
+/// Phones have no libmpv here yet: the player says so instead of starting (docs/mobile.md).
+#[cfg(mobile)]
+const NO_PLAYER: &str = "Playback on phones isn't ready yet.";
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn mpv_init(_window: WebviewWindow, _mpv_config: Value) -> Result<String, String> {
+    Err(NO_PLAYER.into())
+}
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn mpv_command(_window: WebviewWindow, name: String, args: Vec<Value>) -> Result<(), String> {
+    check_command(&name, &args).and(Err(NO_PLAYER.into()))
+}
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn mpv_set(_window: WebviewWindow, name: String, value: Value) -> Result<(), String> {
+    check_prop(&name, &value).and(Err(NO_PLAYER.into()))
+}
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn mpv_ytdl_sign_in(_window: WebviewWindow, _cookies: String) -> Result<(), String> {
+    Err(NO_PLAYER.into())
+}
 
 use crate::ytdlp;
 
+#[cfg(desktop)]
 /// The ytdl hook's yt-dlp options: never a config file or cache of its own (the same as ytdlp.rs runs it), our
 /// JavaScript runtime by path, and the sign-in: Firefox's cookies, or the hook's copy of a cookies.txt.
 fn ytdl_raw(app: &tauri::AppHandle, cookies: &str) -> String {
@@ -218,11 +246,13 @@ pub fn check_command_on(os: Os, name: &str, args: &[Value]) -> Result<(), String
     if ok { Ok(()) } else { Err(refuse()) }
 }
 
+#[cfg(desktop)]
 /// mpv's length-prefixed quoting, so a comma or '=' in a path can't split an option list.
 fn quote(s: &str) -> String {
     format!("%{}%{s}", s.len())
 }
 
+#[cfg(desktop)]
 /// Runs off the async runtime, as the plugin's own commands do: an mpv call can block.
 async fn on_mpv(
     w: WebviewWindow,
@@ -234,6 +264,7 @@ async fn on_mpv(
     }
 }
 
+#[cfg(desktop)]
 /// Starts mpv with the page's options, once checked, plus the ones that hold a path.
 #[tauri::command]
 pub async fn mpv_init(window: WebviewWindow, mut mpv_config: MpvConfig) -> Result<String, String> {
@@ -265,18 +296,21 @@ pub async fn mpv_init(window: WebviewWindow, mut mpv_config: MpvConfig) -> Resul
     window.mpv().init(mpv_config, &label).map_err(|e| e.to_string())
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn mpv_command(window: WebviewWindow, name: String, args: Vec<Value>) -> Result<(), String> {
     check_command(&name, &args)?;
     on_mpv(window, move |w| w.mpv().command(&name, &args, w.label())).await
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn mpv_set(window: WebviewWindow, name: String, value: Value) -> Result<(), String> {
     check_prop(&name, &value)?;
     on_mpv(window, move |w| w.mpv().set_property(&name, &value, w.label())).await
 }
 
+#[cfg(desktop)]
 /// YouTube playback signs in like search and downloads: as a guest, with Firefox's cookies, or with the
 /// hook's checked copy of a cookies.txt export (ytdlp.rs hook_cookies). Also called after Deno is installed.
 #[tauri::command]

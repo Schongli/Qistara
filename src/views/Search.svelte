@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { activate } from '../lib/touch'
   import Artwork from '../components/Artwork.svelte'
   import AlbumGrid from './AlbumGrid.svelte'
   import Videos from './Videos.svelte'
@@ -33,7 +34,7 @@
     <h2 class="t-h2">Songs</h2>
     <div class="songs">
       {#each r.songs.slice(0, 12) as t, i (t.id)}
-        <button class="song" ondblclick={() => queue.play(r.songs, i)} oncontextmenu={(e) => openMenu(e, trackMenu([t]))}>
+        <button class="song" {...activate(() => queue.play(r.songs, i))} oncontextmenu={(e) => openMenu(e, trackMenu([t]))}>
           <Artwork art={t.art} size="40px" radius="4px" shadow={false} />
           <span class="txt"><span class="ellipsis">{t.title}</span><span class="t-sub ellipsis">{t.artist} — {t.album}</span></span>
           <span class="t-sub">{time(t.duration)}</span>
