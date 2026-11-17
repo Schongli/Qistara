@@ -56,6 +56,7 @@
   import './lib/discord.svelte'
   import './lib/touch'
   import './lib/session.svelte'
+  import './lib/update.svelte'
   import { capture, restore } from './lib/scrollmemo'
 
   startMpv().then(() => lib.load()).then(() => queue.restore(lib.byId))

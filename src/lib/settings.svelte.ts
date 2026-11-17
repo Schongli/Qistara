@@ -30,6 +30,8 @@ const defaults = {
   // new downloads join the library
   downloadFolder: '', downloadKind: 'audio' as 'audio' | 'video', downloadVideo: '1080' as VideoQ, downloadAudio: 'original' as AudioQ,
   downloadToLibrary: true,
+  // Settings › General › Updates: look for a new version once a day (update.svelte.ts)
+  autoUpdate: true,
 }
 type Settings = typeof defaults
 

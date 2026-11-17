@@ -16,6 +16,7 @@ mod subsonic;
 mod tags;
 mod tidal;
 mod translate;
+mod update;
 mod user;
 mod ytdlp;
 mod ytmusic;
@@ -608,9 +609,9 @@ fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   let builder = tauri::Builder::default();
-  // playback: libmpv on desktop; phones don't have it yet (mpv.rs answers for it)
+  // playback: libmpv on desktop; phones don't have it yet (mpv.rs answers for it). Updates: desktop too (update.rs)
   #[cfg(desktop)]
-  let builder = builder.plugin(tauri_plugin_libmpv::init());
+  let builder = builder.plugin(tauri_plugin_libmpv::init()).plugin(tauri_plugin_updater::Builder::new().build());
   builder
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_http::init())
@@ -622,6 +623,7 @@ pub fn run() {
     .manage(tidal::TidalToken::default())
     .manage(session::Session::default())
     .manage(discord::Discord::default())
+    .manage(update::Pending::default())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -685,7 +687,7 @@ pub fn run() {
       subsonic::subsonic_stream, subsonic::subsonic_cover, tidal::tidal_status, tidal::tidal_set_client, tidal::tidal_begin,
       tidal::tidal_logout, tidal::tidal_playlists, tidal::tidal_tracks, apple::apple_status, apple::apple_setup, apple::apple_begin,
       apple::apple_logout, apple::apple_playlists, apple::apple_tracks, mpv::mpv_init, mpv::mpv_command, mpv::mpv_set,
-      mpv::mpv_ytdl_sign_in
+      mpv::mpv_ytdl_sign_in, update::update_check, update::update_install
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application")

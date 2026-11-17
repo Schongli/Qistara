@@ -1,0 +1,105 @@
+# Release: push a tag vX.Y.Z (the version in tauri.conf.json) and this builds the Windows installer, has
+# SignPath sign it when SignPath is set up, signs it for the in-app updater, and publishes a GitHub release
+# with latest.json, which Settings › General › Updates reads. docs/code-signing.md has the one-time setup.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+    permissions:
+      contents: write # create the release
+      actions: read # SignPath fetches the unsigned artifact
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag matches the app version
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME but tauri.conf.json says $version"; exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tauri-plugin-libmpv-api setup-lib
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --lib --manifest-path src-tauri/Cargo.toml
+      - name: Build
+        env:
+          # the Discord application id (not a secret); without it the build says Discord isn't set up
+          QISTARA_DISCORD_ID: ${{ vars.QISTARA_DISCORD_ID }}
+        run: npm run tauri build
+
+      - name: Upload the unsigned installer
+        id: unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: qistara-unsigned
+          path: src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+      # Authenticode signature from the SignPath Foundation; skipped until the repository variables are set
+      - name: Sign with SignPath
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      - name: Pick the installer to publish
+        run: |
+          set -euo pipefail
+          mkdir out
+          if [ -d signed ]; then cp signed/*-setup.exe out/; else cp src-tauri/target/release/bundle/nsis/*-setup.exe out/; fi
+          ls -l out
+      # the updater checks this signature (minisign, bound to the version) against the public key in
+      # tauri.conf.json, over the installer's final bytes, so it has to come after SignPath
+      - name: Sign for the updater
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for f in out/*-setup.exe; do npx tauri signer sign --app-version "$VERSION" "$f"; done
+      - name: Release notes and latest.json
+        run: |
+          set -euo pipefail
+          # this version's section of CHANGELOG.md
+          awk -v v="$VERSION" '$0 ~ "^## \\[?"v"\\]?" {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
+          exe=$(cd out && ls *-setup.exe)
+          node -e '
+            const fs = require("fs"), [v, exe, repo, tag] = process.argv.slice(1)
+            const sig = fs.readFileSync(`out/${exe}.sig`, "utf8").trim()
+            const url = `https://github.com/${repo}/releases/download/${tag}/${encodeURIComponent(exe)}`
+            fs.writeFileSync("out/latest.json", JSON.stringify({
+              version: v, notes: fs.readFileSync("notes.md", "utf8").trim(), pub_date: new Date().toISOString(),
+              platforms: { "windows-x86_64": { signature: sig, url } },
+            }, null, 2))
+          ' "$VERSION" "$exe" "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME"
+          cat out/latest.json
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" out/* --title "Qistara $VERSION" --notes-file notes.md --verify-tag

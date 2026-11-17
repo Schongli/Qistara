@@ -66,7 +66,8 @@ The screenshots show the demo library that `scripts/make-test-media.sh` makes: t
 
 Download `Qistara_x.y.z_x64-setup.exe` from [Releases](https://github.com/Schongli/Qistara/releases) and run it.
 - **Requirements:** 64-bit Windows 10 or 11.
-- **Windows warning:** the installer isn't signed yet, so Windows shows "Windows protected your PC". Choose **More info → Run anyway**.
+- **Windows warning:** until code signing is set up ([docs/code-signing.md](docs/code-signing.md)), Windows shows "Windows protected your PC". Choose **More info → Run anyway**.
+- **Updates:** Settings › General › Updates checks once a day and installs signed updates when you choose to.
 
 ## Build from source
 

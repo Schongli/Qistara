@@ -27,6 +27,8 @@
   import { queue } from '../lib/queue.svelte'
   import Artwork from '../components/Artwork.svelte'
   import { mb } from '../lib/format'
+  import { getVersion } from '@tauri-apps/api/app'
+  import { checkUpdate, installUpdate, update } from '../lib/update.svelte'
 
   let { tab = 'general' }: { tab?: string } = $props()
 
@@ -121,6 +123,23 @@
     await invoke('clear_lyrics_cache')
     refreshUsage()
   }
+
+  // ---- updates (update.svelte.ts) ----
+  let version = $state('')
+  getVersion().then((v) => (version = v), () => {})
+  const ago = (t: number) => {
+    const m = Math.round((Date.now() - t) / 60_000)
+    return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : new Date(t).toLocaleDateString()
+  }
+  const updateStatus = $derived(
+    !update.ready ? 'This build can’t update itself: new versions are on the Releases page.'
+    : update.installing ? (update.progress ? `Downloading… ${mb(update.progress[0])}${update.progress[1] ? ` of ${mb(update.progress[1])}` : ''}` : 'Starting the download…')
+    : update.error ? update.error
+    : update.found ? `Qistara ${update.found.version} is available.`
+    : update.checking ? 'Checking…'
+    : update.checked ? `Up to date · checked ${ago(update.checked)}`
+    : 'Not checked yet',
+  )
 
   // ---- Japanese dictionary (optional download, japanese.rs) ----
   let dict = $state<{ installed: boolean; bytes: number } | null>(null)
@@ -228,6 +247,21 @@
         </div>
         <div class="line"><span class="txt"><span>Library artwork</span><span class="hint">Rebuilt from your files when needed{usage ? ` · ${mb(usage.libraryArt)}` : ''}</span></span></div>
         <div class="line"><span class="txt"><span>Tools and dictionary</span><span class="hint">yt-dlp, ffmpeg, Deno; the Japanese dictionary{usage ? ` · ${mb(usage.tools + usage.dictionary)}` : ''}</span></span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="t-h2">Updates</h2>
+      <div class="group">
+        <div class="line">
+          <span class="txt"><span>Qistara {version}</span><span class="hint" class:bad={!!update.error} aria-live="polite">{updateStatus}</span></span>
+          <span class="btns">
+            {#if update.found}<button class="btn primary press" disabled={update.installing} onclick={installUpdate}>Install and Restart</button>{/if}
+            <button class="btn press" disabled={!update.ready || update.checking || update.installing} onclick={() => checkUpdate()}>Check Now</button>
+          </span>
+        </div>
+        {#if update.found?.notes}<div class="notes">{update.found.notes}</div>{/if}
+        <Toggle bind:checked={settings.autoUpdate} label="Check for updates automatically" hint="Once a day, from Qistara’s releases on GitHub. Nothing is downloaded until you choose Install." />
       </div>
     </section>
   {/if}
@@ -519,6 +553,8 @@
   .txt { display: grid; gap: 2px; min-width: 0; }
   .hint { font-size: 12px; color: var(--text-2); }
   .btns { display: flex; gap: 8px; flex: none; }
+  .hint.bad { color: var(--signal-veil); }
+  .notes { max-height: 180px; overflow: auto; padding: 10px 14px; border-bottom: 1px solid var(--sep); font-size: 12.5px; line-height: 1.5; color: var(--text-2); white-space: pre-wrap; }
   .actions { display: flex; gap: 10px; margin-top: 12px; }
   .btn:disabled { opacity: 0.6; }
   select { max-width: 60%; padding: 4px 8px; border-radius: var(--r-sm); border: 1px solid var(--sep); background: var(--bg-2); color: var(--text); }

@@ -78,8 +78,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-      # unsigned test build: updater artifacts need the release key, which only release.yml has
-      - run: npm run tauri build -- --config "{\"bundle\":{\"createUpdaterArtifacts\":false}}"
+      # unsigned test build; release.yml signs releases
+      - run: npm run tauri build
       - uses: actions/upload-artifact@v4
         with:
           name: qistara-windows-nsis
