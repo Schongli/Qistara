@@ -29,7 +29,7 @@ pub fn media_state(_media: State<Media>, _playing: bool, _position: f64) {}
 #[cfg(desktop)]
 pub fn init(window: &WebviewWindow) -> Option<MediaControls> {
     #[cfg(windows)]
-    let hwnd = Some(window.hwnd().ok()?.0 as *mut std::ffi::c_void);
+    let hwnd = Some(window.hwnd().ok()?.0);
     #[cfg(not(windows))]
     let hwnd = None;
     let mut c = MediaControls::new(PlatformConfig { display_name: "Qistara", dbus_name: "qistara", hwnd })
