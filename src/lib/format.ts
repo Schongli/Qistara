@@ -34,3 +34,10 @@ export const collator = new Intl.Collator(undefined, { sensitivity: 'base', nume
 // "The Beatles" sorts under B, as in every music library.
 export const sortKey = (s: string) => s.replace(/^(the|a|an)\s+/i, '')
 export const byName = (a: string, b: string) => collator.compare(sortKey(a), sortKey(b))
+
+/** A size for people: "820 KB", "12 MB", "1.7 GB". */
+export function mb(bytes: number): string {
+  if (bytes < 1e6) return `${Math.max(0, Math.round(bytes / 1e3))} KB`
+  if (bytes < 1e9) return `${Math.round(bytes / 1e6)} MB`
+  return `${(bytes / 1e9).toFixed(1)} GB`
+}

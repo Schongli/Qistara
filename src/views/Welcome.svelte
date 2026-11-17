@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { nav } from '../lib/nav.svelte'
   import { open } from '@tauri-apps/plugin-dialog'
   import Icon from '../components/Icon.svelte'
   import { addFolder } from '../lib/library.svelte'
@@ -13,10 +14,14 @@
   <img class="mark" src="/favicon.svg" alt="" width="84" height="84" />
   <h1 class="t-title">Your music, in true balance.</h1>
   <p class="t-sub">Add the folder where your music and videos live. Qistara plays FLAC, ALAC, WAV, AIFF, APE, WavPack, MP3, AAC, Opus and nearly every video format, and sends lossless audio to your DAC bit-perfect, in exclusive mode. Your Navidrome server, YouTube Music and playlists from Spotify, Apple Music and Tidal join it from Providers.</p>
-  <button class="btn primary press" onclick={pick}><Icon name="FolderSimplePlus" size={16} />Add Music Folder…</button>
+  <div class="start">
+    <button class="btn primary press" onclick={pick}><Icon name="FolderSimplePlus" size={16} />Add Music Folder…</button>
+    <button class="btn press" onclick={() => nav.root({ name: 'ytm' })}><Icon name="YoutubeLogo" size={16} />Just Stream: YT Music</button>
+  </div>
 </div>
 
 <style>
+  .start { display: flex; flex-wrap: wrap; gap: 10px; justify-content: inherit; }
   .welcome { max-width: 460px; margin: 12vh auto 0; text-align: center; display: grid; justify-items: center; gap: 14px; }
   .mark { border-radius: 19px; box-shadow: var(--shadow-art); }
   h1, p { margin: 0; }

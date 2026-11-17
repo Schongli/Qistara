@@ -4,7 +4,7 @@
   import { mpv, seek } from '../lib/player.svelte'
   import { lyr } from '../lib/lyrics.svelte'
   import { targetLanguage, tr } from '../lib/translate.svelte'
-  import { card, learn, openWord } from '../lib/learn.svelte'
+  import { card, installDictionary, learn, openWord } from '../lib/learn.svelte'
   import { settings } from '../lib/settings.svelte'
   import { furigana, toHiragana } from '../lib/kana'
   import { activeLine, isGap, type Line, type Word } from '../lib/lyrics'
@@ -96,6 +96,16 @@
 {/snippet}
 
 <div class="lyrics" class:manual class:learning class:plain={data && !data.synced} bind:clientHeight={h} onwheel={wheel}>
+  {#if settings.learnLyrics && learn.dict}
+    <div class="dict" role="status">
+      {#if learn.dict === 'installing'}
+        <span>{learn.dictDone < 0 ? 'Building the Japanese dictionary…' : `Downloading the Japanese dictionary… ${learn.dictTotal ? Math.round((learn.dictDone / learn.dictTotal) * 100) : 0}%`}</span>
+      {:else}
+        <span>Readings and word forms for Japanese need a dictionary (a 12 MB download, built once on this PC).</span>
+        <button class="get" onclick={installDictionary}>Install</button>
+      {/if}
+    </div>
+  {/if}
   {#if lyr.loading}
     <p class="note">Looking for lyrics…</p>
   {:else if !data}
@@ -176,6 +186,9 @@
   @keyframes breathe { 50% { transform: scale(1.12); } }
   .static p { margin: 0; padding: 4px 12px; font-size: 22px; font-weight: 650; line-height: 1.35; color: rgba(255, 255, 255, 0.8); user-select: text; }
   .note { color: rgba(255, 255, 255, 0.5); font-size: 15px; text-align: center; margin-top: 40%; }
+  .dict { display: flex; align-items: center; gap: 10px; margin: 8px; padding: 10px 12px; border-radius: var(--r); background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.85); font-size: 13px; line-height: 1.4; }
+  .dict span { flex: 1; }
+  .get { flex: none; padding: 6px 12px; border-radius: var(--r); background: #fff; color: #111; font-weight: 650; font-size: 12.5px; }
   .credit { position: absolute; bottom: 4px; right: 12px; margin: 0; font-size: 10.5px; color: rgba(255, 255, 255, 0.35); }
   @media (prefers-reduced-motion: reduce) {
     .line { filter: none; transform: none; transition: color 150ms; }

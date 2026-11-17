@@ -17,7 +17,7 @@
 
 ## Getting started
 
-1. Download `Qistara_x.y.z_x64-setup.exe` from [Releases](https://github.com/Schongli/Qistara/releases) and run it. The installer isn't signed yet, so
+1. Download `Qistara_x.y.z_x64-setup.exe` from [Releases](https://github.com/Schongli/Qistara/releases) and run it. Until the installer is code-signed,
    Windows may say "Windows protected your PC": choose **More info → Run anyway**.
 2. On the welcome screen, choose **Add Music Folder…** and pick the folder that holds your music and videos.
    You can add more folders later in **Settings › General › Library**.
@@ -90,6 +90,10 @@ Open it from **Settings › Playback › Open Equalizer** or the EQ button.
 - Add up to 10 bands: Peak, Low Shelf, High Shelf, Low Cut or High Cut. Each band is coloured by the part of the
   spectrum it sits in.
 - Drag a band's dot on the curve, or focus it and use the keys: **↑/↓** gain (Shift for 3 dB steps), **←/→** frequency.
+  **Shift+drag** (or scroll on a dot) changes its width (Q), **double-click** the curve adds a band and **Delete**
+  removes the selected one.
+- The table under the curve lists every band: type, frequency, gain, Q and on/off, typed in directly. Values are
+  kept in range (20 Hz to 20 kHz, ±24 dB, Q 0.1 to 18).
 - **Auto preamp** lowers the level by the curve's highest boost, so the EQ never clips.
 - **Import AutoEQ…** reads an Equalizer APO / AutoEQ `ParametricEQ.txt` file. Save your own presets by name.
 
@@ -117,12 +121,16 @@ ones. Online sources get only the title, artist, album and length, and what they
 or one you pick. Only the lyric lines are sent to Google Translate, and translations are cached.
 
 **Learn mode** (the graduation-cap button above the lyrics) turns every word into a button: tap one for its meaning.
-Japanese also gets furigana, romaji, dictionary forms and grammar notes, worked out offline. Saved words go to
+Japanese also gets furigana, romaji, dictionary forms and grammar notes, worked out offline with a dictionary that
+Learn mode offers to download the first time (Settings › Lyrics › Learn mode shows it and removes it). Saved words go to
 **Vocabulary**, with the line they came from and a flashcard review (Enter shows the answer, then 1 = Again, 2 = Got It).
 
 **Qur'an:** recitations are recognised from their titles (surah names, Juz 'Amma, Hafs or Shu'bah). Lyrics then show the
 Uthmani text with word meanings, transliteration and a translation you choose (Kemenag, Saheeh International or The Clear Quran),
 and keep the ayah being recited in view. If a recitation isn't recognised, use **Choose Surah…**.
+Qur'an mode speaks English or Indonesian (Settings › Lyrics › Qur'an › Language; it follows your system by default),
+including the surah names (Al-Fatihah, An-Naba', …) and the word meanings, and recognises Indonesian titles such as
+"QS An-Naba", "Murotal Juz 30" or "Surat Asy-Syams".
 
 ## Video
 
@@ -143,7 +151,16 @@ Screenshots are saved to `Pictures\Qistara`.
 ## Sources and accounts
 
 All of these are optional and live in **Settings › Providers** and **Settings › Integrations**.
-Passwords, keys and sign-ins are kept in Windows Credential Manager.
+Passwords, keys and sign-ins are kept in the OS secret store (Windows Credential Manager, the macOS Keychain, or
+Secret Service on Linux).
+
+### YT Music
+
+**YT Music** in the sidebar browses YouTube Music without an account: Home shelves, search by songs, albums,
+artists or playlists, and album, artist and playlist pages. **Start Radio** (in a YT Music or YouTube song's menu)
+keeps playing similar songs, and Autoplay ∞ does the same when the queue ends. Songs play from YouTube through yt-dlp (below),
+so they need its tools once. Nothing is signed in or stored: covers and lyrics for these songs go to the streaming
+cache (Settings › General › Storage). **Links & Videos** keeps the YouTube search, links and Liked Music.
 
 ### YouTube
 
@@ -154,6 +171,12 @@ Music, age-restricted videos and, with Premium, 256 kbps audio:
 - **Firefox:** sign in to YouTube in Firefox, then choose Firefox in Qistara. Your password never leaves the browser.
 - **cookies.txt:** export your YouTube cookies to a file and choose it. Chrome and Edge lock their cookies on Windows,
   so they can't be read directly.
+
+Your cookies reach yt-dlp only as a copy made for that one run and deleted afterwards (yt-dlp writes back to
+the file it's given).
+
+YouTube needs a JavaScript runtime for yt-dlp. If Node.js 20 or newer is installed, it's used; otherwise choose
+**Get Deno** in Downloads › Tools, which fetches Deno from its GitHub release and checks its SHA-256.
 
 ### Navidrome / Subsonic
 
@@ -185,33 +208,71 @@ secret in **Settings › Integrations**, then connect. Each song is scrobbled on
 In **Radio & Streams**, search thousands of stations from [Radio Browser](https://www.radio-browser.info), or play
 and save any stream address yourself.
 
+### Discord
+
+**Settings › Integrations › Discord › Show on Discord** (off by default) shows "Listening to Qistara" on your
+Discord profile, with the title, artist, album and a time bar, while the Discord app runs on the same PC. It talks
+to the Discord app directly, not over the internet. A cover is shown only when it's already a public picture (YT
+Music, YouTube); **Artwork for local files** looks your album up on MusicBrainz (artist and album only) for a Cover
+Art Archive picture. Your file names and folders are never sent.
+
+## Listen together
+
+Play music with friends: everyone hears the same song at the same moment, and there's a chat beside it.
+
+1. **Host:** open the **Session** tab in the pane (the people button in the player bar), type your name and choose
+   **Start a Session**. The first time, your system may ask whether Qistara can accept connections: allow it for
+   private networks.
+2. **Share the invite** (`qistara://session/…`, **Copy**). Guests on your Wi-Fi or a VPN such as Tailscale or ZeroTier
+   can use the address shown; over the internet, forward the port (47800) on your router. The part after `#` is the
+   key: share the invite only with people you'd let in.
+3. **Join:** paste the invite into the Session tab and choose **Join**.
+
+What you play is what they hear: your own files too (they're read from your PC while they play, never saved on
+theirs), YT Music, YouTube and radio. Songs from your Navidrome/Subsonic server aren't shared, because their
+addresses carry your sign-in. Guests can't pause or seek while they follow you. Remove a guest (the × by their name) to
+disconnect them: the invite changes, so the old one stops working. Everything between you is encrypted.
+
 ## Downloads
 
-Paste links to videos, songs, playlists or channels and choose a format:
+Paste links to videos, songs, playlists or channels. With a single link, Qistara shows its title, length and the
+highest quality published, and the size of each choice. Choose **Video** or **Audio**, then a quality:
 
-| Format | What you get |
+| Choice | What you get |
 |---|---|
-| Audio | The best audio as published (Opus or AAC), not re-encoded |
-| MP3 | Converted to MP3 at the highest VBR quality (needs ffmpeg, which Qistara can fetch) |
-| Video 1080p | Up to 1080p, with subtitles when ffmpeg is there |
-| Video, best | The highest resolution published, 4K included |
+| Video: Best, 2160p … 240p | Up to that height, as MKV with the best video and audio merged (without ffmpeg, the best single file) |
+| Audio: Original | The best audio as published (Opus or AAC), not re-encoded |
+| Audio: M4A | AAC in an M4A file, as published |
+| Audio: MP3 320, 192, 128 | Converted to MP3 at that bitrate (needs ffmpeg, which Qistara can fetch) |
 
 The first time, choose **Get yt-dlp**: Qistara fetches the official build from its GitHub release and checks it
 against the published SHA-256.
 
-The folder, format and **Add downloads to the library** are remembered. The default folder is
+The folder, the choice and **Add downloads to the library** are remembered, and quick downloads (a song's menu) use them. The default folder is
 `Music\Qistara Downloads`. Download only what you have the right to keep.
 
 ## Appearance
 
 **Settings › Appearance** has:
 
-- **Theme:** Light, Qistara Obsidian (dark) or Automatic, plus Catppuccin Frappé, Rosé Pine, Gruvbox Dark and Solarized Dark.
+- **Theme:** Light, Qistara Obsidian (dark) or Automatic, plus 17 families, most with light and dark variants picked
+  under the card: Pastel, Moonbloom, Timber, Sundial, Fjord, Nocturne, Neon City, Evergreen, Ukiyo, Slate, Andalus,
+  Madinah, Sakura, Matcha, Pitch Black (for OLED screens) and WibuFest.
+- **Adaptive theme:** the whole app takes its colours from the cover of what's playing, and changes with each song.
 - **Accent:** nine colours, your own, or one taken from the playing song's cover.
 - **Corners** from square to round, five **icon packs**, text size, compact rows and the font.
 - **Window:** Mica blur behind the window, and blur in the interface, each on or off.
 
 Settings has tabs and a search: press **Ctrl+F** on the Settings page.
+
+The window can be as narrow as 360 px: the sidebar becomes icons, then a drawer (the menu button, top left), and
+the pane becomes a sheet. On a touch screen, one tap plays a song and a long press opens its menu.
+
+## Updates
+
+**Settings › General › Updates** checks Qistara's GitHub releases once a day (turn off **Check for updates
+automatically** to stop it) and says when a new version is out, with what's new. Nothing is downloaded until you
+choose **Install and Restart**. An update installs only if it carries Qistara's release signature for that version.
 
 ## Keyboard shortcuts
 
@@ -243,7 +304,8 @@ While a video plays:
 
 ## Where your data lives
 
-Everything Qistara keeps is in `%LOCALAPPDATA%\com.qistara.app`:
+Everything Qistara keeps is in its app data folder: `%LOCALAPPDATA%\com.qistara.app` on Windows,
+`~/Library/Application Support/com.qistara.app` on macOS, `~/.local/share/com.qistara.app` on Linux.
 
 | Path | Contents |
 |---|---|
@@ -251,9 +313,11 @@ Everything Qistara keeps is in `%LOCALAPPDATA%\com.qistara.app`:
 | `art\` | Cached artwork |
 | `lyrics\` | Lyrics found online, one file per song and source |
 | `resume\` | Where each video was stopped |
-| `bin\` | yt-dlp and ffmpeg, if you installed them from Qistara |
+| `bin\` | yt-dlp, ffmpeg and Deno, if you installed them from Qistara |
+| `dict\` | The Japanese dictionary, if you installed it |
+| `streaming\` | Covers and lyrics for your server and YT Music, and download scratch space: Settings › General › Storage clears it |
 
-Sign-ins and keys are in Windows Credential Manager, under names starting with "Qistara".
+Sign-ins and keys are in the OS secret store, under names starting with "Qistara".
 To start over, quit Qistara and delete that folder. Your music files are never changed, except when you save tags
 with Get Info.
 
@@ -271,6 +335,15 @@ tab, or in your DAC's control panel.
 
 **YouTube stopped working.** YouTube changes often. Open **Downloads › Tools** and choose **Check for Update** for yt-dlp.
 
-**Windows warns about the installer.** The installer isn't signed yet: choose **More info → Run anyway**.
+**"YouTube needs a JavaScript runtime."** Choose **Get Deno** in Downloads › Tools, or install Node.js 20 or newer.
+
+**Friends can't join a session.** Check that your firewall lets Qistara accept connections on private networks, that
+they use the address for the network you share (Wi-Fi or VPN), and that the invite is the current one (removing a
+guest changes it).
+
+**macOS: "Shared mode".** Bit-perfect uses hog mode, which takes the device for Qistara alone; another app holding it
+prevents that. **Linux:** choose an `hw:` device in Settings › Playback › Output; `default` goes through the mixer.
+
+**Windows warns about the installer.** Until the installer is code-signed: choose **More info → Run anyway**.
 
 Still stuck? [Open an issue](https://github.com/Schongli/Qistara/issues) and say what you did, what you expected and what happened instead.

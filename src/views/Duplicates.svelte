@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { FILE_MANAGER } from '../lib/os'
   import { revealItemInDir } from '@tauri-apps/plugin-opener'
   import Icon from '../components/Icon.svelte'
   import { lib } from '../lib/library.svelte'
@@ -14,7 +15,7 @@
 <p class="t-sub">
   {#if groups.length}
     {groups.length === 1 ? '1 song exists' : `${groups.length} songs exist`} in more than one file ({extra} extra {extra === 1 ? 'copy' : 'copies'}). The
-    best-quality copy is listed first. Qistara never deletes files; use Show in File Explorer to tidy up.
+    best-quality copy is listed first. Qistara never deletes files; use Show in {FILE_MANAGER} to tidy up.
   {:else}
     No duplicate songs found. Songs match when artist, title and length agree (remaster and version tags are ignored).
   {/if}
@@ -30,7 +31,7 @@
         <span class="q">{q.detail || t.codec}</span>
         <span class="path t-sub ellipsis" title={t.path}>{t.path}</span>
         <button class="icon-btn" aria-label="Play this copy" onclick={() => queue.play([t])}><Icon name="Play" size={14} weight="fill" /></button>
-        <button class="icon-btn" aria-label="Show in File Explorer" title="Show in File Explorer" onclick={() => revealItemInDir(t.path)}><Icon name="FolderOpen" size={15} /></button>
+        <button class="icon-btn" aria-label="Show in {FILE_MANAGER}" title="Show in {FILE_MANAGER}" onclick={() => revealItemInDir(t.path)}><Icon name="FolderOpen" size={15} /></button>
       </div>
     {/each}
   </section>

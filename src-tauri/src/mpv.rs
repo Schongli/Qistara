@@ -6,13 +6,60 @@
 //! path are set here, never by the page.
 
 use serde_json::{json, Value};
-use tauri::{Manager, WebviewWindow};
+#[cfg(desktop)]
+use tauri::Manager;
+use tauri::WebviewWindow;
+#[cfg(desktop)]
 use tauri_plugin_libmpv::{MpvConfig, MpvExt};
+
+/// Phones have no libmpv here yet: the player says so instead of starting (docs/mobile.md).
+#[cfg(mobile)]
+const NO_PLAYER: &str = "Playback on phones isn't ready yet.";
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn mpv_init(_window: WebviewWindow, _mpv_config: Value) -> Result<String, String> {
+    Err(NO_PLAYER.into())
+}
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn mpv_command(_window: WebviewWindow, name: String, args: Vec<Value>) -> Result<(), String> {
+    check_command(&name, &args).and(Err(NO_PLAYER.into()))
+}
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn mpv_set(_window: WebviewWindow, name: String, value: Value) -> Result<(), String> {
+    check_prop(&name, &value).and(Err(NO_PLAYER.into()))
+}
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn mpv_ytdl_sign_in(_window: WebviewWindow, _cookies: String) -> Result<(), String> {
+    Err(NO_PLAYER.into())
+}
 
 use crate::ytdlp;
 
-/// yt-dlp needs a JavaScript runtime for YouTube; `mpv_ytdl_sign_in` appends the sign-in.
-const YTDL_RAW: &str = "js-runtimes=node";
+#[cfg(desktop)]
+/// The ytdl hook's yt-dlp options: never a config file or cache of its own (the same as ytdlp.rs runs it), our
+/// JavaScript runtime by path, and the sign-in: Firefox's cookies, or the hook's copy of a cookies.txt.
+fn ytdl_raw(app: &tauri::AppHandle, cookies: &str) -> String {
+    let mut o = vec!["ignore-config=".to_string(), "no-cache-dir=".to_string()];
+    if let Ok(js) = ytdlp::js_runtime(app) {
+        o.push(format!("js-runtimes={}", quote(&js)));
+    }
+    match cookies {
+        "firefox" => o.push("cookies-from-browser=firefox".into()),
+        "" => {}
+        path => match ytdlp::hook_cookies(app, Some(path)) {
+            Ok(Some(copy)) => o.push(format!("cookies={}", quote(&copy.to_string_lossy()))),
+            // a file that's gone plays as a guest
+            _ => log::warn!("YouTube plays as a guest: the cookies file can't be read"),
+        },
+    }
+    if matches!(cookies, "" | "firefox") {
+        let _ = ytdlp::hook_cookies(app, None);
+    }
+    o.join(",")
+}
 
 #[derive(Clone, Copy)]
 enum Kind {
@@ -25,8 +72,47 @@ enum Kind {
     Aspect,
     Device,
     Af,
+    /// the audio output: one per OS, each the one bit-perfect path that OS has
+    Ao,
 }
 use Kind::*;
+
+/// The rules differ per OS (device names, what a local path looks like). `cfg` only picks the OS: the
+/// functions take it as a value, so every OS's rules are tested on every machine.
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Os {
+    Windows,
+    Mac,
+    Linux,
+}
+pub const OS: Os = if cfg!(windows) { Os::Windows } else if cfg!(target_os = "macos") { Os::Mac } else { Os::Linux };
+
+/// WASAPI exclusive, CoreAudio hog mode (mpv's coreaudio redirects to coreaudio_exclusive), ALSA hw:.
+fn ao(os: Os, s: &str) -> bool {
+    s == match os {
+        Os::Windows => "wasapi",
+        Os::Mac => "coreaudio",
+        Os::Linux => "alsa",
+    }
+}
+
+/// An output device as mpv lists it. ALSA names are held to plain hardware PCMs: an ALSA PCM name can also be a
+/// plugin that writes a file (`file:…`), which would undo everything the allowlist keeps out.
+pub fn device(os: Os, s: &str) -> bool {
+    s == "auto"
+        || match os {
+            Os::Windows => s.starts_with("wasapi/"),
+            Os::Mac => s.strip_prefix("coreaudio/").is_some_and(|uid| !uid.is_empty() && uid.len() <= 256 && !uid.chars().any(char::is_control)),
+            Os::Linux => s.strip_prefix("alsa/").is_some_and(|name| {
+                let (pcm, args) = name.split_once(':').unwrap_or((name, ""));
+                let mut a = args.split(',');
+                let card = |c: &str| c.strip_prefix("CARD=").is_some_and(|c| (1..=32).contains(&c.len()) && c.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_'));
+                let dev = |d: &str| d.strip_prefix("DEV=").is_some_and(|n| (1..=2).contains(&n.len()) && n.bytes().all(|b| b.is_ascii_digit()));
+                matches!(pcm, "default" | "sysdefault" | "hw" | "plughw" | "front" | "iec958" | "hdmi")
+                    && (args.is_empty() || (a.next().is_some_and(card) && a.next().is_none_or(dev) && a.next().is_none()))
+            }),
+        }
+}
 
 /// Properties and start options the page may set (player.svelte.ts and its callers), and what each may hold.
 const PROPS: &[(&str, Kind)] = &[
@@ -37,7 +123,7 @@ const PROPS: &[(&str, Kind)] = &[
     ("replaygain", One(&["no", "track", "album"])), ("audio-spdif", One(&["", "ac3,eac3,dts,dts-hd,truehd"])),
     ("hwdec", One(&["auto-safe", "no"])),
     // start options (startMpv)
-    ("ao", One(&["wasapi"])), ("vo", One(&["gpu-next"])), ("target-colorspace-hint", Flag),
+    ("ao", Ao), ("vo", One(&["gpu-next"])), ("target-colorspace-hint", Flag),
     ("video-sync", One(&["audio"])), ("idle", Flag), ("force-window", Flag), ("keep-open", Flag),
     ("gapless-audio", One(&["weak", "yes", "no"])), ("prefetch-playlist", Flag), ("audio-display", One(&["no"])),
     ("cover-art-auto", One(&["no"])), ("input-default-bindings", Flag), ("input-vo-keyboard", Flag), ("osc", Flag),
@@ -86,24 +172,37 @@ fn af(s: &str) -> bool {
         })
 }
 
-/// A file on a drive or a share (not a device path like \\.\pipe\…).
-fn local(p: &str) -> bool {
+/// A file on a drive or a share (not a device path like \\.\pipe\…); on Linux and macOS an absolute path
+/// outside the kernel's own trees.
+pub fn local_on(os: Os, p: &str) -> bool {
+    if os != Os::Windows {
+        return p.starts_with('/')
+            && !p.starts_with("//")
+            && !p.contains('\0')
+            && !p.split('/').any(|s| s == "..")
+            && !["/dev/", "/proc/", "/sys/"].iter().any(|d| p.starts_with(d));
+    }
     let b = p.as_bytes();
     let drive = b.len() > 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && matches!(b[2], b'\\' | b'/');
     drive || (p.starts_with(r"\\") && !p.starts_with(r"\\?\") && !p.starts_with(r"\\.\"))
 }
 
+
 /// A local file, a stream or a ytdl:// web page: never mpv's other protocols (av://, lavf://, edl://, fd://…).
-fn media(p: &str) -> bool {
+fn media(os: Os, p: &str) -> bool {
     let l = p.to_ascii_lowercase();
     let web = |u: &str| u.starts_with("http://") || u.starts_with("https://");
-    local(p)
+    local_on(os, p)
         || web(&l)
         || ["rtsp://", "rtmp://", "mms://", "mmsh://"].iter().any(|s| l.starts_with(s))
         || l.strip_prefix("ytdl://").is_some_and(web)
 }
 
 pub fn check_prop(name: &str, value: &Value) -> Result<(), String> {
+    check_prop_on(OS, name, value)
+}
+
+pub fn check_prop_on(os: Os, name: &str, value: &Value) -> Result<(), String> {
     let kind = PROPS.iter().find(|(n, _)| *n == name).map(|(_, k)| *k);
     let ok = kind.zip(text(value)).is_some_and(|(kind, s)| match kind {
         Flag => s == "yes" || s == "no",
@@ -111,23 +210,28 @@ pub fn check_prop(name: &str, value: &Value) -> Result<(), String> {
         Track => s == "no" || s == "auto" || index(&s),
         One(allowed) => allowed.contains(&s.as_str()),
         Aspect => s == "-1" || s.split_once(':').is_some_and(|(w, h)| num(w) && num(h)),
-        Device => s == "auto" || s.starts_with("wasapi/"),
+        Device => device(os, &s),
         Af => af(&s),
+        Ao => ao(os, &s),
     });
     if ok { Ok(()) } else { Err(format!("mpv: {name} can't be set to {value}")) }
 }
 
 pub fn check_command(name: &str, args: &[Value]) -> Result<(), String> {
+    check_command_on(OS, name, args)
+}
+
+pub fn check_command_on(os: Os, name: &str, args: &[Value]) -> Result<(), String> {
     let refuse = || format!("mpv: command {name} {} isn't allowed", Value::from(args));
     let owned = args.iter().map(text).collect::<Option<Vec<_>>>().ok_or_else(refuse)?;
     let a: Vec<&str> = owned.iter().map(String::as_str).collect();
     let ok = match (name, a.as_slice()) {
-        ("set", [p, _]) => return check_prop(p, &args[1]),
-        ("loadfile", [p] | [p, "replace" | "append" | "append-play"]) => media(p),
+        ("set", [p, _]) => return check_prop_on(os, p, &args[1]),
+        ("loadfile", [p] | [p, "replace" | "append" | "append-play"]) => media(os, p),
         // resume and reload (queue.svelte.ts): per-file options are only ever the start time
-        ("loadfile", [p, "replace", "-1", start]) => media(p) && start.strip_prefix("start=").is_some_and(num),
+        ("loadfile", [p, "replace", "-1", start]) => media(os, p) && start.strip_prefix("start=").is_some_and(num),
         ("seek", [t, "absolute" | "relative"]) => num(t),
-        ("sub-add", [p, "select"]) => local(p),
+        ("sub-add", [p, "select"]) => local_on(os, p),
         ("af-command", ["pre", "volume", v]) => v.strip_suffix("dB").is_some_and(num),
         ("af-command", [l, "f" | "w" | "g", v]) => eq_label(l) && num(v),
         ("playlist-remove", [i]) => index(i),
@@ -142,11 +246,13 @@ pub fn check_command(name: &str, args: &[Value]) -> Result<(), String> {
     if ok { Ok(()) } else { Err(refuse()) }
 }
 
+#[cfg(desktop)]
 /// mpv's length-prefixed quoting, so a comma or '=' in a path can't split an option list.
 fn quote(s: &str) -> String {
     format!("%{}%{s}", s.len())
 }
 
+#[cfg(desktop)]
 /// Runs off the async runtime, as the plugin's own commands do: an mpv call can block.
 async fn on_mpv(
     w: WebviewWindow,
@@ -158,6 +264,7 @@ async fn on_mpv(
     }
 }
 
+#[cfg(desktop)]
 /// Starts mpv with the page's options, once checked, plus the ones that hold a path.
 #[tauri::command]
 pub async fn mpv_init(window: WebviewWindow, mut mpv_config: MpvConfig) -> Result<String, String> {
@@ -165,11 +272,13 @@ pub async fn mpv_init(window: WebviewWindow, mut mpv_config: MpvConfig) -> Resul
         check_prop(name, value)?;
     }
     let data = window.path().app_local_data_dir().map_err(|e| e.to_string())?;
-    let ytdlp = ytdlp::bin_dir(window.app_handle())?.join("yt-dlp.exe");
+    let ytdlp = ytdlp::bin_dir(window.app_handle())?.join(ytdlp::exe("yt-dlp"));
+    let raw = ytdl_raw(window.app_handle(), "");
     let o = &mut mpv_config.initial_options;
-    o.insert("ytdl-raw-options".into(), json!(YTDL_RAW));
-    // ytdl:// tracks (youtube.svelte.ts) play through our own yt-dlp (ytdlp.rs)
-    let hook = format!("ytdl_hook-ytdl_path={},ytdl_hook-all_formats=no", quote(&ytdlp.to_string_lossy()));
+    o.insert("ytdl-raw-options".into(), json!(raw));
+    // ytdl:// tracks (youtube.svelte.ts) play through our own yt-dlp (ytdlp.rs). A listening session's
+    // loopback stream (session.rs) is never handed to yt-dlp, even when it fails to open.
+    let hook = format!("ytdl_hook-ytdl_path={},ytdl_hook-all_formats=no,ytdl_hook-exclude=^127%.0%.0%.1[:/]", quote(&ytdlp.to_string_lossy()));
     o.insert("script-opts".into(), json!(hook));
     o.insert("watch-later-dir".into(), json!(data.join("resume").to_string_lossy()));
     // dev builds keep mpv's own log (format negotiation, device errors) next to the library
@@ -187,31 +296,27 @@ pub async fn mpv_init(window: WebviewWindow, mut mpv_config: MpvConfig) -> Resul
     window.mpv().init(mpv_config, &label).map_err(|e| e.to_string())
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn mpv_command(window: WebviewWindow, name: String, args: Vec<Value>) -> Result<(), String> {
     check_command(&name, &args)?;
     on_mpv(window, move |w| w.mpv().command(&name, &args, w.label())).await
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub async fn mpv_set(window: WebviewWindow, name: String, value: Value) -> Result<(), String> {
     check_prop(&name, &value)?;
     on_mpv(window, move |w| w.mpv().set_property(&name, &value, w.label())).await
 }
 
-/// YouTube playback signs in like search and downloads: as a guest, with Firefox's cookies, or with a
-/// checked copy of a cookies.txt export (ytdlp.rs cookie_file). A file that's gone plays as a guest.
+#[cfg(desktop)]
+/// YouTube playback signs in like search and downloads: as a guest, with Firefox's cookies, or with the
+/// hook's checked copy of a cookies.txt export (ytdlp.rs hook_cookies). Also called after Deno is installed.
 #[tauri::command]
 pub async fn mpv_ytdl_sign_in(window: WebviewWindow, cookies: String) -> Result<(), String> {
     on_mpv(window, move |w| {
-        let raw = match cookies.as_str() {
-            "" => YTDL_RAW.to_string(),
-            "firefox" => format!("{YTDL_RAW},cookies-from-browser=firefox"),
-            path => match ytdlp::youtube_cookies(w.app_handle().clone(), path.into()) {
-                Ok(copy) => format!("{YTDL_RAW},cookies={}", quote(&copy)),
-                Err(_) => YTDL_RAW.to_string(),
-            },
-        };
+        let raw = ytdl_raw(w.app_handle(), &cookies);
         w.mpv().set_property("ytdl-raw-options", &json!(raw), w.label())
     })
     .await
@@ -221,8 +326,79 @@ pub async fn mpv_ytdl_sign_in(window: WebviewWindow, cookies: String) -> Result<
 mod tests {
     use super::*;
 
+    #[test]
+    fn fuzz_the_allowlist_never_lets_anything_dangerous_through() {
+        let pieces = [
+            "loadfile", "run", "subprocess", "script-opts", "ytdl-raw-options", "@eq0:lavfi=[", "@pre:lavfi=[", "equalizer=f=", "volume=",
+            "amovie=", "]", ",", ":", "=", "dB", "\\\\.\\pipe\\x", "\\\\?\\C:\\", "D:\\a.flac", "/etc/passwd", "ytdl://", "https://x",
+            "av://", "edl://", "lavf://", "replace", "start=", "1", "-1", "yes", "no", "nan", "inf", "1e999", "wasapi/", "alsa/", "file:",
+            "hw:CARD=x,DEV=0", " ", "%", "t=q", "eq", "af", "sid", "auto",
+        ];
+        let names = ["loadfile", "set", "af-command", "seek", "sub-add", "run", "subprocess", "load-script", "stop", "cycle", "playlist-remove"];
+        let mut x = 0x1234_5677u32;
+        let mut next = || {
+            x ^= x << 13;
+            x ^= x >> 17;
+            x ^= x << 5;
+            x as usize
+        };
+        let mut accepted = 0;
+        for _ in 0..20_000 {
+            let args: Vec<Value> = (0..next() % 5).map(|_| Value::String((0..1 + next() % 4).map(|_| pieces[next() % pieces.len()]).collect())).collect();
+            let name = names[next() % names.len()];
+            if check_command_on(Os::Windows, name, &args).is_err() {
+                continue;
+            }
+            accepted += 1;
+            let a: Vec<String> = args.iter().filter_map(text).collect();
+            assert!(!matches!(name, "run" | "subprocess" | "load-script"), "{name}");
+            if name == "loadfile" {
+                assert!(media(Os::Windows, &a[0]) && !a[0].to_ascii_lowercase().starts_with("av://"), "{a:?}");
+            }
+            if name == "sub-add" {
+                assert!(local_on(Os::Windows, &a[0]), "{a:?}");
+            }
+            // a file name may say anything; filters and properties may not
+            if matches!(name, "set" | "af-command") {
+                assert!(a.iter().all(|v| !v.contains("amovie") && !v.contains("script-opts") && !v.contains("ytdl-raw-options")), "{name} {a:?}");
+            }
+        }
+        assert!(accepted > 50, "the fuzzer should reach accepted commands too ({accepted})");
+    }
+
     fn cmd(name: &str, args: Value) -> Result<(), String> {
-        check_command(name, args.as_array().unwrap())
+        check_command_on(Os::Windows, name, args.as_array().unwrap())
+    }
+    fn check_prop(name: &str, value: &Value) -> Result<(), String> {
+        check_prop_on(Os::Windows, name, value)
+    }
+
+    #[test]
+    fn each_os_gets_its_own_bit_perfect_output_and_devices() {
+        let ok = |os, name: &str, v: &str| check_prop_on(os, name, &json!(v)).is_ok();
+        assert!(ok(Os::Windows, "ao", "wasapi") && !ok(Os::Windows, "ao", "coreaudio"));
+        assert!(ok(Os::Mac, "ao", "coreaudio") && !ok(Os::Mac, "ao", "wasapi") && !ok(Os::Mac, "ao", "coreaudio_exclusive"));
+        assert!(ok(Os::Linux, "ao", "alsa") && !ok(Os::Linux, "ao", "pulse") && !ok(Os::Linux, "ao", "pcm"));
+        assert!(ok(Os::Mac, "audio-device", "coreaudio/AppleUSBAudioEngine:Chord:Mojo:14100000:1"));
+        assert!(!ok(Os::Mac, "audio-device", "coreaudio/") && !ok(Os::Mac, "audio-device", "wasapi/{x}"));
+        for good in ["auto", "alsa/default", "alsa/hw:CARD=PCH,DEV=0", "alsa/plughw:CARD=Mojo,DEV=0", "alsa/iec958:CARD=PCH", "alsa/hdmi:CARD=NVidia,DEV=3", "alsa/sysdefault:CARD=U192k"] {
+            assert!(ok(Os::Linux, "audio-device", good), "{good}");
+        }
+        // ALSA plugins that write files or run things, and anything not a hardware PCM
+        for bad in ["alsa/file:'/tmp/x',raw", "alsa/hw:CARD=PCH,DEV=0,x", "alsa/hw:CARD=../x", "alsa/pipe:CMD=sh", "alsa/hw:CARD=", "pulse/x", "alsa/dmix:CARD=PCH", "alsa/hw:CARD=PCH,DEV=100"] {
+            assert!(!ok(Os::Linux, "audio-device", bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn plays_local_files_on_every_os() {
+        assert!(local_on(Os::Linux, "/home/me/Music/a.flac") && local_on(Os::Mac, "/Users/me/Music/a b.flac"));
+        for bad in ["/dev/snd/pcmC0D0p", "/proc/self/environ", "/sys/x", "/home/../proc/self/environ", "//server/x", "relative/a.flac", r"D:\a.flac"] {
+            assert!(!local_on(Os::Linux, bad), "{bad}");
+        }
+        assert!(!local_on(Os::Windows, "/home/me/a.flac"));
+        assert!(check_command_on(Os::Linux, "loadfile", &[json!("/home/me/a.flac"), json!("replace")]).is_ok());
+        assert!(check_command_on(Os::Linux, "sub-add", &[json!("/proc/self/fd/0"), json!("select")]).is_err());
     }
 
     #[test]

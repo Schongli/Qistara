@@ -1,5 +1,6 @@
 mod apple;
 mod db;
+mod discord;
 mod japanese;
 mod keys;
 mod lastfm;
@@ -9,13 +10,16 @@ mod media_keys;
 mod mpv;
 mod quran;
 mod scan;
+mod session;
 mod spotify;
 mod subsonic;
 mod tags;
 mod tidal;
 mod translate;
+mod update;
 mod user;
 mod ytdlp;
+mod ytmusic;
 
 use notify_debouncer_mini::{new_debouncer, notify::RecommendedWatcher, notify::RecursiveMode, Debouncer};
 use std::path::Path;
@@ -32,9 +36,18 @@ const OLD_DATA: [&str; 2] = ["com.confluenceplayer.app", "com.sonora.player"];
 pub struct Lib {
   db: Mutex<rusqlite::Connection>,
   pub art: scan::Art,
+  /// covers of streamed things (your server, YT Music), kept apart from the library's: app data/streaming/art
+  pub stream_art: scan::Art,
   scanning: AtomicBool,
   again: AtomicBool,
   watcher: Mutex<Option<Debouncer<RecommendedWatcher>>>,
+}
+
+impl Lib {
+  /// A library track's path by id (a listening session shares files only this way).
+  pub fn path_of(&self, id: i64) -> Res<Option<String>> {
+    db::path_of(&self.db.lock().unwrap(), id).map_err(err)
+  }
 }
 
 type Res<T> = Result<T, String>;
@@ -49,6 +62,7 @@ struct Library {
   tracks: Vec<db::Track>,
   playlists: Vec<user::Playlist>,
   art_dir: String,
+  stream_art_dir: String,
 }
 
 #[tauri::command]
@@ -59,6 +73,7 @@ fn library(lib: State<Lib>) -> Res<Library> {
     tracks: db::tracks(&c).map_err(err)?,
     playlists: user::playlists(&c).map_err(err)?,
     art_dir: lib.art.dir.to_string_lossy().into_owned(),
+    stream_art_dir: lib.stream_art.dir.to_string_lossy().into_owned(),
   })
 }
 
@@ -97,8 +112,14 @@ fn screenshot_dir(app: AppHandle) -> Res<String> {
   Ok(d.to_string_lossy().into_owned())
 }
 
-fn lyrics_dir(lib: &Lib) -> std::path::PathBuf {
-  lib.art.dir.with_file_name("lyrics")
+/// Lyrics found online for a library song stay with the library; those for a server song ("sub:<id>"), a
+/// YouTube video or a stream go to streaming/lyrics, which Settings › Storage can clear on its own.
+fn lyrics_dir(lib: &Lib, key: &str) -> std::path::PathBuf {
+  if ["sub:", "session:", "ytdl://", "http://", "https://"].iter().any(|p| key.starts_with(p)) {
+    lib.stream_art.dir.with_file_name("lyrics")
+  } else {
+    lib.art.dir.with_file_name("lyrics")
+  }
 }
 
 #[tauri::command]
@@ -110,7 +131,7 @@ fn lyrics(path: String) -> Option<lyrics::Found> {
 /// Network trouble is an error and isn't cached, so the next play tries again.
 #[tauri::command]
 async fn lyrics_fetch(lib: State<'_, Lib>, source: lyrics_online::Source, key: String, song: lyrics_online::Song) -> Res<String> {
-  let dir = lyrics_dir(&lib);
+  let dir = lyrics_dir(&lib, &key);
   if let Some(text) = lyrics::cached(&key, source.name(), &dir) {
     return Ok(text);
   }
@@ -325,14 +346,15 @@ fn write_playlist(path: String, text: String) -> Res<()> {
   std::fs::write(&path, text.as_bytes()).map_err(err)
 }
 
-/// Reads a small text file the user picked (an Equalizer APO / AutoEQ preset).
+/// Reads a text file the user picked: an Equalizer APO / AutoEQ preset, or an M3U playlist (any encoding).
 #[tauri::command]
-fn read_text(path: String) -> Res<String> {
+fn read_text(path: String, playlist: Option<bool>) -> Res<String> {
+  let (max, what) = if playlist == Some(true) { (16 << 20, "a playlist") } else { (1 << 20, "a preset") };
   let m = std::fs::metadata(&path).map_err(err)?;
-  if m.len() > 1024 * 1024 {
-    return Err("file is too large for a preset".into());
+  if m.len() > max {
+    return Err(format!("This file is too large to be {what}."));
   }
-  std::fs::read_to_string(&path).map_err(err)
+  Ok(lyrics::decode_text(&std::fs::read(&path).map_err(err)?))
 }
 
 /// A picked image file, staged so the tag editor can preview it before embedding.
@@ -368,13 +390,91 @@ async fn fetch_cover(lib: State<'_, Lib>, url: String) -> Res<String> {
   stage(&lib, &bytes)
 }
 
-/// Appearance › Match artwork: the vivid colour of a cached cover. `art` is a cache file name only.
+/// A cached cover by the name the page knows it by: "<hash>.jpg" (the library's) or "stream:<hash>.jpg"
+/// (streaming/art). A name only: never a path.
+fn art_file(lib: &Lib, art: &str) -> Option<std::path::PathBuf> {
+  let (stream, name) = art_name(art)?;
+  Some(if stream { lib.stream_art.dir.join(name) } else { lib.art.dir.join(name) })
+}
+
+/// (is it a streaming cover, its file name), or None for anything that isn't a plain cache name.
+fn art_name(art: &str) -> Option<(bool, &str)> {
+  let (stream, name) = art.strip_prefix("stream:").map_or((false, art), |n| (true, n));
+  (!name.is_empty() && !name.contains(['/', '\\', ':']) && !name.contains("..")).then_some((stream, name))
+}
+
+/// Appearance › Match artwork: the vivid colour of a cached cover.
 #[tauri::command]
 fn art_color(lib: State<Lib>, art: String) -> Option<String> {
-  if art.is_empty() || art.contains(['/', '\\']) || art.contains("..") {
-    return None;
+  vivid(&image::open(art_file(&lib, &art)?).ok()?)
+}
+
+/// A listening session shows guests the host's cover of a library song: a 160 px JPEG small enough to send
+/// with the song's details (64 KB at most).
+#[tauri::command]
+fn session_art(lib: State<Lib>, art: String) -> Option<String> {
+  use base64::Engine;
+  let img = image::open(art_file(&lib, &art)?).ok()?.thumbnail(160, 160).to_rgb8();
+  let mut out = Vec::new();
+  image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 75).encode_image(&img).ok()?;
+  (out.len() <= 64 * 1024).then(|| format!("data:image/jpeg;base64,{}", base64::engine::general_purpose::STANDARD.encode(out)))
+}
+
+/// Settings › Storage: what each part of app data takes, in bytes.
+#[derive(serde::Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct Storage {
+  library_art: u64,
+  lyrics: u64,
+  streaming: u64,
+  tools: u64,
+  dictionary: u64,
+}
+
+fn dir_size(p: &Path) -> u64 {
+  walkdir::WalkDir::new(p).into_iter().flatten().filter_map(|e| e.metadata().ok()).filter(|m| m.is_file()).map(|m| m.len()).sum()
+}
+
+#[tauri::command]
+async fn storage_usage(app: AppHandle) -> Res<Storage> {
+  let d = app.path().app_local_data_dir().map_err(err)?;
+  tauri::async_runtime::spawn_blocking(move || Storage {
+    library_art: dir_size(&d.join("art")),
+    lyrics: dir_size(&d.join("lyrics")),
+    streaming: dir_size(&d.join("streaming")),
+    tools: dir_size(&d.join("bin")),
+    dictionary: dir_size(&d.join("dict")),
+  })
+  .await
+  .map_err(err)
+}
+
+/// Empties streaming/: server and YT Music covers and their lyrics. The sign-in copy of a session in use and
+/// a download in progress (streaming/tmp) are left alone; the library is never touched.
+#[tauri::command]
+fn clear_streaming_cache(app: AppHandle, lib: State<Lib>, dl: State<ytdlp::Downloads>) -> Res<()> {
+  let root = lib.stream_art.dir.parent().ok_or("no data folder")?.to_path_buf();
+  for sub in ["art", "lyrics"] {
+    clear_dir(&root.join(sub));
   }
-  vivid(&image::open(lib.art.dir.join(&art)).ok()?)
+  if !dl.busy() {
+    clear_dir(&ytdlp::streaming_dir(&app, "tmp")?);
+  }
+  Ok(())
+}
+
+/// Lyrics found online for library songs: the next play looks them up again.
+#[tauri::command]
+fn clear_lyrics_cache(lib: State<Lib>) {
+  clear_dir(&lib.art.dir.with_file_name("lyrics"));
+}
+
+/// Removes what's in `dir`, keeping the folder (the asset scope and the art cache point at it).
+fn clear_dir(dir: &Path) {
+  for e in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+    let p = e.path();
+    let _ = if p.is_dir() { std::fs::remove_dir_all(&p) } else { std::fs::remove_file(&p) };
+  }
 }
 
 /// The cover's main colour: its colourful, mid-bright pixels are sorted into 12 hue bands and the
@@ -417,6 +517,16 @@ fn rescan(app: AppHandle) {
   }
   std::thread::spawn(move || {
     let lib = app.state::<Lib>();
+    /// If anything below panics, later rescans must still run.
+    struct Unstick<'a>(&'a AtomicBool);
+    impl Drop for Unstick<'_> {
+      fn drop(&mut self) {
+        if std::thread::panicking() {
+          self.0.store(false, SeqCst);
+        }
+      }
+    }
+    let _unstick = Unstick(&lib.scanning);
     loop {
       lib.again.store(false, SeqCst);
       match scan::scan(&lib.db, &lib.art, &|done, total| {
@@ -496,6 +606,99 @@ fn copy_dir(from: &Path, to: &Path) -> std::io::Result<()> {
   Ok(())
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+  let builder = tauri::Builder::default();
+  // playback: libmpv on desktop; phones don't have it yet (mpv.rs answers for it). Updates: desktop too (update.rs)
+  #[cfg(desktop)]
+  let builder = builder.plugin(tauri_plugin_libmpv::init()).plugin(tauri_plugin_updater::Builder::new().build());
+  builder
+    .plugin(tauri_plugin_dialog::init())
+    .plugin(tauri_plugin_http::init())
+    .plugin(tauri_plugin_opener::init())
+    .manage(LastfmPending::default())
+    .manage(ScrobbleLock::default())
+    .manage(spotify::Token::default())
+    .manage(ytdlp::Downloads::default())
+    .manage(tidal::TidalToken::default())
+    .manage(session::Session::default())
+    .manage(discord::Discord::default())
+    .manage(update::Pending::default())
+    .setup(|app| {
+      if cfg!(debug_assertions) {
+        app.handle().plugin(
+          tauri_plugin_log::Builder::default()
+            .level(log::LevelFilter::Info)
+            .build(),
+        )?;
+      }
+      let dir = app.path().app_local_data_dir()?;
+      // only the newest old library: if copying it fails, the next start tries it again (never an older one)
+      if let Some(old) = OLD_DATA.iter().filter_map(|n| dir.parent().map(|p| p.join(n))).find(|o| o.join("library.db").exists()) {
+        match migrate(&old, &dir) {
+          Ok(true) => log::info!("copied the library from {}", old.display()),
+          Ok(false) => {}
+          Err(e) => log::warn!("couldn't copy the library from {}: {e}", old.display()),
+        }
+      }
+      std::fs::create_dir_all(&dir)?;
+      // the webview may load artwork from the cache only (the $APPLOCALDATA glob didn't match on Windows)
+      let (art, stream_art) = (dir.join("art"), dir.join("streaming").join("art"));
+      for d in [&art, &stream_art] {
+        std::fs::create_dir_all(d)?;
+        app.asset_protocol_scope().allow_directory(d, true)?;
+        // Tauri checks canonical paths, and under folder redirection (MSIX app containers) the files we
+        // write can resolve somewhere other than the folder itself: also allow where a written file lands
+        let probe = d.join(".scope");
+        if let Some(real) = std::fs::write(&probe, b"").ok().and_then(|_| std::fs::canonicalize(&probe).ok()).and_then(|p| p.parent().map(Path::to_path_buf)) {
+          app.asset_protocol_scope().allow_directory(real, true)?;
+        }
+      }
+      app.manage(Lib {
+        db: Mutex::new(db::open(&dir.join("library.db"))?),
+        art: scan::Art::new(art),
+        stream_art: scan::Art::new(stream_art),
+        scanning: AtomicBool::new(false),
+        again: AtomicBool::new(false),
+        watcher: Mutex::new(None),
+      });
+      ytdlp::sweep_cookies(app.handle());
+      watch(app.handle());
+      rescan(app.handle().clone());
+      let controls = app.get_webview_window("main").and_then(|w| media_keys::init(&w));
+      app.manage(media_keys::Media(Mutex::new(controls)));
+      Ok(())
+    })
+    .invoke_handler(tauri::generate_handler![
+      library, add_folder, remove_folder, cover, art_color, storage_usage, clear_streaming_cache, clear_lyrics_cache, rescan, extensions, screenshot_dir, lyrics, lyrics_fetch,
+      playlist_create, playlist_update, playlist_items, playlist_delete, rate, love, played, skipped, top,
+      tag_write, fetch_cover, stage_image, read_text, write_playlist, kv_get, kv_set,
+      lastfm_status, lastfm_set_keys, lastfm_begin, lastfm_finish, lastfm_logout, lastfm_now_playing, lastfm_scrobble, media_keys::media_track, media_keys::media_state,
+      spotify::spotify_status, spotify::spotify_set_client, spotify::spotify_begin, spotify::spotify_logout, spotify::spotify_playlists,
+      spotify::spotify_tracks, spotify::spotify_player, spotify::spotify_control, japanese::japanese_words, japanese::japanese_install, japanese::japanese_remove,
+      translate::google_translate,
+      quran::quran_fetch, quran::quran_pauses, ytdlp::tools_status, ytdlp::tool_install, ytdlp::ytdlp_update,
+      ytdlp::download_add, ytdlp::download_cancel, ytdlp::youtube_search, ytdlp::youtube_list, ytdlp::youtube_ready, ytdlp::download_probe,
+      session::session_host, session::session_share, session::session_state, session::session_chat, session::session_kick,
+      session::session_join, session::session_leave, session_art, discord::discord_set, discord::discord_ready,
+      ytmusic::ytm_home, ytmusic::ytm_search, ytmusic::ytm_album, ytmusic::ytm_artist, ytmusic::ytm_playlist, ytmusic::ytm_radio,
+      japanese::japanese_status,
+      subsonic::subsonic_status, subsonic::subsonic_connect, subsonic::subsonic_logout, subsonic::subsonic_call,
+      subsonic::subsonic_stream, subsonic::subsonic_cover, tidal::tidal_status, tidal::tidal_set_client, tidal::tidal_begin,
+      tidal::tidal_logout, tidal::tidal_playlists, tidal::tidal_tracks, apple::apple_status, apple::apple_setup, apple::apple_begin,
+      apple::apple_logout, apple::apple_playlists, apple::apple_tracks, mpv::mpv_init, mpv::mpv_command, mpv::mpv_set,
+      mpv::mpv_ytdl_sign_in, update::update_check, update::update_install
+    ])
+    .build(tauri::generate_context!())
+    .expect("error while building tauri application")
+    .run(|app, event| {
+      // no sign-in copy outlives the app (ytdlp.rs)
+      if let tauri::RunEvent::Exit = event {
+        ytdlp::sweep_cookies(app);
+      }
+    });
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -519,6 +722,15 @@ mod tests {
     assert_eq!(std::fs::read(new.join("library.db")).unwrap(), b"mine");
     // nothing to copy: a fresh install
     assert!(!migrate(&d.path().join("none"), &d.path().join("fresh")).unwrap());
+  }
+
+  #[test]
+  fn names_covers_never_paths() {
+    assert_eq!(art_name("0123abcd.jpg"), Some((false, "0123abcd.jpg")));
+    assert_eq!(art_name("stream:0123abcd.jpg"), Some((true, "0123abcd.jpg")));
+    for bad in ["", "stream:", "../library.db", "stream:../../x", "a/b.jpg", r"a\b.jpg", "C:x.jpg", "stream:stream:x"] {
+      assert_eq!(art_name(bad), None, "{bad}");
+    }
   }
 
   #[test]
@@ -549,76 +761,4 @@ mod tests {
     let grey = image::RgbImage::from_pixel(64, 64, image::Rgb([90, 90, 90]));
     assert_eq!(vivid(&image::DynamicImage::ImageRgb8(grey)), None);
   }
-}
-
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-  tauri::Builder::default()
-    .plugin(tauri_plugin_libmpv::init())
-    .plugin(tauri_plugin_dialog::init())
-    .plugin(tauri_plugin_http::init())
-    .plugin(tauri_plugin_opener::init())
-    .manage(LastfmPending::default())
-    .manage(ScrobbleLock::default())
-    .manage(spotify::Token::default())
-    .manage(ytdlp::Downloads::default())
-    .manage(tidal::TidalToken::default())
-    .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
-      let dir = app.path().app_local_data_dir()?;
-      // only the newest old library: if copying it fails, the next start tries it again (never an older one)
-      if let Some(old) = OLD_DATA.iter().filter_map(|n| dir.parent().map(|p| p.join(n))).find(|o| o.join("library.db").exists()) {
-        match migrate(&old, &dir) {
-          Ok(true) => log::info!("copied the library from {}", old.display()),
-          Ok(false) => {}
-          Err(e) => log::warn!("couldn't copy the library from {}: {e}", old.display()),
-        }
-      }
-      std::fs::create_dir_all(&dir)?;
-      // the webview may load artwork from the cache only (the $APPLOCALDATA glob didn't match on Windows)
-      let art = dir.join("art");
-      std::fs::create_dir_all(&art)?;
-      app.asset_protocol_scope().allow_directory(&art, true)?;
-      // Tauri checks canonical paths, and under folder redirection (MSIX app containers) the files we
-      // write can resolve somewhere other than the folder itself: also allow where a written file lands
-      let probe = art.join(".scope");
-      if let Some(real) = std::fs::write(&probe, b"").ok().and_then(|_| std::fs::canonicalize(&probe).ok()).and_then(|p| p.parent().map(Path::to_path_buf)) {
-        app.asset_protocol_scope().allow_directory(real, true)?;
-      }
-      app.manage(Lib {
-        db: Mutex::new(db::open(&dir.join("library.db"))?),
-        art: scan::Art::new(dir.join("art")),
-        scanning: AtomicBool::new(false),
-        again: AtomicBool::new(false),
-        watcher: Mutex::new(None),
-      });
-      watch(app.handle());
-      rescan(app.handle().clone());
-      let controls = app.get_webview_window("main").and_then(|w| media_keys::init(&w));
-      app.manage(media_keys::Media(Mutex::new(controls)));
-      Ok(())
-    })
-    .invoke_handler(tauri::generate_handler![
-      library, add_folder, remove_folder, cover, art_color, rescan, extensions, screenshot_dir, lyrics, lyrics_fetch,
-      playlist_create, playlist_update, playlist_items, playlist_delete, rate, love, played, skipped, top,
-      tag_write, fetch_cover, stage_image, read_text, write_playlist, kv_get, kv_set,
-      lastfm_status, lastfm_set_keys, lastfm_begin, lastfm_finish, lastfm_logout, lastfm_now_playing, lastfm_scrobble, media_keys::media_track, media_keys::media_state,
-      spotify::spotify_status, spotify::spotify_set_client, spotify::spotify_begin, spotify::spotify_logout, spotify::spotify_playlists,
-      spotify::spotify_tracks, spotify::spotify_player, spotify::spotify_control, japanese::japanese_words, translate::google_translate,
-      quran::quran_fetch, quran::quran_pauses, ytdlp::tools_status, ytdlp::tool_install, ytdlp::ytdlp_update,
-      ytdlp::download_add, ytdlp::download_cancel, ytdlp::youtube_search, ytdlp::youtube_list, ytdlp::youtube_cookies,
-      subsonic::subsonic_status, subsonic::subsonic_connect, subsonic::subsonic_logout, subsonic::subsonic_call,
-      subsonic::subsonic_stream, subsonic::subsonic_cover, tidal::tidal_status, tidal::tidal_set_client, tidal::tidal_begin,
-      tidal::tidal_logout, tidal::tidal_playlists, tidal::tidal_tracks, apple::apple_status, apple::apple_setup, apple::apple_begin,
-      apple::apple_logout, apple::apple_playlists, apple::apple_tracks, mpv::mpv_init, mpv::mpv_command, mpv::mpv_set,
-      mpv::mpv_ytdl_sign_in
-    ])
-    .run(tauri::generate_context!())
-    .expect("error while building tauri application");
 }

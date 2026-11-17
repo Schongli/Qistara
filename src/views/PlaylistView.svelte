@@ -72,7 +72,8 @@
 />
 
 <style>
-  .head { display: flex; gap: 28px; align-items: flex-end; margin-bottom: 26px; }
+  .head { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-end; margin-bottom: 26px; }
+  @media (max-width: 600px) { .head { gap: 16px; } .head > :first-child { width: min(200px, 60vw); } }
   .art { width: 236px; flex: none; }
   .mosaic { display: grid; grid-template-columns: 1fr 1fr; border-radius: var(--r-art); overflow: hidden; box-shadow: var(--shadow-art); }
   .info { min-width: 0; padding-bottom: 4px; }

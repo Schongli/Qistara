@@ -22,12 +22,30 @@ export function filterOf(b: Band): string {
   }
 }
 
+/** What a band may hold. FFmpeg's biquads need the frequency below Nyquist; Q and gain beyond these are no EQ. */
+export const LIMITS = { gain: 24, q: [0.1, 18] as const }
+
+/**
+ * A band with every number usable: frequency 20 Hz … min(20 kHz, 0.45·fs), gain ±24 dB, Q 0.1–18. A value that
+ * isn't a number (an emptied field gives null) keeps `prev`'s, so typing can never send NaN to mpv.
+ */
+export function clampBand(b: Band, fs = 48000, prev?: Band): Band {
+  const fix = (v: number, lo: number, hi: number, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback)
+  return {
+    type: TYPES.some(([t]) => t === b.type) ? b.type : 'peak',
+    f: Math.round(fix(b.f, 20, Math.min(20000, fs * 0.45), prev?.f ?? 1000) * 10) / 10,
+    g: fix(b.g, -LIMITS.gain, LIMITS.gain, prev?.g ?? 0),
+    q: fix(b.q, LIMITS.q[0], LIMITS.q[1], prev?.q ?? 1),
+    on: !!b.on,
+  }
+}
+
 /** mpv `af` value: labelled filters (@eq0…, @pre) so drags can retune them with af-command. */
-export function afString(eq: Eq): string {
+export function afString(eq: Eq, fs = 48000): string {
   if (!eq.enabled) return ''
-  const parts = eq.bands.flatMap((b, i) => (b.on ? [`@eq${i}:lavfi=[${filterOf(b)}]`] : []))
+  const parts = eq.bands.flatMap((b, i) => (b.on ? [`@eq${i}:lavfi=[${filterOf(clampBand(b, fs))}]`] : []))
   if (!parts.length) return ''
-  const pre = preampOf(eq)
+  const pre = preampOf(eq, fs)
   return [`@pre:lavfi=[volume=${num(pre)}dB]`, ...parts].join(',')
 }
 
@@ -60,18 +78,18 @@ export function response(b: Band, f: number, fs = 48000): number {
   return 10 * Math.log10(num / den)
 }
 
-/** Sum of all enabled bands (without preamp) at `f`. */
-export const total = (eq: Eq, f: number) => eq.bands.reduce((s, b) => (b.on ? s + response(b, f) : s), 0)
+/** Sum of all enabled bands (without preamp) at `f`, at the sample rate playing (`fs`). */
+export const total = (eq: Eq, f: number, fs = 48000) => eq.bands.reduce((s, b) => (b.on ? s + response(b, f, fs) : s), 0)
 
 /** Log-spaced 20 Hz – 20 kHz. */
 export const freqs = (n = 160) => Array.from({ length: n }, (_, i) => 20 * Math.pow(1000, i / (n - 1)))
 
 /** Auto preamp lowers the level by the curve's highest boost so the EQ never clips. */
-export function preampOf(eq: Eq): number {
-  if (!eq.autoPreamp) return eq.preamp
+export function preampOf(eq: Eq, fs = 48000): number {
+  if (!eq.autoPreamp) return Number.isFinite(eq.preamp) ? Math.min(6, Math.max(-24, eq.preamp)) : 0
   // band centres are sampled too, so a peak's exact maximum is never missed between grid points
-  const at = [...freqs(240), ...eq.bands.filter((b) => b.on).map((b) => b.f)]
-  return -Math.max(0, ...at.map((f) => total(eq, f)))
+  const at = [...freqs(240), ...eq.bands.filter((b) => b.on).map((b) => b.f)].filter((f) => f < fs / 2)
+  return -Math.max(0, ...at.map((f) => total(eq, f, fs)))
 }
 
 export const FLAT: Eq = {
@@ -101,9 +119,12 @@ export function parseApo(text: string): Eq | null {
   const bands: Band[] = []
   for (const m of text.matchAll(/Filter\s*\d*:\s*(ON|OFF)\s+(\w+)\s+Fc\s+([\d.]+)\s*Hz(?:\s+Gain\s+([-\d.]+)\s*dB)?(?:\s+Q\s+([\d.]+))?/gi)) {
     const t = type[m[2].toUpperCase()]
-    if (t) bands.push({ type: t, f: +m[3], g: +(m[4] ?? 0), q: +(m[5] ?? 0.707), on: m[1].toUpperCase() === 'ON' })
+    const band = { type: t, f: +m[3], g: +(m[4] ?? 0), q: +(m[5] ?? 0.707), on: m[1].toUpperCase() === 'ON' }
+    // "1.2.3 Hz" reads as NaN, which mpv would refuse
+    if (t && [band.f, band.g, band.q].every(Number.isFinite)) bands.push(clampBand(band))
   }
   if (!bands.length) return null
   const pre = text.match(/Preamp:\s*([-\d.]+)\s*dB/i)
-  return { enabled: true, autoPreamp: !pre, preamp: pre ? +pre[1] : 0, bands: bands.slice(0, MAX_BANDS) }
+  const preamp = pre ? +pre[1] : NaN
+  return { enabled: true, autoPreamp: !Number.isFinite(preamp), preamp: Number.isFinite(preamp) ? preamp : 0, bands: bands.slice(0, MAX_BANDS) }
 }

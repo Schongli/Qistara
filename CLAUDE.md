@@ -1,16 +1,19 @@
 # Qistara
 
-Lossless music + media player (formerly Confluence Player, before that Sonora). Tauri 2 (Rust) + Svelte 5 + libmpv. Windows-first.
+Lossless music + media player (formerly Confluence Player, before that Sonora). Tauri 2 (Rust) + Svelte 5 + libmpv. Windows-first;
+macOS and Linux build and run from source (system libmpv), phones have a build scaffold only (`docs/mobile.md`).
 Phases and status: `ROADMAP.md`.
 
 ## Commands
-- `npm run tauri dev`: run the app (needs `src-tauri/lib/*.dll`: `npx tauri-plugin-libmpv-api setup-lib`)
+- `npm run tauri dev`: run the app (Windows needs `src-tauri/lib/*.dll`: `npx tauri-plugin-libmpv-api setup-lib`;
+  macOS/Linux need any file in `src-tauri/lib/` for the resource glob, e.g. `.placeholder`)
 - `npx vitest run` (TS logic) and `cargo test --lib --manifest-path src-tauri/Cargo.toml` (Rust).
   While `tauri dev` runs, add `--target-dir src-tauri/target-test`: the build step re-copies the libmpv DLL the app holds open.
   A Cargo.toml change rebuilds while the app runs and fails the same way: close the app, then restart `tauri dev`.
-- The first build downloads the IPADIC dictionary for Lindera (`lindera-ipadic` build script, md5-checked) and embeds it.
+- IPADIC isn't embedded: `japanese_install` downloads it at runtime (fixed URL, md5 + size checked) and builds `dict/ipadic/`.
+- Releases: tag `vX.Y.Z` → `.github/workflows/release.yml` (SignPath + updater signature); setup in `docs/code-signing.md`.
 - `bash scripts/make-test-media.sh`: regenerate `test-media/` (FLAC 16/44.1 + 24/96, HEVC10 MKV w/ subs, chapters)
-- `npm run tauri build`: NSIS installer
+- `npm run tauri build`: NSIS installer (unsigned; CI: `.github/workflows/ci.yml` on all three OSes)
 
 ## Debugging
 - Webview `console.*` and unhandled rejections are forwarded into the `tauri dev` output.
@@ -23,11 +26,16 @@ Phases and status: `ROADMAP.md`.
 ## Invariants
 - Bit-perfect mode is the default: `BIT_PERFECT` in `src/lib/player.svelte.ts`. Never set `audio-samplerate`,
   `audio-format`, filters, volume != 100 or speed != 1 while it is on. In this mode volume goes to `ao-volume`.
+  `ao` is per OS (`AO` in signal.ts): wasapi, coreaudio (exclusive → `coreaudio_exclusive`, hog mode), alsa.
 - `src/lib/signal.ts` is the single source of the bit-perfect verdict; extend it (with tests), don't duplicate it.
+  Exclusive = WASAPI exclusive, `coreaudio_exclusive`, or an ALSA `hw:`/`iec958:`/`hdmi:` device.
+- OS rules in `mpv.rs` are pure functions of an `Os` value (`check_prop_on`, `device`, `local_on`), so every CI runner
+  tests all three. ALSA devices: `ALSA_DEVICE` (signal.ts) and `device()` (mpv.rs) accept the same names; change both, with tests.
 - Queue lives in TS; mpv's playlist only ever holds [current, next] (gapless).
 - The page reaches mpv only through `src-tauri/src/mpv.rs` (`cmd`/`set` in player.svelte.ts), which allowlists each
   command, property and value: a new one must be added there, with a test. Never grant `libmpv:default` or the plugin's
   command/set_property/init; options holding a path (script-opts, ytdl-raw-options, log/resume/screenshot dirs) are set in Rust.
+  The hook's script-opts keep `ytdl_hook-exclude` for `127.0.0.1` (session URLs) and its raw options `ignore-config`.
 - Tag writes: copy → write → re-read → atomic rename. Never write tags in place.
 - SQL: column names from fixed enums, values always bound.
 - No personal data in HTTP requests (User-Agent is `UA` in lib.rs / `ua.ts`: `Qistara/<version>`). Lyrics translation sends only the lyric lines;
@@ -37,9 +45,22 @@ Phases and status: `ROADMAP.md`.
   service's own API path. Sign-out clears that service's kv import map (`spotifyImports`, `appleImports`,
   `tidalImports`). Apple's loopback page answers only `Host: 127.0.0.1:<port>`. Spotify, Apple Music and Tidal are
   import-only: never play, record or download their DRM streams.
-- yt-dlp (`ytdlp.rs`): fixed presets only, always `--ignore-config` and `--` before URLs, URLs must be http(s).
-  A cookies file reaches yt-dlp (and mpv's ytdl hook) only as a checked copy in app data: yt-dlp writes back to it.
-  yt-dlp/ffmpeg are fetched only from their GitHub releases and must match the release's SHA-256 list.
+- yt-dlp (`ytdlp.rs`): fixed `Choice`s only, always `--ignore-config` (also `-U`/`--version`) and `--` before URLs,
+  URLs must be http(s), `--js-runtimes` from `js_runtime()` (bin/ Deno, Node 20+, Deno on PATH; else `NO_JS`).
+  Cookies reach yt-dlp only as a per-run `CookieCopy` in `streaming/session/` (0600, deleted on Drop): yt-dlp writes
+  back to it. mpv's hook gets its own copy only while signed in, swept at start and on exit.
+  yt-dlp/ffmpeg/Deno are fetched only from their GitHub releases and must match the release's SHA-256 list.
+- Streaming data lives in `streaming/` (art as `stream:<name>`, lyrics for `sub:`/`ytdl://`/`http`/`session:` keys,
+  cookies, tmp), never in the library's `art/`/`lyrics/`; it must stay clearable without touching the library.
+- YT Music (`ytmusic.rs`): fixed InnerTube endpoints, no cookies, no stored visitor id, ids validated (`valid_*`),
+  thumbnails only from `THUMB_HOSTS` (same hosts in the CSP).
+- Sessions (`session.rs`): the host shares track ids, never paths (`db::path_of` + `mpv::local`), and never Subsonic
+  URLs (they carry the token). Frames are AES-256-GCM per direction with counter nonces, ≤ 1 MiB; guests ≤ 16, chat
+  ≤ 500 chars. Kick bans the address and rekeys. The guest proxy listens on 127.0.0.1 only and checks Host.
+- Discord (`discord.rs`): local IPC only; only title, artist, album, times and an https cover, only while the setting
+  is on; never a path.
+- Updates (`update.rs`): the page gets only `update_check`/`update_install`, never the plugin's commands
+  (`updater:default`); the endpoint is fixed in tauri.conf.json and `requireSignedVersion` stays on.
 - YouTube tracks are `ytdl://<watch url>` played by mpv's ytdl hook (`ytdl_hook-all_formats=no`, bestaudio); remote
   tracks (YouTube, server, radio) have negative ids, so they never reach stats, playlists or the restored queue.
 - Rename: the data folder was `com.confluenceplayer.app`, before that `com.sonora.player` (`OLD_DATA` in lib.rs, newest
@@ -56,6 +77,10 @@ Phases and status: `ROADMAP.md`.
 - Theme tokens use `light-dark()` in `app.css`; Appearance sets `color-scheme`/inline `--accent` (`appearance.svelte.ts`).
   A custom or artwork accent always goes through `readableAccent` (`color.ts`). Lyrics/Qur'an views are white on the
   dark blurred-cover backdrop in both Now Playing and the docked pane (`PanelContent.svelte`).
+- Theme palettes (`themes.ts`) carry Qistara's own names (upstream schemes credited in the README) and must pass
+  `themes.test.ts` contrast checks; `RENAMED` maps old ids. Adaptive theme = `adaptivePalette`, tested over all hues.
+- Layout: ≤900 px icon rail, ≤600 px drawer + sheet; rows play via `activate()` (`touch.ts`), not `ondblclick`.
+  The root's `has-caps` class means Caps.svelte draws the window buttons (not macOS, not phones).
 
 ## Skills (IWNOTS map)
 - Always: `/ponytail`. Big feature: `/feature-dev`. Logic: `/test-driven-development`.

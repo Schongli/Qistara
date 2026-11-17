@@ -25,6 +25,10 @@ export type Route =
   | { name: 'vocabulary' }
   | { name: 'downloads' }
   | { name: 'youtube' }
+  | { name: 'ytm' }
+  | { name: 'ytmAlbum'; id: string }
+  | { name: 'ytmArtist'; id: string }
+  | { name: 'ytmPlaylist'; id: string }
   | { name: 'providers' }
   | { name: 'server' }
   | { name: 'apple' }
@@ -89,7 +93,8 @@ export const ui = $state({
   queue: false,
   lyrics: false,
   // the docked pane beside the library
-  panel: '' as '' | 'lyrics' | 'queue',
+  panel: '' as '' | 'lyrics' | 'queue' | 'session',
+  drawer: false, // the sidebar slid in over a phone-width window
   // bumped to focus the search field (Ctrl+F, the sidebar's Search); Ctrl+F in Settings searches settings
   search: 0,
   settingsSearch: 0,

@@ -118,8 +118,127 @@ const TABLE: [string, string, number][] = [
   ["الناس", "An-Nas", 6],
 ]
 
-export interface Surah { n: number; ar: string; en: string; ayahs: number }
-export const SURAHS: Surah[] = TABLE.map(([ar, en, ayahs], i) => ({ n: i + 1, ar, en, ayahs }))
+/** The names as Indonesian Qur'ans print them (Kemenag's transliteration): "Asy-Syams", "Al-Kausar". */
+const ID_NAMES: string[] = [
+  "Al-Fatihah",
+  "Al-Baqarah",
+  "Ali 'Imran",
+  "An-Nisa'",
+  "Al-Ma'idah",
+  "Al-An'am",
+  "Al-A'raf",
+  "Al-Anfal",
+  "At-Taubah",
+  "Yunus",
+  "Hud",
+  "Yusuf",
+  "Ar-Ra'd",
+  "Ibrahim",
+  "Al-Hijr",
+  "An-Nahl",
+  "Al-Isra'",
+  "Al-Kahf",
+  "Maryam",
+  "Taha",
+  "Al-Anbiya'",
+  "Al-Hajj",
+  "Al-Mu'minun",
+  "An-Nur",
+  "Al-Furqan",
+  "Asy-Syu'ara'",
+  "An-Naml",
+  "Al-Qasas",
+  "Al-'Ankabut",
+  "Ar-Rum",
+  "Luqman",
+  "As-Sajdah",
+  "Al-Ahzab",
+  "Saba'",
+  "Fatir",
+  "Yasin",
+  "As-Saffat",
+  "Sad",
+  "Az-Zumar",
+  "Gafir",
+  "Fussilat",
+  "Asy-Syura",
+  "Az-Zukhruf",
+  "Ad-Dukhan",
+  "Al-Jasiyah",
+  "Al-Ahqaf",
+  "Muhammad",
+  "Al-Fath",
+  "Al-Hujurat",
+  "Qaf",
+  "Az-Zariyat",
+  "At-Tur",
+  "An-Najm",
+  "Al-Qamar",
+  "Ar-Rahman",
+  "Al-Waqi'ah",
+  "Al-Hadid",
+  "Al-Mujadilah",
+  "Al-Hasyr",
+  "Al-Mumtahanah",
+  "As-Saff",
+  "Al-Jumu'ah",
+  "Al-Munafiqun",
+  "At-Tagabun",
+  "At-Talaq",
+  "At-Tahrim",
+  "Al-Mulk",
+  "Al-Qalam",
+  "Al-Haqqah",
+  "Al-Ma'arij",
+  "Nuh",
+  "Al-Jinn",
+  "Al-Muzzammil",
+  "Al-Muddassir",
+  "Al-Qiyamah",
+  "Al-Insan",
+  "Al-Mursalat",
+  "An-Naba'",
+  "An-Nazi'at",
+  "'Abasa",
+  "At-Takwir",
+  "Al-Infitar",
+  "Al-Mutaffifin",
+  "Al-Insyiqaq",
+  "Al-Buruj",
+  "At-Tariq",
+  "Al-A'la",
+  "Al-Gasyiyah",
+  "Al-Fajr",
+  "Al-Balad",
+  "Asy-Syams",
+  "Al-Lail",
+  "Ad-Duha",
+  "Asy-Syarh",
+  "At-Tin",
+  "Al-'Alaq",
+  "Al-Qadr",
+  "Al-Bayyinah",
+  "Az-Zalzalah",
+  "Al-'Adiyat",
+  "Al-Qari'ah",
+  "At-Takasur",
+  "Al-'Asr",
+  "Al-Humazah",
+  "Al-Fil",
+  "Quraisy",
+  "Al-Ma'un",
+  "Al-Kausar",
+  "Al-Kafirun",
+  "An-Nasr",
+  "Al-Lahab",
+  "Al-Ikhlas",
+  "Al-Falaq",
+  "An-Nas",
+]
+
+/** en: the transliteration quran.com uses; id: the Kemenag one. */
+export interface Surah { n: number; ar: string; en: string; id: string; ayahs: number }
+export const SURAHS: Surah[] = TABLE.map(([ar, en, ayahs], i) => ({ n: i + 1, ar, en, id: ID_NAMES[i], ayahs }))
 
 /** At-Tawbah has no basmala, and Al-Fatihah's basmala is its first ayah. */
 export const hasBasmala = (n: number) => n !== 1 && n !== 9
@@ -141,14 +260,22 @@ export const normalizeArabic = (s: string) =>
 export const joinTanwin = (s: string) => s.replace(/([ࣰ-ࣲ])\s+(?=[اى])/g, '$1')
 
 const ARTICLE = new Set(['al', 'an', 'ad', 'at', 'as', 'ash', 'az', 'ar', 'adh', 'ath', 'el'])
-/** Latin words without articles, apostrophes, doubled letters or a final h, with the common
- *  spelling variants folded together: "Al-Ma'idah" → ["maida"], "Al-Burooj" → ["buruj"], "Quraysh" → ["quraish"]. */
+/** Latin words without articles, apostrophes, doubled letters or a final h, with the common spelling variants
+ *  folded together, English and Indonesian alike: "Al-Ma'idah" → ["maida"], "Al-Burooj" → ["buruj"],
+ *  "Quraysh" and "Quraisy" → ["quraish"], "Ash-Shams" and "Asy-Syams" → ["shams"], "Al-Kawthar", "Al-Kautsar"
+ *  and "Al-Kausar" → ["kausar"], "Adh-Dhariyat" and "Adz-Dzariyat" → ["zariat"]. */
 export const latinWords = (s: string) =>
   s
     .normalize('NFKD')
     .replace(/\p{M}/gu, '')
     .toLowerCase()
     .replace(/['’ʿʾ`]/g, '')
+    // Indonesian (Kemenag) and English spellings of the same Arabic letters: ش sy/sh, ذ dz/dh/z, ث ts/th/s, غ g/gh
+    .replace(/sy/g, 'sh')
+    .replace(/dz|dh/g, 'z')
+    .replace(/ts|th/g, 's')
+    .replace(/gh/g, 'g')
+    .replace(/aw/g, 'au')
     .replace(/ee/g, 'i')
     .replace(/oo|ou/g, 'u')
     .replace(/y/g, 'i')
@@ -169,12 +296,13 @@ function oneEdit(a: string, b: string): boolean {
 const AR_ALIASES: [string, number][] = [['الانشراح', 94], ['اللهب', 111], ['الدهر', 76], ['بني اسراييل', 17], ['المومن', 40], ['براءه', 9]]
 const LAT_ALIASES: [string, number][] = [['Lahab', 111], ['Inshirah', 94], ['Dahr', 76], ['Bani Israil', 17], ["Al-Mu'min", 40], ['Taha', 20]]
 const arNames: [string, number][] = [...SURAHS.map((s): [string, number] => [normalizeArabic(s.ar), s.n]), ...AR_ALIASES]
-const latNames = [...SURAHS.map((s): [string, number] => [s.en, s.n]), ...LAT_ALIASES].map(([en, n]) => ({ n, words: latinWords(en) }))
+const latNames = [...SURAHS.flatMap((s): [string, number][] => [[s.en, s.n], [s.id, s.n]]), ...LAT_ALIASES].map(([en, n]) => ({ n, words: latinWords(en) }))
 
 // "a selection from Surah …": only some ayahs are recited, so it can't be synced automatically
 const PARTIAL = /ما تيسر|مقتطف|ايات من|excerpt|selection|verses from/
 // albums, artists and folders that mean Qur'an recitation (in latinWords / normalizeArabic spelling)
-const QURAN_HINT = /quran|koran|mushaf|juz|tilawa|recitation|murata|mujawad|afasi|mishari|sudais|shuraim|ghamdi|minshawi|husari|basit|muaiqli|مصحف|القران|قران|جزء|تلاوه|مرتل|مجود|العفاسي|السديس|الحصري|المنشاوي|عبد الباسط/
+// murotal: Indonesian "murottal"; muzamil, bahanan, taqi: reciters well known in Indonesia
+const QURAN_HINT = /quran|koran|mushaf|juz|tilawa|recitation|murata|murotal|mujawad|ngaji|afasi|mishari|sudais|shuraim|gamdi|minshawi|husari|basit|muaiqli|muzamil|bahanan|taqi malik|مصحف|القران|قران|جزء|تلاوه|مرتل|مجود|العفاسي|السديس|الحصري|المنشاوي|عبد الباسط/
 
 /** Surah number named in Arabic: after "سورة" anywhere, or, in a Qur'an album, as the title's first word(s). */
 function arabicSurah(text: string, bare: boolean): number | null {
@@ -196,7 +324,8 @@ function arabicSurah(text: string, bare: boolean): number | null {
 /** Surah number named in Latin script: after "surah/surat/sura", or bare when `bare`. */
 function latinSurah(text: string, bare: boolean): number | null {
   const words = latinWords(text)
-  const at = words.findIndex((w) => w === 'sura' || w === 'surat')
+  // "QS. Yasin" (Qur'an Surah) is how Indonesian titles name one
+  const at = words.findIndex((w) => w === 'sura' || w === 'surat' || w === 'qs')
   if (at < 0 && !bare) return null
   const rest = at < 0 ? words : words.slice(at + 1)
   const line = ` ${rest.join(' ')} `
@@ -216,7 +345,8 @@ function latinSurah(text: string, bare: boolean): number | null {
   // one-letter spelling slips in a longer one-word name ("Kawthur", "Mao'un"), as the first word only
   const first = rest[0] ?? ''
   const near = latNames.filter(({ words: name }) => name.length === 1 && name[0].length >= 4 && first.length >= 4 && oneEdit(first, name[0]))
-  return near.length === 1 ? near[0].n : null
+  // one surah, perhaps under both its English and Kemenag names
+  return new Set(near.map((x) => x.n)).size === 1 ? near[0].n : null
 }
 
 /** Whole-juz tracks whose juz starts exactly at a surah: Juz 'Amma (30) and Juz Tabarak (29). */

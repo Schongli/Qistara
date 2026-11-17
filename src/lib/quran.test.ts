@@ -139,3 +139,20 @@ describe('ayah alignment', () => {
     expect(right / truth.length).toBeGreaterThan(0.97)
   })
 })
+
+describe('Indonesian titles', () => {
+  it('has every surah under its Kemenag name too', () => {
+    expect([SURAHS[90].id, SURAHS[107].id, SURAHS[50].id, SURAHS[105].id]).toEqual(['Asy-Syams', 'Al-Kausar', 'Az-Zariyat', 'Quraisy'])
+  })
+  it('reads Kemenag and everyday Indonesian spellings', () => {
+    const cases: [string, number][] = [
+      ['Murottal Surat Asy-Syams', 91], ['QS. Yasin', 36], ['Surah Al Kautsar', 108], ['Surat Al-Kausar', 108], ['Surat Adz-Dzariyat', 51],
+      ['Surat At-Takatsur', 102], ['Surat Quraisy', 106], ['Surat Al-Muddatstsir', 74], ['Surat Al-Insyiqaq', 84], ["Surat Asy-Syu'ara'", 26],
+      ['Surat Al-Jatsiyah', 45], ['Surat Al-Gasyiyah', 88], ['Surat Al-Ghasyiyah', 88], ['Surat At-Taubah', 9], ['Surat Al-Lail', 92],
+    ]
+    for (const [title, n] of cases) expect(detectRecitation(t(title))?.surahs, title).toEqual([n])
+  })
+  it('knows a murottal album without the word Quran', () => {
+    expect(detectRecitation(t('Ad-Duha', { album: 'Murottal Juz 30 untuk Anak' }))?.surahs).toEqual([93])
+  })
+})

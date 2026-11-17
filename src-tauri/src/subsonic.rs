@@ -82,7 +82,10 @@ pub enum Call {
     Playlist { id: String },
 }
 
-pub fn endpoint(call: &Call) -> Result<(&'static str, Vec<(&'static str, String)>), String> {
+/// A Subsonic method and its query parameters.
+pub type Endpoint = (&'static str, Vec<(&'static str, String)>);
+
+pub fn endpoint(call: &Call) -> Result<Endpoint, String> {
     let id = |id: &String| if valid_id(id) { Ok(vec![("id", id.clone())]) } else { Err("bad id".to_string()) };
     Ok(match call {
         Call::AlbumList { kind, offset } => {
@@ -191,6 +194,8 @@ fn structured_to_lrc(list: &serde_json::Value) -> String {
     let all = list.as_array().map(Vec::as_slice).unwrap_or_default();
     let Some(l) = all.iter().find(|l| l["synced"] == true).or(all.first()) else { return String::new() };
     let lines = l["line"].as_array().map(Vec::as_slice).unwrap_or_default();
+    // one line per entry: a break inside a value would start a timed line of its own
+    let value = |x: &serde_json::Value| x["value"].as_str().unwrap_or_default().replace(['\r', '\n'], " ");
     let mut out = String::new();
     if l["synced"] == true {
         if let Some(o) = l["offset"].as_i64().filter(|o| *o != 0) {
@@ -198,11 +203,11 @@ fn structured_to_lrc(list: &serde_json::Value) -> String {
         }
         for x in lines {
             let ms = x["start"].as_i64().unwrap_or(0).max(0);
-            out.push_str(&format!("[{:02}:{:02}.{:03}]{}\n", ms / 60000, ms / 1000 % 60, ms % 1000, x["value"].as_str().unwrap_or_default()));
+            out.push_str(&format!("[{:02}:{:02}.{:03}]{}\n", ms / 60000, ms / 1000 % 60, ms % 1000, value(x)));
         }
     } else {
         for x in lines {
-            out.push_str(x["value"].as_str().unwrap_or_default());
+            out.push_str(&value(x));
             out.push('\n');
         }
     }
@@ -218,7 +223,8 @@ pub fn subsonic_stream(id: String) -> Result<String, String> {
     Ok(signed(&creds()?, "stream", &[("id", id), ("format", "raw".into())], &salt()?)?.to_string())
 }
 
-/// A cover, saved into the art cache (the page may only show pictures from there); returns its cache name.
+/// A cover, saved into the streaming art cache (the page may only show pictures from there); returns its
+/// name as artUrl (library.svelte.ts) reads it: "stream:<hash>.jpg".
 #[tauri::command]
 pub async fn subsonic_cover(lib: State<'_, Lib>, id: String) -> Result<Option<String>, String> {
     if !valid_id(&id) {
@@ -233,12 +239,34 @@ pub async fn subsonic_cover(lib: State<'_, Lib>, id: String) -> Result<Option<St
     if bytes.len() > 20 * 1024 * 1024 {
         return Ok(None);
     }
-    Ok(lib.art.thumb(&bytes))
+    Ok(lib.stream_art.thumb(&bytes).map(|n| format!("stream:{n}")))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fuzz_structured_lyrics_from_a_server_never_panic() {
+        use serde_json::json;
+        let mut x = 7u32;
+        let mut next = || {
+            x ^= x << 13;
+            x ^= x >> 17;
+            x ^= x << 5;
+            x
+        };
+        let pick = |n: u32| [json!(null), json!(true), json!(-5), json!(1e300), json!("x\n[00:01.00]y"), json!([]), json!({}), json!(i64::MAX)][n as usize % 8].clone();
+        for _ in 0..5000 {
+            let line = json!({ "start": pick(next()), "value": pick(next()) });
+            let doc = json!([{ "synced": pick(next()), "offset": pick(next()), "line": [line.clone(), line, pick(next())] }, pick(next())]);
+            let lrc = structured_to_lrc(&doc);
+            // a value with a line break must not start a line of its own: one line per entry
+            let entries = doc[0]["line"].as_array().unwrap().len() + usize::from(doc[0]["synced"] == true && doc[0]["offset"].as_i64().is_some_and(|o| o != 0));
+            assert!(lrc.is_empty() || lrc.lines().count() == entries || doc[0]["synced"] != true && doc[1]["line"].is_null(), "{lrc:?}");
+            assert!(!lrc.contains("\n[00:01.00]y"), "{lrc:?}");
+        }
+    }
 
     #[test]
     fn reads_server_addresses() {

@@ -27,12 +27,12 @@
   Saheeh and Clear Quran; ayahs synced from the pauses in the recording (quran.com timings for its own Alafasy
   murattal), Fix sync by tapping; words save to Vocabulary
 - [ ] Learn mode next: romanization for Korean/Chinese/other scripts, a furigana on/off switch
-- [ ] Video thumbnails + Movies/TV grouping, crossfade, CUE-sheet tracks, file organiser, Discord presence
+- [ ] Video thumbnails + Movies/TV grouping, crossfade, CUE-sheet tracks, file organiser
 
 ## Phase 3
 - [x] Spotify: PKCE sign-in with your own developer app (owner needs Premium), playlist + Liked Songs import
   matched to local files, Connect remote (sign-in and remote not yet tried with a real account)
-- [ ] DLNA/UPnP, device sync, macOS/Linux
+- [ ] DLNA/UPnP, device sync
 
 ## Phase 4: Confluence Player
 - [x] Rename from Sonora (name, icon, data folder and Credential Manager migration)
@@ -44,7 +44,7 @@
 - [x] Navidrome / Subsonic: browse, search and stream (FLAC as stored)
 - [x] Providers page; Apple Music (own MusicKit key) and Tidal (own developer app) playlist import
   (Apple and Tidal not yet tried with real accounts)
-- [ ] Offline copies of server songs, Deezer, Discord presence, UI translations
+- [ ] Offline copies of server songs, Deezer, UI translations (beyond Qur'an mode)
 
 ## Phase 5: Qistara
 - [x] Rename from Confluence Player ("Confluence" is a registered name): pivot-Q mark, Obsidian and brass palette,
@@ -56,5 +56,32 @@
 - [x] Settings tabs and search; theme presets (Catppuccin Frappé, Rosé Pine, Gruvbox Dark, Solarized Dark); corners;
   blur window / blur UI; icon packs (Phosphor, Lucide, Iconoir, Remix, Solar)
   (all of Phase 5 not yet checked by hand in the installed app)
+
+## Phase 6: Qistara 0.4
+- [x] CI on Windows, macOS and Linux (vitest, svelte-check, cargo test, clippy, the Windows installer); a release
+  workflow with SignPath signing and signed in-app updates
+- [x] Bit-perfect on macOS (CoreAudio hog mode) and Linux (ALSA `hw:`), Unix paths, per-OS wording
+- [x] YouTube without Node.js (Deno on demand, a clear message when no runtime), per-run cookie copies, Video/Audio
+  downloads with quality and sizes
+- [x] Japanese dictionary as an optional download; streaming data kept apart in `streaming/` with Storage settings
+- [x] Parametric EQ table, graph editing (double-click, Shift+drag Q, Delete), real sample rate
+- [x] Virtualised track tables and Up Next; icon packs loaded on demand
+- [x] Parser hardening and fuzz tests (LRC/TTML/KRC/M3U, metadata tags never shown as lyrics)
+- [x] YT Music as a guest (InnerTube): Home, search, albums, artists, playlists, radio, autoplay
+- [x] Listen-together sessions with chat (encrypted, hosted on your PC, your files included)
+- [x] Themes: 17 families with Qistara's own names (WibuFest included), adaptive theme from the cover
+- [x] Discord Rich Presence
+- [x] Qur'an mode in Indonesian
+- [x] Layout down to 360 px, touch, a mobile build scaffold (playback on phones still needs a native player)
+
+Checked here: unit and fuzz tests, a session between two instances on one machine, and screenshots of every view
+at 1280 and 390 px with mocked data. Not yet checked by hand (needs real hardware, accounts or the network):
+- [ ] CoreAudio hog mode on a Mac and ALSA `hw:` on Linux, with a DAC; WASAPI exclusive after this release's changes
+- [ ] YT Music against live replies; playing its songs; Start Radio and autoplay
+- [ ] Deno and IPADIC downloads; downloads at each quality, with and without ffmpeg
+- [ ] A session between two PCs over Wi-Fi and over Tailscale, through the firewall prompt
+- [ ] Discord on Windows (named pipe) with a real application id
+- [ ] A release through SignPath, and an update from 0.4.0 to the next version
+- [ ] Touch on a Windows tablet; a phone build (`tauri android init`)
 
 Not planned: fake-lossless checker, native DSD/DoP (mpv converts DSD to PCM), playing or downloading DRM streams.

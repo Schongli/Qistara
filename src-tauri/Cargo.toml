@@ -1,6 +1,6 @@
 [package]
 name = "qistara"
-version = "0.3.0"
+version = "0.4.0"
 description = "Qistara: lossless music and media player"
 authors = []
 license = "MIT"
@@ -23,7 +23,6 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.12.5", features = ["protocol-asset"] }
 tauri-plugin-log = "2"
-tauri-plugin-libmpv = "0.3.2"
 tauri-plugin-dialog = "2.8.4"
 tauri-plugin-http = "2.9.0"
 rusqlite = { version = "0.42.0", features = ["bundled"] }
@@ -32,23 +31,33 @@ walkdir = "2.5.0"
 rayon = "1.12.0"
 notify-debouncer-mini = "0.7.0"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
-souvlaki = "0.9.3"
 md5 = "0.8.1"
 tauri-plugin-opener = "2.7.3"
-keyring = { version = "4.2.0", default-features = false, features = ["v1", "windows-native-keyring-store"] }
 # Spotify sign-in (PKCE); all four were already in the build as dependencies of other crates
 sha2 = "0.10"
 base64 = "0.22"
 flate2 = "1"
 getrandom = "0.3"
 url = "2"
+# legacy text files (GBK / Shift-JIS lyrics, ANSI playlists); already in the build through reqwest
+encoding_rs = "0.8.44"
 # Apple Music developer tokens (ES256); already in the build through rustls
 ring = "0.17"
 # Japanese lyrics for learners: word splitting, readings and dictionary forms. The IPADIC dictionary is
-# downloaded once at build time (md5-checked) and embedded: ~46 MB in the app, ~7 MB in the installer.
-lindera = { version = "6.2", features = ["embed-ipadic"] }
+# optional: Learn mode downloads and builds it on first use (japanese.rs), so the app doesn't carry ~46 MB.
+lindera = "6.2"
 # decoding recitations to find the pauses between ayahs (pure Rust)
 symphonia = { version = "0.5", default-features = false, features = ["aac", "alac", "flac", "isomp4", "mp3", "wav", "pcm", "ogg", "vorbis"] }
+
+# Desktop only: libmpv playback, media keys, the OS secret store and the updater. Phones (Tauri mobile) build without them and
+# say what isn't ready yet (docs/mobile.md).
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-libmpv = "0.3.2"
+souvlaki = "0.9.3"
+# v1 picks the native store per OS: Credential Manager, macOS Keychain, Secret Service
+keyring = { version = "4.2.0", default-features = false, features = ["v1"] }
+# Settings › General › Updates (update.rs): signed updates from GitHub releases
+tauri-plugin-updater = "2.14.1"
 
 [dev-dependencies]
 tempfile = "3.27.0"

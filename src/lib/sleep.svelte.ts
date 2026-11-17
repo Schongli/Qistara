@@ -1,6 +1,6 @@
 // Sleep timer: pause after N minutes, or at the end of the current song (the next one is cued, paused).
 import { untrack } from 'svelte'
-import { mpv, set } from './player.svelte'
+import { lock, mpv, set } from './player.svelte'
 import { queue } from './queue.svelte'
 
 export const sleep = $state({ until: 0, endOfSong: false, left: 0 })
@@ -24,7 +24,8 @@ setInterval(tick, 10_000)
 $effect.root(() => {
   // the song ran out with nothing queued behind it: cue the next one, paused, and end the timer
   $effect(() => {
-    if (mpv.eof && sleep.endOfSong) {
+    // a listening session's guest doesn't choose when songs end
+    if (mpv.eof && sleep.endOfSong && !lock.following) {
       untrack(async () => {
         sleep.endOfSong = false
         await queue.stopAfter(false)

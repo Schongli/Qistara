@@ -1,4 +1,25 @@
-// Bit-perfect verdict: compares what the decoder produced with what WASAPI receives.
+// Bit-perfect verdict: compares what the decoder produced with what the output (WASAPI, CoreAudio, ALSA) receives.
+
+export type Os = 'windows' | 'macos' | 'linux'
+export const osOf = (ua: string): Os => (/Windows/.test(ua) ? 'windows' : /Macintosh|Mac OS X/.test(ua) ? 'macos' : 'linux')
+/** The one output per OS that can skip the system mixer: WASAPI exclusive, CoreAudio hog mode, ALSA hw:. */
+export const AO: Record<Os, string> = { windows: 'wasapi', macos: 'coreaudio', linux: 'alsa' }
+/** ALSA devices Qistara lets you pick: plain hardware PCMs (the same rule as device() in mpv.rs). */
+export const ALSA_DEVICE = /^alsa\/(default|sysdefault|hw|plughw|front|iec958|hdmi)(:CARD=\w{1,32}(,DEV=\d{1,2})?)?$/
+export function pickable(os: Os, name: string): boolean {
+  if (name === 'auto') return true
+  if (os === 'windows') return name.startsWith('wasapi/')
+  if (os === 'macos') return /^coreaudio\/.{1,256}$/.test(name)
+  return ALSA_DEVICE.test(name)
+}
+/** "WASAPI exclusive", "CoreAudio hog mode", "ALSA hw:"… for the Signal Path. */
+export function outputLabel(ao: string | null, exclusive: boolean, device = ''): string {
+  if (ao === 'wasapi') return `WASAPI ${exclusive ? 'exclusive' : 'shared'}`
+  if (ao === 'coreaudio_exclusive') return 'CoreAudio hog mode'
+  if (ao === 'coreaudio') return 'CoreAudio shared'
+  if (ao === 'alsa') return `ALSA ${/^alsa\/(hw|iec958|hdmi):/.test(device) ? 'direct to hardware' : 'through the system mixer'}`
+  return ao ?? ''
+}
 
 export interface AudioParams {
   format: string
@@ -9,8 +30,9 @@ export interface AudioParams {
 export interface SignalInput {
   audioIn: AudioParams | null
   audioOut: AudioParams | null
-  ao: string | null
-  exclusive: boolean
+  ao: string | null // current-ao: wasapi, coreaudio_exclusive (hog mode granted), coreaudio, alsa…
+  exclusive: boolean // what was asked for; on WASAPI that is what you get
+  device?: string
   filters: number // entries in mpv's af chain (EQ etc.)
   volume: number
   speed: number
@@ -38,7 +60,13 @@ export function verdict(s: SignalInput): Verdict {
   // S/PDIF/HDMI bitstream: the encoded stream reaches the receiver untouched
   if (o.format.startsWith('spdif')) return { bitPerfect: true, issues: [] }
 
-  if (s.ao !== 'wasapi' || !s.exclusive) issues.push('Shared mode: Windows mixer may resample')
+  const direct = s.ao === 'wasapi' ? s.exclusive : s.ao === 'coreaudio_exclusive' || (s.ao === 'alsa' && /^alsa\/(hw|iec958|hdmi):/.test(s.device ?? ''))
+  if (!direct) issues.push(
+    s.ao === 'wasapi' ? 'Shared mode: Windows mixer may resample'
+    : s.ao?.startsWith('coreaudio') ? 'Shared mode: macOS may resample'
+    : s.ao === 'alsa' ? 'Not a hw: device: ALSA or PipeWire may resample'
+    : 'Shared mode: the system mixer may resample',
+  )
   if (a.samplerate !== o.samplerate) issues.push(`Resampled ${khz(a.samplerate)} → ${khz(o.samplerate)}`)
   // Mono sent to both speakers copies samples unchanged, so it stays bit-perfect.
   const monoToStereo = a['channel-count'] === 1 && o['channel-count'] === 2

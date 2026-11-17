@@ -2,7 +2,8 @@
 // lets through only what the app uses: the page isn't granted the plugin's own command/set_property/init.
 import { destroy, listenEvents, observeProperties, type MpvObservableProperty } from 'tauri-plugin-libmpv-api'
 import { invoke } from '@tauri-apps/api/core'
-import type { AudioParams } from './signal'
+import { AO, type AudioParams } from './signal'
+import { OS } from './os'
 
 export interface MpvTrack {
   id: number
@@ -113,9 +114,12 @@ const KEY: Record<(typeof PROPS)[number][0], keyof typeof mpv> = {
 }
 const EMPTY: Partial<Record<keyof typeof mpv, unknown>> = { time: 0, duration: 0, af: [], tracks: [], chapters: [], devices: [], abA: 'no', abB: 'no', eof: false }
 
-// Bit-perfect profile: WASAPI exclusive at the file's own rate/format, nothing in between.
+export { OS }
+
+// Bit-perfect profile: the OS's exclusive output (WASAPI exclusive, CoreAudio hog mode, ALSA) at the file's own
+// rate/format, nothing in between.
 export const BIT_PERFECT = {
-  ao: 'wasapi', 'audio-exclusive': 'yes', af: '', volume: 100, 'volume-max': 100, replaygain: 'no', speed: 1,
+  ao: AO[OS], 'audio-exclusive': 'yes', af: '', volume: 100, 'volume-max': 100, replaygain: 'no', speed: 1,
 } as const
 
 type Handler = (e: { event: string; [k: string]: unknown }) => void
@@ -166,8 +170,11 @@ export async function load(path: string, mode: 'replace' | 'append' | 'append-pl
   // keep-open pauses at end of file and the pause carries over to the next load
   if (mode === 'replace') await set('pause', false)
 }
-export const togglePause = () => set('pause', !mpv.pause)
-export const seek = (t: number) => cmd('seek', t, 'absolute')
+/** A listening session's guest follows the host: buttons, keys and lyric taps leave playback alone while it does
+ *  (session.svelte.ts moves mpv itself). */
+export const lock = $state({ following: false })
+export const togglePause = () => (lock.following ? Promise.resolve() : set('pause', !mpv.pause))
+export const seek = (t: number) => (lock.following ? Promise.resolve() : cmd('seek', t, 'absolute'))
 export const stop = () => cmd('stop')
 // a new command or property must also be allowed in mpv.rs
 export const set = (name: string, value: string | number | boolean) => invoke<void>('mpv_set', { name, value })

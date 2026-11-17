@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { QURAN_TEXT, quranLang } from '../lib/qurantext'
+  import { settings } from '../lib/settings.svelte'
   // "Qur'an: Choose Surah…": says which surah(s) a recording recites when its name doesn't, or that it
   // isn't a recitation at all. Saved per file (quran.svelte.ts overrideRecitation).
   import { SURAHS, latinWords, normalizeArabic, type Recitation, type Riwayah } from '../lib/quran'
@@ -28,12 +30,14 @@
     })
   })
 
+  const lang = $derived(quranLang(settings.quranLang))
+  const T = $derived(QURAN_TEXT[lang])
   const matches = $derived.by(() => {
     const s = q.trim()
     if (!s) return SURAHS
     const lat = latinWords(s).join(' ')
     const ar = normalizeArabic(s)
-    return SURAHS.filter((x) => String(x.n) === s || (lat && latinWords(x.en).join(' ').includes(lat)) || (ar && normalizeArabic(x.ar).includes(ar)))
+    return SURAHS.filter((x) => String(x.n) === s || (lat && (latinWords(x.en).join(' ').includes(lat) || latinWords(x.id).join(' ').includes(lat))) || (ar && normalizeArabic(x.ar).includes(ar)))
   })
 
   async function save() {
@@ -52,9 +56,9 @@
 
 <div class="scrim" role="presentation" onclick={onclose}></div>
 <div class="sheet" role="dialog" aria-modal="true" aria-label="Choose surah" tabindex="-1" onkeydown={(e) => e.key === 'Escape' && onclose()}>
-  <h2 class="t-h2">What does this recording recite?</h2>
+  <h2 class="t-h2">{T.pickTitle}</h2>
   <p class="t-sub ellipsis">{track.title}</p>
-  <input class="search" bind:value={q} placeholder="Surah name or number" aria-label="Find a surah" spellcheck="false" />
+  <input class="search" bind:value={q} placeholder={T.find} aria-label="Find a surah" spellcheck="false" />
   <div class="list" role="listbox" aria-label="Surahs">
     {#if !q.trim()}
       {#each JUZ as j (j.key)}
@@ -65,25 +69,25 @@
     {/if}
     {#each matches as s (s.n)}
       <button class="row press" class:sel={picked === `s${s.n}`} role="option" aria-selected={picked === `s${s.n}`} onclick={() => (picked = `s${s.n}`)}>
-        <span class="n">{s.n}</span><span class="en">{s.en}</span><span class="ar" lang="ar">{s.ar}</span>
+        <span class="n">{s.n}</span><span class="en">{lang === 'id' ? s.id : s.en}</span><span class="ar" lang="ar">{s.ar}</span>
       </button>
     {/each}
   </div>
   <div class="opts">
-    <label>Riwayah
+    <label>{T.riwayah}
       <select bind:value={riwayah}>
         <option value="hafs">Hafs 'an 'Asim</option>
         <option value="shubah">Shu'bah 'an 'Asim</option>
       </select>
     </label>
-    <label class="check"><input type="checkbox" bind:checked={partial} />Only some ayahs (sync by tapping)</label>
+    <label class="check"><input type="checkbox" bind:checked={partial} />{T.partial}</label>
   </div>
   <div class="actions">
-    <button class="btn press" onclick={() => set(undefined)} title="Let Qistara work it out from the name">Automatic</button>
-    <button class="btn press" onclick={() => set('none')}>Not a Recitation</button>
+    <button class="btn press" onclick={() => set(undefined)} title={T.autoHint}>{T.auto}</button>
+    <button class="btn press" onclick={() => set('none')}>{T.none}</button>
     <span class="sp"></span>
-    <button class="btn press" onclick={onclose}>Cancel</button>
-    <button class="btn primary press" disabled={!picked} onclick={save}>Save</button>
+    <button class="btn press" onclick={onclose}>{T.cancel}</button>
+    <button class="btn primary press" disabled={!picked} onclick={save}>{T.save}</button>
   </div>
 </div>
 

@@ -13,6 +13,7 @@
 
 <header class="bar" class:caps data-tauri-drag-region>
   <div class="hist" data-tauri-drag-region>
+    <button class="icon-btn press menu" aria-label="Menu" aria-expanded={ui.drawer} onclick={() => (ui.drawer = !ui.drawer)}><Icon name="ListBullets" size={18} weight="bold" /></button>
     <button class="icon-btn press" aria-label="Back" disabled={!nav.canBack} onclick={() => nav.back()}><Icon name="CaretLeft" size={17} weight="bold" /></button>
     <button class="icon-btn press" aria-label="Forward" disabled={!nav.canForward} onclick={() => nav.forward()}><Icon name="CaretRight" size={17} weight="bold" /></button>
   </div>
@@ -38,6 +39,7 @@
     padding: 0 14px; background: var(--bar); backdrop-filter: var(--blur);
   }
   .bar.caps { padding-right: 146px; }
+  :global(.os-macos) .bar.caps { padding-right: 16px; }
   .hist { display: flex; gap: 2px; }
   .icon-btn:disabled { color: var(--text-3); background: none; }
   .search {
@@ -49,5 +51,14 @@
   input::placeholder { color: var(--text-2); }
   kbd { font: 600 10px var(--font); color: var(--text-3); border: 1px solid var(--sep); border-radius: var(--r-xs); padding: 1px 4px; }
   .search:focus-within kbd { display: none; }
+  .menu { display: none; }
+  @media (max-width: 600px) {
+    .bar { grid-template-columns: auto minmax(0, 1fr); gap: 8px; padding-left: 10px; }
+    .search { min-width: 0; }
+    /* Caps.svelte's buttons are 36 px wide here, and always over this bar (the pane is a sheet below it) */
+    :global(.has-caps) .bar { padding-right: 114px; }
+    .menu { display: grid; }
+    kbd { display: none; }
+  }
   @media (prefers-reduced-transparency: reduce) { .bar { backdrop-filter: none; } }
 </style>

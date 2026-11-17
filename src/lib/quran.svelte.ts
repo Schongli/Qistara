@@ -7,6 +7,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { untrack } from 'svelte'
 import { queue } from './queue.svelte'
 import { settings } from './settings.svelte'
+import { quranLang } from './qurantext'
 import { kvGet, kvSet } from './persist'
 import { alignAyahs, detectRecitation, hasBasmala, joinTanwin, normalizeArabic, type Recitation, type Unit } from './quran'
 import type { Track } from './library.svelte'
@@ -184,7 +185,8 @@ async function load(t: Track | null) {
   if (!rec || mine !== seq) return
   Object.assign(quran, { rec, path: t.path, status: 'loading', stream: /^[a-z]+:\/\//i.test(t.path) })
   try {
-    const lang = settings.quranTranslations.includes('kemenag') ? 'id' : 'en'
+    // word meanings in the language Qur'an mode speaks; on Automatic, Indonesian also while Kemenag shows (as before)
+    const lang = settings.quranLang === 'auto' && settings.quranTranslations.includes('kemenag') ? 'id' : quranLang(settings.quranLang)
     const wantClear = settings.quranTranslations.includes('clear')
     const next = new Map<number, SurahData>()
     for (const n of rec.surahs) next.set(n, await loadSurah(n, lang, rec.riwayah === 'shubah', wantClear))

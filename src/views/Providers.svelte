@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { KEY_STORE, OS } from '../lib/os'
   // Where music comes from: your folders, YouTube, your own server, and the services whose playlists can be
   // imported. Each one signs in or out here.
   import { open } from '@tauri-apps/plugin-dialog'
@@ -65,7 +66,7 @@
     </button>
     {#if openId === 'youtube'}
       <div class="body">
-        <p class="t-sub">Signing in lets yt-dlp open your Liked Music, age-restricted videos and, with Premium, 256 kbps audio. It reads the sign-in from your browser's cookies on this PC; your password never leaves the browser. Chrome and Edge lock their cookies to themselves on Windows, so use Firefox or a cookies.txt export.</p>
+        <p class="t-sub">Signing in lets yt-dlp open your Liked Music, age-restricted videos and, with Premium, 256 kbps audio. It reads the sign-in from your browser's cookies on this PC; your password never leaves the browser.{#if OS === 'windows'} Chrome and Edge lock their cookies to themselves on Windows, so use Firefox or a cookies.txt export.{/if}</p>
         <div class="choices" role="radiogroup" aria-label="YouTube sign-in">
           <label class="choice"><input type="radio" name="yt" checked={!settings.ytCookies} onchange={() => (settings.ytCookies = '')} />Guest</label>
           <label class="choice"><input type="radio" name="yt" checked={settings.ytCookies === 'firefox'} onchange={() => (settings.ytCookies = 'firefox')} />Firefox (signed in to YouTube)</label>
@@ -90,7 +91,7 @@
             <button class="btn press" onclick={serverSignOut}>Sign Out</button>
           </div>
         {:else}
-          <p class="t-sub">Navidrome, Gonic, Airsonic, Ampache and others that speak the Subsonic API. Without https:// the address is used as http://, so type https:// if your server has TLS. The password is kept in Windows Credential Manager and only ever sent to that server, as a salted hash.</p>
+          <p class="t-sub">Navidrome, Gonic, Airsonic, Ampache and others that speak the Subsonic API. Without https:// the address is used as http://, so type https:// if your server has TLS. The password is kept in {KEY_STORE} and only ever sent to that server, as a salted hash.</p>
           <form class="form" onsubmit={(e) => (e.preventDefault(), connectServer())}>
             <input bind:value={address} placeholder="Server address, e.g. 192.168.1.5:4533" aria-label="Server address" spellcheck="false" />
             <input bind:value={user} placeholder="User name" aria-label="User name" spellcheck="false" autocomplete="username" />
@@ -163,7 +164,7 @@
           <p class="t-sub">Apple only lets apps read your library with a MusicKit key from the Apple Developer Program (a paid membership). Apple Music streams are DRM-protected, so the import matches songs to the files you have.</p>
           <ol class="steps t-sub">
             <li>In <button class="link" onclick={() => openUrl('https://developer.apple.com/account/resources/authkeys/list')}>Certificates, Identifiers &amp; Profiles › Keys</button>, create a key with <b>Media Services (MusicKit)</b> and download its <code>.p8</code> file.</li>
-            <li>Enter your <b>Team ID</b> (top right of the developer site) and the key's <b>Key ID</b>, then choose the <code>.p8</code> file. It's kept in Windows Credential Manager.</li>
+            <li>Enter your <b>Team ID</b> (top right of the developer site) and the key's <b>Key ID</b>, then choose the <code>.p8</code> file. It's kept in {KEY_STORE}.</li>
           </ol>
           <div class="keys">
             <input bind:value={teamId} placeholder="Team ID" aria-label="Apple Team ID" spellcheck="false" />

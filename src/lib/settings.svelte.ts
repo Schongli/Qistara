@@ -3,38 +3,59 @@ import { untrack } from 'svelte'
 import { mpv, set } from './player.svelte'
 import { queue } from './queue.svelte'
 import { kvLoad, kvSet } from './persist'
-import type { Preset } from './downloads.svelte'
+import type { AudioQ, VideoQ } from './downloads.svelte'
 import { normalizeSources } from './lyricsources'
-import type { ThemeId } from './themes'
+import { RENAMED, type ThemeId } from './themes'
 
 // lyricsLanguage '' = the Windows display language
 // quranTranslations: ids from quran.svelte.ts TRANSLATIONS, shown under each ayah
 const defaults = {
   bitPerfect: true, soundCheck: false, passthrough: false, hwdec: true, translateLyrics: false, lyricsLanguage: '', learnLyrics: false,
-  quranTranslations: ['kemenag'] as string[], quranTranslit: true,
+  // quranLang: what Qur'an mode speaks and the language of word meanings ('auto' = the system's)
+  quranTranslations: ['kemenag'] as string[], quranTranslit: true, quranLang: 'auto' as 'auto' | 'en' | 'id',
   // Settings › Lyrics: where lyrics come from, in order; preferWordSync keeps asking for word timing
   lyricsSources: normalizeSources(undefined), preferWordSync: false,
   // Appearance (appearance.svelte.ts): accent '' = the default brass; zoom scales the whole UI
-  theme: 'auto' as ThemeId, accent: '', matchArtwork: false, zoom: 1,
+  // adaptiveTheme: the whole palette follows the cover of what's playing (matchArtwork: the accent only)
+  theme: 'auto' as ThemeId, accent: '', matchArtwork: false, adaptiveTheme: false, zoom: 1,
   corners: 'rounded' as 'square' | 'subtle' | 'rounded' | 'round', blurUi: true,
   iconPack: 'phosphor' as 'phosphor' | 'lucide' | 'iconoir' | 'remix' | 'solar',
   density: 'comfortable' as 'comfortable' | 'compact', solidChrome: false, font: 'inter' as 'inter' | 'system',
   hiddenNav: [] as string[],
+  // Discord Rich Presence (discord.svelte.ts): off until turned on; local covers looked up on MusicBrainz
+  discord: false, discordLocalArt: false,
   // YouTube sign-in for yt-dlp: '' guest, 'firefox' (its cookies), or the path of a cookies.txt file
   ytCookies: '',
-  // Downloads: the folder ('' = Music\Qistara Downloads), format and whether new downloads join the library
-  downloadFolder: '', downloadPreset: 'audioOriginal' as Preset, downloadToLibrary: true,
+  // Downloads: the folder ('' = Music/Qistara Downloads), video or audio and the quality of each, and whether
+  // new downloads join the library
+  downloadFolder: '', downloadKind: 'audio' as 'audio' | 'video', downloadVideo: '1080' as VideoQ, downloadAudio: 'original' as AudioQ,
+  downloadToLibrary: true,
+  // Settings › General › Updates: look for a new version once a day (update.svelte.ts)
+  autoUpdate: true,
 }
 type Settings = typeof defaults
 
 export const settings = $state<Settings>({ ...defaults })
 // nothing is saved or applied until the stored values are in, so they are never overwritten by defaults
 const state = $state({ loaded: false })
-kvLoad<Partial<Settings> & { onlineLyrics?: boolean }>('settings').then((v) => {
+kvLoad<Partial<Settings> & { onlineLyrics?: boolean; downloadPreset?: string }>('settings').then((v) => {
   if (v) Object.assign(settings, v)
   // the one "Find lyrics online" switch became the source list
   settings.lyricsSources = normalizeSources(v?.lyricsSources, v?.onlineLyrics)
   delete (settings as { onlineLyrics?: boolean }).onlineLyrics
+  // 0.3's four download presets became video/audio with a quality each
+  const presets: Record<string, readonly ['audio' | 'video', string]> = {
+    audioOriginal: ['audio', 'original'], audioMp3: ['audio', 'mp3-320'], video1080: ['video', '1080'], videoBest: ['video', 'best'],
+  }
+  const old = presets[v?.downloadPreset ?? '']
+  if (old) {
+    settings.downloadKind = old[0]
+    if (old[0] === 'video') settings.downloadVideo = old[1] as VideoQ
+    else settings.downloadAudio = old[1] as AudioQ
+  }
+  delete (settings as { downloadPreset?: string }).downloadPreset
+  // 0.4 gave the themes Qistara's own names
+  settings.theme = RENAMED[settings.theme] ?? settings.theme
   state.loaded = true
 })
 

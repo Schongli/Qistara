@@ -1,3 +1,4 @@
+import { joinPath, pathKey } from './paths'
 import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { byName, collator } from './format'
@@ -62,6 +63,7 @@ class Library {
   folders = $state.raw<string[]>([])
   playlists = $state.raw<Playlist[]>([])
   artDir = $state('')
+  streamArtDir = $state('')
   loaded = $state(false)
   scan = $state<{ done: number; total: number } | null>(null)
   error = $state('')
@@ -82,11 +84,12 @@ class Library {
 
   async load() {
     try {
-      const l = await invoke<{ tracks: Track[]; folders: string[]; playlists: Playlist[]; artDir: string }>('library')
+      const l = await invoke<{ tracks: Track[]; folders: string[]; playlists: Playlist[]; artDir: string; streamArtDir: string }>('library')
       this.tracks = l.tracks
       this.folders = l.folders
       this.playlists = l.playlists
       this.artDir = l.artDir
+      this.streamArtDir = l.streamArtDir
       this.loaded = true
     } catch (e) {
       this.error = String(e)
@@ -142,9 +145,16 @@ listen<string>('scan-error', (e) => {
   lib.error = e.payload
 })
 
-/** A cached cover by name, or a remote track's https picture (YouTube) as it is. */
-export const artUrl = (art: string | null | undefined) =>
-  art?.startsWith('https://') ? art : art && lib.artDir ? convertFileSrc(`${lib.artDir}\\${art}`) : null
+/**
+ * A cover as the page can show it: a library cover by cache name, a streamed one ("stream:<name>", your server's
+ * and YT Music's, kept in streaming/art), a remote https picture as it is, or a session host's small JPEG.
+ */
+export function artUrl(art: string | null | undefined): string | null {
+  if (!art) return null
+  if (art.startsWith('https://') || art.startsWith('data:image/jpeg;base64,')) return art
+  if (art.startsWith('stream:')) return lib.streamArtDir ? convertFileSrc(joinPath(lib.streamArtDir, art.slice(7))) : null
+  return lib.artDir ? convertFileSrc(joinPath(lib.artDir, art)) : null
+}
 
 export const addFolder = (path: string) => invoke('add_folder', { path })
 export const removeFolder = (path: string) => invoke('remove_folder', { path })
@@ -159,7 +169,7 @@ export const mediaExtensions = () => (extensions ??= invoke('extensions'))
 let adHoc = -1
 /** A track for a file outside the library (opened or dropped); reuses the library entry when there is one. */
 export async function fileTrack(path: string): Promise<Track | null> {
-  const known = lib.tracks.find((t) => t.path.toLowerCase() === path.toLowerCase())
+  const known = lib.tracks.find((t) => pathKey(t.path) === pathKey(path))
   if (known) return known
   const ext = path.split('.').pop()?.toLowerCase() ?? ''
   const { audio, video } = await mediaExtensions()

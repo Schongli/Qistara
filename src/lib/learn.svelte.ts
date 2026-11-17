@@ -1,7 +1,8 @@
 // Learn mode for lyrics: each line split into words you can tap, furigana and romaji for Japanese,
 // a dictionary card per word, and saved words with spaced review (vocab.ts).
-// Japanese is analysed offline (japanese.rs); word meanings come from Google Translate, one word at a time.
+// Japanese is analysed offline (japanese.rs, with a dictionary downloaded on first use); word meanings come from Google Translate, one word at a time.
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { untrack } from 'svelte'
 import { lyr } from './lyrics.svelte'
 import { mpv, seek, set } from './player.svelte'
@@ -18,7 +19,11 @@ import { review, vocabId, type VocabItem } from './vocab'
 import type { Lyrics } from './lyrics'
 
 /** pieces: each line split into words and gaps. romaji: one line each, Japanese only. */
-export const learn = $state({ japanese: false, pieces: null as Piece[][] | null, romaji: null as string[] | null, error: '' })
+export const learn = $state({
+  japanese: false, pieces: null as Piece[][] | null, romaji: null as string[] | null, error: '',
+  /** The IPADIC dictionary is an optional download (japanese.rs): missing, or being installed. */
+  dict: '' as '' | 'missing' | 'installing', dictDone: 0, dictTotal: 0,
+})
 
 let seq = 0
 async function analyze(data: Lyrics | null, on: boolean) {
@@ -39,7 +44,31 @@ async function analyze(data: Lyrics | null, on: boolean) {
       learn.pieces = lines.map((l) => [...seg.segment(l)].map((s) => ({ text: s.segment, tap: !!s.isWordLike })))
     }
   } catch (e) {
-    if (mine === seq) learn.error = String(e)
+    if (mine !== seq) return
+    if (String(e).includes('japanese-dictionary-missing')) learn.dict = 'missing'
+    else learn.error = String(e)
+  }
+}
+
+/** Downloads and builds the Japanese dictionary, then analyses the lyrics again. */
+export async function installDictionary() {
+  if (learn.dict === 'installing') return
+  learn.dict = 'installing'
+  Object.assign(learn, { dictDone: 0, dictTotal: 0 })
+  const off = await listen<{ stage: string; done: number; total: number }>('japanese-progress', (e) => {
+    learn.dictDone = e.payload.stage === 'build' ? -1 : e.payload.done
+    learn.dictTotal = e.payload.total
+  })
+  try {
+    await invoke('japanese_install')
+    learn.dict = ''
+    toast('Japanese dictionary installed')
+    analyze(lyr.data, settings.learnLyrics)
+  } catch (e) {
+    learn.dict = 'missing'
+    toast(String(e))
+  } finally {
+    off()
   }
 }
 

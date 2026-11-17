@@ -143,8 +143,8 @@ pub fn read(path: &Path, mtime: i64, size: i64, art: &Art) -> Track {
         added_at: now(),
         ..Default::default()
     };
-    if t.kind == "audio" {
-        if let Ok(f) = lofty::read_from_path(path) {
+    if t.kind == "audio"
+        && let Ok(f) = lofty::read_from_path(path) {
             let p = f.properties();
             t.duration = p.duration().as_secs_f64();
             t.sample_rate = p.sample_rate();
@@ -187,7 +187,6 @@ pub fn read(path: &Path, mtime: i64, size: i64, art: &Art) -> Track {
                 t.art = front(tag).and_then(|p| art.thumb(p.data()));
             }
         }
-    }
     if t.art.is_none() {
         t.art = path.parent().and_then(|d| art.folder(d));
     }
@@ -198,7 +197,9 @@ pub fn read(path: &Path, mtime: i64, size: i64, art: &Art) -> Track {
 fn under(path: &str, folder: &str) -> bool {
     let f = folder.trim_end_matches(['\\', '/']).as_bytes();
     let p = path.as_bytes();
-    p.len() > f.len() && p[..f.len()].eq_ignore_ascii_case(f) && matches!(p[f.len()], b'\\' | b'/')
+    // Windows paths ignore case; Linux and macOS paths are what the file system reported
+    let same = |a: &[u8], b: &[u8]| if cfg!(windows) { a.eq_ignore_ascii_case(b) } else { a == b };
+    p.len() > f.len() && same(&p[..f.len()], f) && matches!(p[f.len()], b'\\' | b'/')
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
@@ -253,10 +254,13 @@ pub fn scan(db: &Mutex<Connection>, art: &Art, progress: &(dyn Fn(usize, usize) 
     let total = todo.len();
     let parsed: Vec<Track> = todo
         .par_iter()
-        .map(|(p, m, s)| {
-            let t = read(p, *m, *s, art);
+        .filter_map(|(p, m, s)| {
+            // a crafted or damaged file that panics a parser costs that file, not the whole scan
+            let t = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| read(p, *m, *s, art)))
+                .inspect_err(|_| log::warn!("skipped a file the tag reader choked on: {}", p.display()))
+                .ok();
             let n = done.fetch_add(1, Ordering::Relaxed) + 1;
-            if n % 25 == 0 || n == total {
+            if n.is_multiple_of(25) || n == total {
                 progress(n, total);
             }
             t
@@ -372,7 +376,7 @@ mod tests {
 
     #[test]
     fn folder_matching_is_case_insensitive_and_boundary_safe() {
-        assert!(under(r"D:\Music\a.flac", r"d:\music"));
+        assert_eq!(under(r"D:\Music\a.flac", r"d:\music"), cfg!(windows), "only Windows ignores case");
         assert!(under(r"D:\Music\a.flac", r"D:\Music\"));
         assert!(!under(r"D:\Musicals\a.flac", r"D:\Music"));
         assert!(under(r"D:\a.flac", r"D:\"));

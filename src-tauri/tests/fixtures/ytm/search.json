@@ -1,0 +1,169 @@
+{
+ "contents": {
+  "tabbedSearchResultsRenderer": {
+   "tabs": [
+    {
+     "tabRenderer": {
+      "content": {
+       "sectionListRenderer": {
+        "contents": [
+         {
+          "musicCardShelfRenderer": {
+           "title": {
+            "runs": [
+             {
+              "text": "Rick Astley",
+              "navigationEndpoint": {
+               "browseEndpoint": {
+                "browseId": "UCuAXFkgsw1L7xaCfnd5JJOw",
+                "browseEndpointContextSupportedConfigs": {
+                 "browseEndpointContextMusicConfig": {
+                  "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                 }
+                }
+               }
+              }
+             }
+            ]
+           },
+           "subtitle": {
+            "runs": [
+             {
+              "text": "Artist"
+             },
+             {
+              "text": " • "
+             },
+             {
+              "text": "4.2M subscribers"
+             }
+            ]
+           },
+           "thumbnail": {
+            "musicThumbnailRenderer": {
+             "thumbnail": {
+              "thumbnails": [
+               {
+                "url": "https://yt3.ggpht.com/ra=w120-h120-p-l90-rj",
+                "width": 120,
+                "height": 120
+               }
+              ]
+             }
+            }
+           }
+          }
+         },
+         {
+          "musicShelfRenderer": {
+           "title": {
+            "runs": [
+             {
+              "text": "Songs"
+             }
+            ]
+           },
+           "contents": [
+            {
+             "musicResponsiveListItemRenderer": {
+              "flexColumns": [
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Never Gonna Give You Up"
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Song"
+                   },
+                   {
+                    "text": " • "
+                   },
+                   {
+                    "text": "Rick Astley",
+                    "navigationEndpoint": {
+                     "browseEndpoint": {
+                      "browseId": "UCuAXFkgsw1L7xaCfnd5JJOw"
+                     }
+                    }
+                   },
+                   {
+                    "text": " • "
+                   },
+                   {
+                    "text": "3:33"
+                   }
+                  ]
+                 }
+                }
+               }
+              ],
+              "playlistItemData": {
+               "videoId": "dQw4w9WgXcQ"
+              }
+             }
+            },
+            {
+             "musicResponsiveListItemRenderer": {
+              "flexColumns": [
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Some Compilation Song"
+                   }
+                  ]
+                 }
+                }
+               },
+               {
+                "musicResponsiveListItemFlexColumnRenderer": {
+                 "text": {
+                  "runs": [
+                   {
+                    "text": "Song"
+                   },
+                   {
+                    "text": " • "
+                   },
+                   {
+                    "text": "Various"
+                   },
+                   {
+                    "text": " • "
+                   },
+                   {
+                    "text": "2:00"
+                   }
+                  ]
+                 }
+                }
+               }
+              ],
+              "playlistItemData": {
+               "videoId": "abcdefghijk"
+              }
+             }
+            }
+           ]
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   ]
+  }
+ }
+}

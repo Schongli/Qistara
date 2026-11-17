@@ -46,6 +46,8 @@
   }
   .play:hover { background: var(--accent); }
   .tile:hover .play, .play:focus-visible { opacity: 1; transform: none; }
+  @media (hover: none) { .play { opacity: 1; transform: none; } }
+  @media (max-width: 600px) { .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 20px 14px; } }
   .name { display: block; width: 100%; text-align: left; font-weight: 550; line-height: 17px; }
   .artist { display: block; width: 100%; text-align: left; }
   .artist:hover, .name:hover { text-decoration: underline; text-underline-offset: 2px; }

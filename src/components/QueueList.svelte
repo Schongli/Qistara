@@ -1,16 +1,24 @@
 <script lang="ts">
+  import { activate } from '../lib/touch'
   import Icon from './Icon.svelte'
   import Artwork from './Artwork.svelte'
   import Playing from './Playing.svelte'
   import { queue } from '../lib/queue.svelte'
   import { mpv } from '../lib/player.svelte'
   import { openMenu, trackMenu } from '../lib/menu.svelte'
+  import VirtualList from './VirtualList.svelte'
+  import type { Track } from '../lib/library.svelte'
 
   let { dark = false }: { dark?: boolean } = $props()
   let dragFrom = $state<number | null>(null)
   let over = $state<number | null>(null)
   const base = $derived(queue.index + 1)
+  // Up Next can be the whole library (play from Songs): only the rows on screen are made
+  const ROW = 52
+  const reset = () => (dragFrom = over = null)
 </script>
+
+<svelte:window ondragend={reset} ondrop={reset} />
 
 <div class="q" class:dark>
   {#if queue.current}
@@ -31,7 +39,9 @@
       {#if queue.upNext.length}<button class="clear" onclick={() => queue.clearUpNext()}>Clear</button>{/if}
     </span>
   </div>
-  {#each queue.upNext as t, i (base + i + ':' + t.id)}
+  <VirtualList items={queue.upNext} rowHeight={ROW} page overscan={6}>
+    {#snippet empty()}<p class="sub empty">{queue.current ? 'Nothing up next. Use Play Next or Play Later on any song or album.' : 'Play something to fill Up Next.'}</p>{/snippet}
+    {#snippet row(t: Track, i: number)}
     {@const at = base + i}
     <div
       class="item"
@@ -43,7 +53,7 @@
       ondragleave={() => over === at && (over = null)}
       ondrop={(e) => { e.preventDefault(); if (dragFrom !== null && dragFrom !== at) queue.reorder(dragFrom, at); dragFrom = over = null }}
       ondragend={() => (dragFrom = over = null)}
-      ondblclick={() => queue.jump(at)}
+      {...activate(() => queue.jump(at))}
       oncontextmenu={(e) => openMenu(e, trackMenu([t]))}
     >
       <span class="grip"><Icon name="DotsSixVertical" size={14} weight="bold" /></span>
@@ -51,9 +61,8 @@
       <span class="txt"><span class="ellipsis">{t.title}</span><span class="sub ellipsis">{t.artist}</span></span>
       <button class="rm" aria-label="Remove {t.title}" onclick={() => queue.remove(at)}><Icon name="X" size={12} weight="bold" /></button>
     </div>
-  {:else}
-    <p class="sub empty">{queue.current ? 'Nothing up next. Use Play Next or Play Later on any song or album.' : 'Play something to fill Up Next.'}</p>
-  {/each}
+    {/snippet}
+  </VirtualList>
 </div>
 
 <style>
@@ -64,7 +73,7 @@
   .acts { display: flex; align-items: center; gap: 12px; }
   .auto { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 11px; font-size: 11.5px; font-weight: 600; color: var(--text-2); background: var(--fill); }
   .auto.on { color: var(--on-accent); background: var(--accent); }
-  .item { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--r); min-width: 0; border-top: 2px solid transparent; }
+  .item { display: flex; align-items: center; gap: 10px; height: 52px; box-sizing: border-box; padding: 6px 8px; border-radius: var(--r); min-width: 0; border-top: 2px solid transparent; }
   .item:hover { background: var(--fill); }
   .item.over { border-top-color: var(--accent); }
   .txt { flex: 1; min-width: 0; display: grid; line-height: 17px; }
@@ -74,6 +83,7 @@
   .rm { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: var(--text-2); opacity: 0; }
   .item:hover .rm, .rm:focus-visible { opacity: 1; }
   .rm:hover { background: var(--fill-2); }
+  @media (hover: none) { .grip, .rm { opacity: 1; } }
   .empty { padding: 4px 8px; margin: 0; line-height: 1.5; }
   .dark { --fill: rgba(255, 255, 255, 0.08); --fill-2: rgba(255, 255, 255, 0.14); --text: #fff; --text-2: rgba(255, 255, 255, 0.62); --text-3: rgba(255, 255, 255, 0.4); color: #fff; }
 </style>

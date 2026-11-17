@@ -31,7 +31,7 @@
       { id: 'videos', label: 'Videos', route: { name: 'videos' }, icon: 'FilmStrip' },
     ] },
     { group: 'Sources', items: [
-      { id: 'youtube', label: 'YouTube', route: { name: 'youtube' }, icon: 'YoutubeLogo' },
+      { id: 'youtube', label: 'YT Music', route: { name: 'ytm' }, icon: 'YoutubeLogo' },
       { id: 'server', label: 'Server', route: { name: 'server' }, icon: 'HardDrives', when: () => !!server.account },
       { id: 'spotify', label: 'Spotify', route: { name: 'spotify' }, icon: 'SpotifyLogo', when: () => !!spotify.user },
       { id: 'apple', label: 'Apple Music', route: { name: 'apple' }, icon: 'AppleLogo', when: () => !!apple.s.user },
@@ -60,13 +60,13 @@
       'sep',
       { label: 'Import Playlist (M3U)…', action: importPlaylist },
     ])
-  // album pages belong to the Albums destination, etc.
-  const section = $derived(nav.route.name === 'album' ? 'albums' : nav.route.name)
+  // album pages belong to the Albums destination, YT Music's pages and its Links & Videos view to YT Music
+  const section = $derived(nav.route.name === 'album' ? 'albums' : /^(ytm|youtube)/.test(nav.route.name) ? 'ytm' : nav.route.name)
   const selected = (r: Route) => section === r.name
   let closed = $state<Record<string, boolean>>({})
 </script>
 
-<nav class="side" aria-label="Library">
+<nav class="side" class:open={ui.drawer} aria-label="Library">
   <div class="brand" data-tauri-drag-region>
     <Logo size={22} />
     <span data-tauri-drag-region>Qistara</span>
@@ -83,7 +83,7 @@
         {/if}
         {#if !closed[g.group]}
           {#each items as it (it.id)}
-            <button class="item press" class:sel={selected(it.route)} onclick={() => (nav.root(it.route), it.id === 'search' && ui.search++)}>
+            <button class="item press" class:sel={selected(it.route)} title={it.label} aria-label={it.label} onclick={() => (nav.root(it.route), it.id === 'search' && ui.search++)}>
               <span class="ic"><Icon name={it.icon} size={17} /></span>{it.label}
             </button>
           {/each}
@@ -138,6 +138,8 @@
     width: 236px; flex: none; display: flex; flex-direction: column; min-height: 0;
     padding: 0 10px 10px; background: var(--sidebar); border-right: 1px solid var(--sep);
   }
+  /* room for macOS's own traffic lights above the logo */
+  :global(.os-macos) .side { padding-top: 30px; }
   .brand { display: flex; align-items: center; gap: 9px; height: var(--bar-h); padding: 0 8px; flex: none; }
   .brand span { font-weight: 700; font-size: 15px; letter-spacing: -0.02em; }
   .scroll { flex: 1; min-height: 0; overflow-y: auto; display: grid; align-content: start; gap: 1px; margin: 0 -4px; padding: 0 4px; }
@@ -158,6 +160,24 @@
   .add:hover { background: var(--fill-2); color: var(--text); }
   .pin { display: flex; align-items: center; gap: 10px; padding: 4px 8px; border-radius: var(--r); text-align: left; min-width: 0; }
   .pt { display: grid; min-width: 0; line-height: 1.3; }
+  /* a narrow window keeps the icons (an icon rail); a phone-width one slides the whole sidebar in from the left */
+  @media (max-width: 900px) and (min-width: 601px) {
+    .side { width: 64px; padding: 0 8px 10px; }
+    .brand { justify-content: center; padding: 0; }
+    .brand span, .head, .add, .pt, .scan .t-sub { display: none; }
+    .item { justify-content: center; padding: 0; height: 40px; font-size: 0; }
+    .item :global(.ellipsis) { display: none; }
+    .pin { justify-content: center; padding: 4px 0; }
+  }
+  @media (max-width: 600px) {
+    .side {
+      position: fixed; z-index: 60; inset: 0 auto 0 0; width: min(280px, 86vw); background: var(--bg-2);
+      transform: translateX(-102%); transition: transform 260ms var(--ease-out); box-shadow: var(--shadow-pop);
+    }
+    .side.open { transform: none; }
+  }
+  @media (pointer: coarse) { .item { height: 44px; } .pin { padding: 6px 8px; } }
+  @media (prefers-reduced-motion: reduce) { .side { transition: none; } }
   .foot { display: grid; gap: 1px; padding-top: 6px; border-top: 1px solid var(--sep); margin-top: 6px; }
   .scan { padding: 8px 10px 6px; }
   .bar { height: 3px; margin-top: 6px; border-radius: 2px; background: var(--fill-2); overflow: hidden; }

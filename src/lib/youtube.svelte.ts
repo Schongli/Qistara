@@ -3,7 +3,9 @@
 import { invoke } from '@tauri-apps/api/core'
 import { remoteTrack } from './radio.svelte'
 import { ytCookies } from './downloads.svelte'
-import { mpv } from './player.svelte'
+import { mpv, onMpvEvent } from './player.svelte'
+import { queue } from './queue.svelte'
+import { toast } from './nav.svelte'
 import { settings } from './settings.svelte'
 import type { Track } from './library.svelte'
 
@@ -11,11 +13,27 @@ type Video = { id: string; title: string; channel: string; duration: number | nu
 
 export const yt = $state({ tracks: [] as Track[], title: '', loading: false, error: '' })
 
-export const ytTrack = (v: Video) =>
-  remoteTrack({
-    path: `ytdl://https://www.youtube.com/watch?v=${v.id}`, title: v.title, artist: v.channel, album: 'YouTube',
-    duration: v.duration ?? 0, codec: 'YouTube', art: `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`,
+// one track per video for the whole session: the same song found twice keeps its id, so the now-playing mark,
+// play-next checks and the queue all recognise it
+const byVideo = new Map<string, Track>()
+
+/** The track for a YouTube video id; what's known about it (a YT Music album and square art) fills in what isn't. */
+export function videoTrack(id: string, info: Partial<Track> & { title: string }): Track {
+  const known = byVideo.get(id)
+  if (known) {
+    if (info.album && known.album === 'YouTube') Object.assign(known, { album: info.album, art: info.art ?? known.art })
+    return known
+  }
+  const t = remoteTrack({
+    path: `ytdl://https://www.youtube.com/watch?v=${id}`, album: 'YouTube', codec: 'YouTube', art: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`, ...info,
   })
+  byVideo.set(id, t)
+  return t
+}
+
+export const ytTrack = (v: Video) => videoTrack(v.id, { title: v.title, artist: v.channel, duration: v.duration ?? 0 })
+/** The video id of a YouTube track, if it is one. */
+export const videoId = (t: Track) => t.path.match(/^ytdl:\/\/https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})$/)?.[1] ?? null
 
 async function run(title: string, cmd: string, args: Record<string, string>) {
   yt.loading = true
@@ -42,4 +60,10 @@ $effect.root(() => {
     if (!mpv.ready) return
     invoke('mpv_ytdl_sign_in', { cookies: c }).catch((e) => console.warn('YouTube playback sign-in:', e))
   })
+})
+
+// a YouTube track that fails to open would otherwise just go silent
+onMpvEvent((e) => {
+  if (e.event !== 'end-file' || String(e.reason) !== 'error' || !queue.current?.path.startsWith('ytdl://')) return
+  toast(`Couldn't play this YouTube video${e.file_error ? ` (${e.file_error})` : ''}. Check for a yt-dlp update in Downloads.`)
 })

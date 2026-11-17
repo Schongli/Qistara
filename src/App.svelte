@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte'
+  import { tick, untrack } from 'svelte'
   import Sidebar from './components/Sidebar.svelte'
   import TopBar from './components/TopBar.svelte'
   import PlayerBar from './components/PlayerBar.svelte'
@@ -8,6 +8,8 @@
   import Home from './views/Home.svelte'
   import Downloads from './views/Downloads.svelte'
   import YouTube from './views/YouTube.svelte'
+  import YtMusic from './views/YtMusic.svelte'
+  import YtmPage from './views/YtmPage.svelte'
   import Providers from './views/Providers.svelte'
   import Server from './views/Server.svelte'
   import ServiceView from './views/ServiceView.svelte'
@@ -51,6 +53,10 @@
   import './lib/lastfm.svelte'
   import './lib/sleep.svelte'
   import './lib/appearance.svelte'
+  import './lib/discord.svelte'
+  import './lib/touch'
+  import './lib/session.svelte'
+  import './lib/update.svelte'
   import { capture, restore } from './lib/scrollmemo'
 
   startMpv().then(() => lib.load()).then(() => queue.restore(lib.byId))
@@ -98,6 +104,11 @@
     else if (e.key === 'Escape') ui.nowPlaying ? (ui.nowPlaying = false) : (ui.panel = '')
     else if (e.altKey && e.key === 'ArrowLeft') nav.back()
   }
+  // a destination chosen from the drawer closes it
+  $effect(() => {
+    void nav.route
+    untrack(() => (ui.drawer = false))
+  })
 </script>
 
 <svelte:window onkeydown={keys} onmouseup={(e) => e.button === 3 && nav.back()} />
@@ -157,6 +168,10 @@
         <Downloads />
       {:else if r.name === 'youtube'}
         <YouTube />
+      {:else if r.name === 'ytm'}
+        <YtMusic />
+      {:else if r.name === 'ytmAlbum' || r.name === 'ytmArtist' || r.name === 'ytmPlaylist'}
+        {#key r.id}<YtmPage kind={r.name === 'ytmAlbum' ? 'album' : r.name === 'ytmArtist' ? 'artist' : 'playlist'} id={r.id} />{/key}
       {:else if r.name === 'providers'}
         <Providers />
       {:else if r.name === 'server'}
@@ -167,10 +182,11 @@
     </div>
   </main>
   {#if ui.panel}<RightPanel />{/if}
+  {#if ui.drawer}<button class="scrim" aria-label="Close menu" onclick={() => (ui.drawer = false)}></button>{/if}
   </div>
   <PlayerBar />
   <!-- over the docked pane's dark backdrop the caption glyphs turn white -->
-  <Caps light={!!ui.panel} />
+  <Caps light={!!ui.panel} overPane />
 </div>
 {#if ui.mini}{:else if video}<VideoView />{:else}<NowPlaying />{/if}
 {#if ui.editor}
@@ -198,6 +214,12 @@
   .main { position: relative; flex: 1; min-width: 0; background: var(--bg); }
   .content { position: absolute; inset: 0; overflow-y: auto; padding: calc(var(--bar-h) + 28px) 28px 48px; }
   .content.fixed { overflow: hidden; padding: 0; }
+  .scrim { display: none; }
+  @media (max-width: 600px) {
+    .content { padding: calc(var(--bar-h) + 16px) 16px 32px; }
+    .scrim { display: block; position: fixed; inset: 0; z-index: 55; background: var(--sheet-dim); }
+    .toast { max-width: calc(100vw - 32px); }
+  }
 
   /* video: mpv draws under the whole window; the library steps aside for the player */
   .app.video { visibility: hidden; }

@@ -21,3 +21,24 @@ describe('M3U', () => {
     expect(parseM3u(out, 'C:\\').map((e) => e.path)).toEqual(['D:\\Music\\a.flac', 'D:\\x.mp3'])
   })
 })
+
+describe('M3U hardening', () => {
+  it('survives a stray % and reads file URLs with a host', () => {
+    const text = 'file:///D:/Music/100%.flac\nfile://localhost/D:/Music/a.flac\nfile://nas/share/b.flac\n'
+    expect(parseM3u(text, 'D:\\Lists').map((e) => e.path)).toEqual(['D:\\Music\\100%.flac', 'D:\\Music\\a.flac', '\\\\nas\\share\\b.flac'])
+  })
+  it('resolves drive-root paths and never climbs above the drive or share', () => {
+    expect(parseM3u('\\Music\\a.flac\n..\\..\\..\\..\\b.flac', 'E:\\Lists\\Mine').map((e) => e.path)).toEqual(['E:\\Music\\a.flac', 'E:\\b.flac'])
+    expect(normalize('\\\\nas\\music\\..\\..\\x.flac')).toBe('\\\\nas\\music\\x.flac')
+  })
+  it('reads POSIX playlists on Linux and macOS', () => {
+    const text = '#EXTM3U\n/home/me/Music/a.flac\n../b.flac\nfile:///Users/me/My%20Song.flac\nfile://localhost/srv/c.flac\n'
+    expect(parseM3u(text, '/home/me/Music/Lists').map((e) => e.path)).toEqual(['/home/me/Music/a.flac', '/home/me/Music/b.flac', '/Users/me/My Song.flac', '/srv/c.flac'])
+    expect(normalize('/a/../../b', true)).toBe('/b')
+  })
+  it('splits old Mac line breaks and keeps tags with line breaks on one line', () => {
+    expect(parseM3u('#EXTM3U\rD:\\a.flac\rD:\\b.flac', 'C:\\').length).toBe(2)
+    const out = buildM3u([{ path: 'D:\\a.flac', title: 'Two\nlines', artist: 'A\r\nB', duration: 1 }])
+    expect(out.split('\r\n')).toEqual(['#EXTM3U', '#EXTINF:1,A B - Two lines', 'D:\\a.flac', ''])
+  })
+})

@@ -21,10 +21,49 @@ fn cache_file(key: &str, source: &str, cache: &Path) -> PathBuf {
     cache.join(format!("{:016x}.lrc", h.finish()))
 }
 
+/// Sidecar lyrics files are small; anything bigger isn't one (and TTML parsing would crawl).
+const MAX_SIDECAR: u64 = 2 * 1024 * 1024;
+
+/// Text from a file of unknown encoding: a BOM, else UTF-8, else Shift-JIS when it holds kana, else GBK when
+/// its high bytes pair up like Chinese text, else Windows-1252 (what Winamp and old taggers wrote).
+pub fn decode_text(b: &[u8]) -> String {
+    if let Some((enc, bom)) = encoding_rs::Encoding::for_bom(b) {
+        return enc.decode_without_bom_handling(&b[bom..]).0.into_owned();
+    }
+    if let Ok(s) = std::str::from_utf8(b) {
+        return s.to_owned();
+    }
+    let (sjis, bad) = encoding_rs::SHIFT_JIS.decode_without_bom_handling(b);
+    if !bad && sjis.chars().any(|c| matches!(c, '\u{3041}'..='\u{30ff}')) {
+        return sjis.into_owned();
+    }
+    // GB2312 text is pairs of bytes >= 0xA1; accented Latin is a high byte followed by plain ASCII
+    let (mut pairs, mut cjk, mut i) = (0, 0, 0);
+    while i < b.len() {
+        if b[i] >= 0x81 {
+            pairs += 1;
+            if b[i] >= 0xa1 && b.get(i + 1).is_some_and(|&n| n >= 0xa1) {
+                cjk += 1;
+            }
+            i += 2;
+        } else {
+            i += 1;
+        }
+    }
+    let (gbk, bad) = encoding_rs::GBK.decode_without_bom_handling(b);
+    if !bad && pairs > 0 && cjk * 10 >= pairs * 9 {
+        return gbk.into_owned();
+    }
+    encoding_rs::WINDOWS_1252.decode_without_bom_handling(b).0.into_owned()
+}
+
 pub fn local(path: &Path) -> Option<Found> {
     for (ext, kind) in [("ttml", "ttml"), ("lrc", "lrc"), ("txt", "lrc")] {
-        if let Ok(text) = std::fs::read_to_string(path.with_extension(ext)) {
-            return Some(Found { kind, text, source: "file" });
+        let file = path.with_extension(ext);
+        if std::fs::metadata(&file).is_ok_and(|m| m.is_file() && m.len() <= MAX_SIDECAR)
+            && let Ok(bytes) = std::fs::read(&file)
+        {
+            return Some(Found { kind, text: decode_text(&bytes), source: "file" });
         }
     }
     let embedded = lofty::read_from_path(path).ok().and_then(|f| {
@@ -67,5 +106,23 @@ mod tests {
         std::fs::write(d.path().join("song.lrc"), "[00:01.00]sidecar").unwrap();
         let f = local(&song).unwrap();
         assert_eq!((f.kind, f.text.as_str(), f.source), ("lrc", "[00:01.00]sidecar", "file"));
+        // a sidecar far too big to be lyrics is ignored
+        std::fs::write(d.path().join("song.lrc"), vec![b'a'; MAX_SIDECAR as usize + 1]).unwrap();
+        assert_eq!(local(&song), None);
+    }
+
+    #[test]
+    fn decodes_legacy_lyric_and_playlist_encodings() {
+        let enc = |e: &'static encoding_rs::Encoding, s: &str| e.encode(s).0.into_owned();
+        let jp = "[00:01.00]君の名前を呼んでいた";
+        let zh = "[00:01.00]我们一起走过的路";
+        let latin = "#EXTINF:1,Mötley Crüe - Café\r\nD:\\Música\\Beyoncé.flac";
+        assert_eq!(decode_text(&enc(encoding_rs::SHIFT_JIS, jp)), jp);
+        assert_eq!(decode_text(&enc(encoding_rs::GBK, zh)), zh);
+        assert_eq!(decode_text(&enc(encoding_rs::WINDOWS_1252, latin)), latin);
+        assert_eq!(decode_text("utf8 ✓ ünï".as_bytes()), "utf8 ✓ ünï");
+        let mut utf16 = vec![0xff, 0xfe];
+        utf16.extend("bom".encode_utf16().flat_map(u16::to_le_bytes));
+        assert_eq!(decode_text(&utf16), "bom");
     }
 }

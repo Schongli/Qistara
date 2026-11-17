@@ -5,8 +5,10 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { settings } from './settings.svelte'
 import { queue } from './queue.svelte'
+import { OS } from './player.svelte'
+import { PHONE } from './os'
 import { onAccent, readableAccent } from './color'
-import { presetOf, presetVars } from './themes'
+import { adaptivePalette, presetOf, presetVars, type Palette } from './themes'
 
 export const ACCENTS: [string, string][] = [
   ['Brass', '#e5a93c'], ['River', '#0a7f6f'], ['Ocean', '#0a64d6'], ['Indigo', '#5b4fc4'], ['Orchid', '#9b3fc8'],
@@ -14,29 +16,45 @@ export const ACCENTS: [string, string][] = [
 ]
 
 const root = document.documentElement
+// macOS keeps its own traffic lights top-left (tauri.macos.conf.json); Linux and Windows get Caps.svelte
+root.classList.add(`os-${OS}`)
+// Caps.svelte draws the window's buttons (not on macOS, which has its own, nor on phones)
+root.classList.toggle('has-caps', OS !== 'macos' && !PHONE)
 const system = matchMedia('(prefers-color-scheme: dark)')
 const scheme = $state({ systemDark: system.matches })
 system.addEventListener('change', (e) => (scheme.systemDark = e.matches))
 const preset = $derived(presetOf(settings.theme))
-// the presets are all dark themes
-export const isDark = () => !!preset || settings.theme === 'dark' || (settings.theme === 'auto' && scheme.systemDark)
+/** Whether the chosen theme is dark (Automatic follows the system). */
+const chosenDark = () => (preset ? preset.dark : settings.theme === 'dark' || (settings.theme === 'auto' && scheme.systemDark))
+const art = $state({ color: null as string | null })
+/** Adaptive theme: the whole palette from the cover's colour, dark or light as the chosen theme is. */
+const palette = $derived<Palette | undefined>(settings.adaptiveTheme && art.color ? adaptivePalette(art.color, chosenDark()) : preset)
+export const isDark = () => (palette ? palette.dark : chosenDark())
 const RADIUS = { square: 0, subtle: 0.5, rounded: 1, round: 1.75 }
 
-const art = $state({ color: null as string | null })
 const warn = (what: string) => (e: unknown) => console.warn(`appearance: ${what}:`, e)
 
 $effect.root(() => {
   $effect(() => {
-    const scheme = preset ? 'dark' : settings.theme === 'auto' ? null : (settings.theme as 'light' | 'dark')
+    const scheme = palette ? (palette.dark ? 'dark' : 'light') : settings.theme === 'auto' ? null : (settings.theme as 'light' | 'dark')
     root.style.colorScheme = scheme ?? ''
     // the Mica tint and caption follow the window's theme, not the page's
     getCurrentWindow().setTheme(scheme).catch(warn('theme'))
   })
+  let lastPalette = ''
   $effect(() => {
-    const vars = preset ? presetVars(preset) : {}
+    const p = palette
+    const vars = p ? presetVars(p) : {}
     // inline values beat the .solid / .noblur rules in app.css, so a preset applies them itself
-    if (preset && (settings.solidChrome || !settings.blurUi)) vars['--bar'] = preset.bg
-    if (preset && settings.solidChrome) vars['--sidebar'] = preset.bg2
+    if (p && (settings.solidChrome || !settings.blurUi)) vars['--bar'] = p.bg
+    if (p && settings.solidChrome) vars['--sidebar'] = p.bg2
+    // the adaptive theme changes with every song: let the colours ease over instead of jumping
+    const key = p ? p.bg + p.text : ''
+    if (lastPalette && key !== lastPalette && settings.adaptiveTheme && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      root.classList.add('fade')
+      setTimeout(() => root.classList.remove('fade'), 700)
+    }
+    lastPalette = key
     for (const k of ['--bg', '--bg-2', '--text', '--text-2', '--text-3', '--fill', '--fill-2', '--sep', '--bar', '--sidebar']) {
       if (vars[k]) root.style.setProperty(k, vars[k])
       else root.style.removeProperty(k)
@@ -46,13 +64,13 @@ $effect.root(() => {
     getCurrentWebview().setZoom(settings.zoom).catch(warn('zoom'))
   })
   $effect(() => {
-    const cover = settings.matchArtwork ? queue.current?.art : null
+    const cover = settings.matchArtwork || settings.adaptiveTheme ? queue.current?.art : null
     art.color = null
     if (cover) invoke<string | null>('art_color', { art: cover }).then((c) => queue.current?.art === cover && (art.color = c), warn('artwork colour'))
   })
   $effect(() => {
-    const picked = (settings.matchArtwork && art.color) || settings.accent || preset?.accent
-    const accent = picked && readableAccent(picked, preset?.bg ?? (isDark() ? '#111318' : '#ffffff'))
+    const picked = ((settings.matchArtwork || settings.adaptiveTheme) && art.color) || settings.accent || preset?.accent
+    const accent = picked && readableAccent(picked, palette?.bg ?? (isDark() ? '#111318' : '#ffffff'))
     if (accent) {
       root.style.setProperty('--accent', accent)
       root.style.setProperty('--on-accent', onAccent(accent))

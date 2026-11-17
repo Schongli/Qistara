@@ -1,11 +1,13 @@
 <script lang="ts">
+  import { KEY_STORE, SYSTEM } from '../lib/os'
   import { tick } from 'svelte'
   import { open } from '@tauri-apps/plugin-dialog'
   import { invoke } from '@tauri-apps/api/core'
   import { openUrl } from '@tauri-apps/plugin-opener'
   import Icon from '../components/Icon.svelte'
   import { addFolder, lib, removeFolder, rescan } from '../lib/library.svelte'
-  import { mpv, set } from '../lib/player.svelte'
+  import { mpv, OS, set } from '../lib/player.svelte'
+  import { pickable } from '../lib/signal'
   import { settings } from '../lib/settings.svelte'
   import { nav, ui } from '../lib/nav.svelte'
   import Toggle from '../components/Toggle.svelte'
@@ -13,11 +15,20 @@
   import Providers from './Providers.svelte'
   import { NAV } from '../components/Sidebar.svelte'
   import { ACCENTS } from '../lib/appearance.svelte'
-  import { LIGHT, OBSIDIAN, PRESETS, presetOf, type Palette, type ThemeId } from '../lib/themes'
+  import { FAMILIES, LIGHT, OBSIDIAN, presetOf, type Family, type Palette, type ThemeId } from '../lib/themes'
   import { connect, finish, lastfm, refresh } from '../lib/lastfm.svelte'
   import { defaultFolder } from '../lib/downloads.svelte'
   import { plural } from '../lib/format'
   import { LANGUAGES, languageName, targetFor } from '../lib/translate'
+  import { installDictionary, learn } from '../lib/learn.svelte'
+  import { forgetCovers } from '../lib/subsonic.svelte'
+  import { usePack } from '../lib/icons.svelte'
+  import { discord } from '../lib/discord.svelte'
+  import { queue } from '../lib/queue.svelte'
+  import Artwork from '../components/Artwork.svelte'
+  import { mb } from '../lib/format'
+  import { getVersion } from '@tauri-apps/api/app'
+  import { checkUpdate, installUpdate, update } from '../lib/update.svelte'
 
   let { tab = 'general' }: { tab?: string } = $props()
 
@@ -70,13 +81,19 @@
   }
 
   // ---- appearance ----
+  // the icon-pack previews need every pack, so they load once Appearance is open
+  $effect(() => {
+    if (shown('appearance')) for (const [p] of PACKS) usePack(p)
+  })
   const preset = $derived(presetOf(settings.theme))
   const accent = $derived(settings.accent || preset?.accent || ACCENTS[0][1])
   // live while the picker is dragged; saved (and made readable) when it closes
   const preview = (hex: string) => document.documentElement.style.setProperty('--accent', hex)
   const toggleNav = (id: string) =>
     (settings.hiddenNav = settings.hiddenNav.includes(id) ? settings.hiddenNav.filter((x) => x !== id) : [...settings.hiddenNav, id])
-  const themes: [ThemeId, string, Palette][] = [['light', 'Light', LIGHT], ['dark', 'Qistara Obsidian', OBSIDIAN], ...PRESETS.map((p): [ThemeId, string, Palette] => [p.id, p.label, p])]
+  const builtIn: [ThemeId, string, Palette][] = [['light', 'Light', LIGHT], ['dark', 'Obsidian', OBSIDIAN]]
+  // a family's card shows its chosen variant, or its first one
+  const shown_ = (f: Family) => f.variants.find((v) => v.id === settings.theme) ?? f.variants[0]
 
   // ---- library and downloads ----
   export async function pickFolder() {
@@ -88,6 +105,52 @@
   async function pickDownloads() {
     const d = await open({ directory: true, multiple: false, title: 'Save downloads in' })
     if (typeof d === 'string') settings.downloadFolder = d
+  }
+
+  // ---- storage: the library's own data apart from what streaming leaves behind (lib.rs storage_usage) ----
+  type Usage = { libraryArt: number; lyrics: number; streaming: number; tools: number; dictionary: number }
+  let usage = $state<Usage | null>(null)
+  const refreshUsage = () => invoke<Usage>('storage_usage').then((u) => (usage = u), () => (usage = null))
+  $effect(() => {
+    if (shown('general')) refreshUsage()
+  })
+  async function clearStreaming() {
+    await invoke('clear_streaming_cache')
+    forgetCovers()
+    refreshUsage()
+  }
+  async function clearLyrics() {
+    await invoke('clear_lyrics_cache')
+    refreshUsage()
+  }
+
+  // ---- updates (update.svelte.ts) ----
+  let version = $state('')
+  getVersion().then((v) => (version = v), () => {})
+  const ago = (t: number) => {
+    const m = Math.round((Date.now() - t) / 60_000)
+    return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : new Date(t).toLocaleDateString()
+  }
+  const updateStatus = $derived(
+    !update.ready ? 'This build can’t update itself: new versions are on the Releases page.'
+    : update.installing ? (update.progress ? `Downloading… ${mb(update.progress[0])}${update.progress[1] ? ` of ${mb(update.progress[1])}` : ''}` : 'Starting the download…')
+    : update.error ? update.error
+    : update.found ? `Qistara ${update.found.version} is available.`
+    : update.checking ? 'Checking…'
+    : update.checked ? `Up to date · checked ${ago(update.checked)}`
+    : 'Not checked yet',
+  )
+
+  // ---- Japanese dictionary (optional download, japanese.rs) ----
+  let dict = $state<{ installed: boolean; bytes: number } | null>(null)
+  const refreshDict = () => invoke<{ installed: boolean; bytes: number }>('japanese_status').then((d) => (dict = d), () => (dict = null))
+  $effect(() => {
+    learn.dict
+    if (shown('lyrics')) refreshDict()
+  })
+  async function removeDict() {
+    await invoke('japanese_remove').catch((e) => (learn.error = String(e)))
+    refreshDict()
   }
 
   // ---- Last.fm ----
@@ -169,6 +232,38 @@
         <Toggle bind:checked={settings.downloadToLibrary} label="Add downloads to the library" hint="New downloads appear with the rest of your music." />
       </div>
     </section>
+
+    <section>
+      <h2 class="t-h2">Storage</h2>
+      <p class="t-sub">What streaming leaves behind is kept apart from your library, so it can be cleared without touching your music, playlists or settings.</p>
+      <div class="group">
+        <div class="line">
+          <span class="txt"><span>Streaming cache</span><span class="hint">Covers and lyrics from your server and YT Music{usage ? ` · ${mb(usage.streaming)}` : ''}</span></span>
+          <button class="btn press" onclick={clearStreaming}>Clear</button>
+        </div>
+        <div class="line">
+          <span class="txt"><span>Lyrics found online</span><span class="hint">For songs in your library; looked up again on the next play{usage ? ` · ${mb(usage.lyrics)}` : ''}</span></span>
+          <button class="btn press" onclick={clearLyrics}>Clear</button>
+        </div>
+        <div class="line"><span class="txt"><span>Library artwork</span><span class="hint">Rebuilt from your files when needed{usage ? ` · ${mb(usage.libraryArt)}` : ''}</span></span></div>
+        <div class="line"><span class="txt"><span>Tools and dictionary</span><span class="hint">yt-dlp, ffmpeg, Deno; the Japanese dictionary{usage ? ` · ${mb(usage.tools + usage.dictionary)}` : ''}</span></span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="t-h2">Updates</h2>
+      <div class="group">
+        <div class="line">
+          <span class="txt"><span>Qistara {version}</span><span class="hint" class:bad={!!update.error} aria-live="polite">{updateStatus}</span></span>
+          <span class="btns">
+            {#if update.found}<button class="btn primary press" disabled={update.installing} onclick={installUpdate}>Install and Restart</button>{/if}
+            <button class="btn press" disabled={!update.ready || update.checking || update.installing} onclick={() => checkUpdate()}>Check Now</button>
+          </span>
+        </div>
+        {#if update.found?.notes}<div class="notes">{update.found.notes}</div>{/if}
+        <Toggle bind:checked={settings.autoUpdate} label="Check for updates automatically" hint="Once a day, from Qistara’s releases on GitHub. Nothing is downloaded until you choose Install." />
+      </div>
+    </section>
   {/if}
 
   {#if shown('appearance')}
@@ -179,11 +274,27 @@
           <span class="shot">{@render mini(OBSIDIAN)}<span class="half">{@render mini(LIGHT)}</span></span>
           <span class="name">Automatic</span>
         </button>
-        {#each themes as [id, label, p] (id)}
+        {#each builtIn as [id, label, p] (id)}
           <button class="theme press" role="radio" aria-checked={settings.theme === id} onclick={() => (settings.theme = id)}>
             <span class="shot">{@render mini(p)}</span>
             <span class="name">{label}</span>
           </button>
+        {/each}
+        {#each FAMILIES as f (f.id)}
+          {@const cur = shown_(f)}
+          {@const on = f.variants.some((v) => v.id === settings.theme)}
+          <div class="theme fam">
+            <button class="press pick" role="radio" aria-checked={on} aria-label="{f.label} {f.variants.length > 1 ? cur.label : ''}" title={f.note} onclick={() => (settings.theme = cur.id)}>
+              <span class="shot">{@render mini(cur)}</span>
+            </button>
+            {#if f.variants.length > 1}
+              <select class="variant" value={cur.id} aria-label="{f.label} variant" onchange={(e) => (settings.theme = e.currentTarget.value)}>
+                {#each f.variants as v (v.id)}<option value={v.id}>{f.label} · {v.label}</option>{/each}
+              </select>
+            {:else}
+              <span class="name">{f.label}</span>
+            {/if}
+          </div>
         {/each}
       </div>
       <div class="group">
@@ -199,7 +310,8 @@
           </div>
         </div>
         {#if preset && settings.accent}<div class="line"><span>Accent</span><button class="btn press" onclick={() => (settings.accent = '')}>Use the Theme's Own</button></div>{/if}
-        <Toggle bind:checked={settings.matchArtwork} label="Adaptive accent" hint="Takes the accent from the cover of what's playing; grey covers keep your accent." />
+        <Toggle bind:checked={settings.adaptiveTheme} label="Adaptive theme" hint="The whole window takes on the colours of what's playing, dark or light as your theme is. With nothing playing, or a grey cover, your theme comes back." />
+        <Toggle bind:checked={settings.matchArtwork} disabled={settings.adaptiveTheme} label="Adaptive accent" hint={settings.adaptiveTheme ? 'Part of the adaptive theme while it is on.' : "Takes the accent from the cover of what's playing; grey covers keep your accent."} />
       </div>
     </section>
 
@@ -234,7 +346,7 @@
           <span>Font</span>
           <select bind:value={settings.font}>
             <option value="inter">Inter</option>
-            <option value="system">Segoe UI (Windows)</option>
+            <option value="system">{OS === 'windows' ? 'Segoe UI (Windows)' : 'System font'}</option>
           </select>
         </label>
         <label class="line">
@@ -257,7 +369,7 @@
     <section>
       <h2 class="t-h2">Window</h2>
       <div class="group">
-        <Toggle bind:checked={() => !settings.solidChrome, (v) => (settings.solidChrome = !v)} label="Blur window" hint="Lets the Windows Mica material show through the sidebar and bars." />
+        {#if OS === 'windows'}<Toggle bind:checked={() => !settings.solidChrome, (v) => (settings.solidChrome = !v)} label="Blur window" hint="Lets the Windows Mica material show through the sidebar and bars." />{/if}
         <Toggle bind:checked={settings.blurUi} label="Blur UI" hint="Frosted bars, menus and popovers. Off makes them solid." />
       </div>
     </section>
@@ -275,7 +387,7 @@
   {#if shown('playback')}
     <section>
       <h2 class="t-h2">Audio</h2>
-      <p class="t-sub">Bit-perfect mode sends every sample to your DAC untouched: WASAPI exclusive output at the file's own sample rate and bit depth, with nothing in between. Volume then controls your device directly.</p>
+      <p class="t-sub">Bit-perfect mode sends every sample to your DAC untouched: {OS === 'windows' ? 'WASAPI exclusive output' : OS === 'macos' ? 'CoreAudio hog mode' : 'ALSA straight to the device (pick a “hw:” device below)'} at the file's own sample rate and bit depth, with nothing in between. Volume then controls your device directly.</p>
       <div class="group">
         <Toggle bind:checked={settings.bitPerfect} label="Bit-Perfect mode" hint="Exclusive access to the output device. Other apps can't play sound while Qistara plays." />
         <Toggle bind:checked={settings.soundCheck} disabled={settings.bitPerfect} label="Sound Check" hint={settings.bitPerfect ? 'Changes levels, so it is off in Bit-Perfect mode.' : 'Plays songs at a similar loudness using ReplayGain tags.'} />
@@ -290,7 +402,7 @@
         <label class="line">
           <span>Audio device</span>
           <select value={mpv.device} onchange={(e) => set('audio-device', e.currentTarget.value)}>
-            {#each mpv.devices.filter((d) => d.name === 'auto' || d.name.startsWith('wasapi/')) as d (d.name)}
+            {#each mpv.devices.filter((d) => pickable(OS, d.name)) as d (d.name)}
               <option value={d.name}>{d.name === 'auto' ? 'System default' : d.description}</option>
             {/each}
           </select>
@@ -324,10 +436,35 @@
         <label class="line">
           <span>Translate to</span>
           <select bind:value={settings.lyricsLanguage}>
-            <option value="">{languageName(targetFor(navigator.language))} (Windows language)</option>
+            <option value="">{languageName(targetFor(navigator.language))} ({SYSTEM} language)</option>
             {#each LANGUAGES as [code, name] (code)}<option value={code}>{name}</option>{/each}
           </select>
         </label>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="t-h2">Qur'an</h2>
+      <div class="group">
+        <label class="line">
+          <span class="txt"><span>Language</span><span class="hint">Qur'an mode's labels, surah names (Kemenag spelling in Indonesian) and word meanings</span></span>
+          <select bind:value={settings.quranLang}>
+            <option value="auto">Automatic ({SYSTEM})</option>
+            <option value="en">English</option>
+            <option value="id">Bahasa Indonesia</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="t-h2">Learn mode</h2>
+      <div class="group">
+        <div class="line">
+          <span>Japanese dictionary <span class="t-sub">{learn.dict === 'installing' ? 'installing…' : dict?.installed ? `installed, ${mb(dict.bytes)}` : 'not installed: needed for readings and word forms'}</span></span>
+          {#if dict?.installed}<button class="btn press" onclick={removeDict}>Remove</button>
+          {:else}<button class="btn press" disabled={learn.dict === 'installing'} onclick={installDictionary}>Install (12 MB)</button>{/if}
+        </div>
       </div>
     </section>
   {/if}
@@ -337,6 +474,31 @@
   {/if}
 
   {#if shown('integrations')}
+    <section>
+      <h2 class="t-h2">Discord</h2>
+      <div class="dc-wrap">
+        <div class="dc" aria-label="How it looks on Discord">
+          <span class="dc-head">Listening to Qistara</span>
+          <div class="dc-body">
+            <Artwork art={discord.cover ?? queue.current?.art} size="76px" radius="8px" shadow={false} />
+            <div class="dc-txt">
+              <b class="ellipsis">{queue.current?.title ?? 'Song title'}</b>
+              <span class="ellipsis">{queue.current ? `by ${queue.current.artist || 'Unknown artist'}` : 'by Artist'}</span>
+              <span class="ellipsis">{queue.current?.album || 'Album'}</span>
+            </div>
+          </div>
+          <span class="dc-btn">Get Qistara</span>
+        </div>
+      </div>
+      <div class="group">
+        <Toggle bind:checked={settings.discord} disabled={!discord.ready} label="Show on Discord" hint={discord.ready ? 'Your Discord profile says what you play, while it plays. Only the title, artist, album and times go to the Discord app on this PC.' : "Discord isn't set up in this build: release builds carry Qistara's Discord application."} />
+      </div>
+      <p class="t-sub sub2">Local files</p>
+      <div class="group">
+        <Toggle bind:checked={settings.discordLocalArt} disabled={!settings.discord} label="Artwork for local files" hint="Discord can't see your files, so this looks the album up on MusicBrainz (artist and album only) and shows its Cover Art Archive picture. Off: the Qistara logo." />
+      </div>
+    </section>
+
     <section>
       <h2 class="t-h2">Last.fm</h2>
       {#if lastfm.user}
@@ -350,7 +512,7 @@
         </div>
       {:else}
         <p class="t-sub">Scrobbles each song once you've heard half of it (or 4 minutes). Uses your own free API account:
-          <button class="link" onclick={() => openUrl('https://www.last.fm/api/account/create')}>create one at last.fm/api</button>, then paste the key and shared secret. They're stored in Windows Credential Manager.</p>
+          <button class="link" onclick={() => openUrl('https://www.last.fm/api/account/create')}>create one at last.fm/api</button>, then paste the key and shared secret. They're stored in {KEY_STORE}.</p>
         <div class="keys">
           <input bind:value={key} placeholder="API key" aria-label="Last.fm API key" spellcheck="false" />
           <input bind:value={secret} type="password" placeholder="Shared secret" aria-label="Last.fm shared secret" spellcheck="false" />
@@ -391,6 +553,8 @@
   .txt { display: grid; gap: 2px; min-width: 0; }
   .hint { font-size: 12px; color: var(--text-2); }
   .btns { display: flex; gap: 8px; flex: none; }
+  .hint.bad { color: var(--signal-veil); }
+  .notes { max-height: 180px; overflow: auto; padding: 10px 14px; border-bottom: 1px solid var(--sep); font-size: 12.5px; line-height: 1.5; color: var(--text-2); white-space: pre-wrap; }
   .actions { display: flex; gap: 10px; margin-top: 12px; }
   .btn:disabled { opacity: 0.6; }
   select { max-width: 60%; padding: 4px 8px; border-radius: var(--r-sm); border: 1px solid var(--sep); background: var(--bg-2); color: var(--text); }
@@ -421,6 +585,16 @@
   [aria-checked='true'] > .p-box { box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
   .themes, .corners { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 14px 12px; margin-bottom: 14px; }
   .theme, .corner { display: grid; gap: 7px; justify-items: center; }
+  .dc-wrap { display: grid; place-items: center; padding: 18px; border-radius: var(--r-lg); border: 1px solid var(--sep); margin: 10px 0 12px; }
+  .dc { display: grid; gap: 8px; width: min(360px, 100%); padding: 12px; border-radius: 10px; background: #232428; color: #dbdee1; }
+  .dc-head { font-size: 12px; color: #b5bac1; }
+  .dc-body { display: flex; gap: 12px; align-items: center; min-width: 0; }
+  .dc-txt { display: grid; gap: 2px; min-width: 0; font-size: 12.5px; color: #b5bac1; }
+  .dc-txt b { color: #f2f3f5; font-size: 14px; }
+  .dc-btn { display: grid; place-items: center; height: 32px; border-radius: 4px; background: #4e5058; color: #fff; font-size: 13px; font-weight: 600; }
+  .pick { display: block; width: 100%; border-radius: var(--r); }
+  .variant { max-width: 100%; height: 22px; padding: 0 4px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-2); font: inherit; font-size: 12px; text-align: center; cursor: pointer; }
+  .variant:hover, .variant:focus-visible { background: var(--fill); color: var(--text); }
   .shot, .c-box {
     position: relative; display: block; width: 100%; aspect-ratio: 16 / 10; border-radius: var(--r-lg); overflow: hidden;
     box-shadow: 0 0 0 1px var(--sep); transition: box-shadow 160ms var(--ease-out);

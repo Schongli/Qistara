@@ -17,7 +17,8 @@ async function ask(t: Track, id: LyricsSource): Promise<Lyrics | null> {
   const sid = serverSongId(t.path)
   if (t.kind !== 'audio' || !t.title || (id === 'subsonic' ? !sid : !t.artist)) return null
   // a server song's address is signed afresh each session, so it is cached by its id instead
-  const key = sid ? `sub:${sid}` : t.path
+  // a listening session's song is a loopback URL with a new token each time: cache it by what it is instead
+  const key = sid ? `sub:${sid}` : t.path.startsWith('http://127.0.0.1:') ? `session:${t.artist}|${t.title}` : t.path
   const song = { title: t.title, artist: t.artist, album: t.album, duration: t.duration, id: sid }
   const text = await invoke<string>('lyrics_fetch', { source: id, key, song })
   return text.trim() ? parseLyrics('lrc', text) : null

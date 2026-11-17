@@ -112,3 +112,8 @@ img { display: block; }
 
 /* Arabic (the Qur'an view, saved Arabic words): the Qur'anic font, kept in its own direction inside other text */
 :lang(ar) { font-family: var(--font-quran); unicode-bidi: isolate; }
+
+/* the adaptive theme eases into a new cover's colours (appearance.svelte.ts adds .fade for a moment) */
+:root.fade, :root.fade * {
+  transition: background-color 600ms var(--ease-out, ease), color 600ms var(--ease-out, ease), border-color 600ms var(--ease-out, ease), fill 600ms, stroke 600ms !important;
+}

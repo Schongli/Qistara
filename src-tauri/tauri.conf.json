@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Qistara",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "identifier": "com.qistara.app",
   "build": {
     "frontendDist": "../dist",
@@ -16,8 +16,8 @@
         "title": "Qistara",
         "width": 1280,
         "height": 820,
-        "minWidth": 940,
-        "minHeight": 600,
+        "minWidth": 360,
+        "minHeight": 480,
         "resizable": true,
         "decorations": false,
         "transparent": true,
@@ -31,7 +31,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data: https://i.scdn.co https://i.ytimg.com https://*.mzstatic.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'",
+      "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data: https://i.scdn.co https://i.ytimg.com https://lh3.googleusercontent.com https://yt3.ggpht.com https://yt3.googleusercontent.com https://*.mzstatic.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'",
       "assetProtocol": {
         "enable": true,
         "scope": []
@@ -53,5 +53,17 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdDNjdGMEE1Njk0MDYyRTcKUldUbllrQnBwZkJuZkNQTHgxTTlDVFpMLzdIL05ERXllSkZVSHlTUzFJUktQVG1tbmhRbXc2QmYK",
+      "endpoints": [
+        "https://github.com/Schongli/Qistara/releases/latest/download/latest.json"
+      ],
+      "requireSignedVersion": true,
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

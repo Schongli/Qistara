@@ -35,8 +35,10 @@ export async function search(query: string) {
   return { artists: (r.artist ?? []) as SArtist[], albums: (r.album ?? []) as SAlbum[], songs: (r.song ?? []) as SSong[] }
 }
 
-// one fetch per cover per session; the bytes land in the art cache, named by their content
+// one fetch per cover per session; the bytes land in streaming/art, named by their content
 const covers = new Map<string, Promise<string | null>>()
+/** After Settings › Storage empties streaming/: fetch covers again instead of pointing at deleted files. */
+export const forgetCovers = () => covers.clear()
 export const cover = (id: string | undefined) => {
   if (!id) return Promise.resolve(null)
   if (!covers.has(id)) covers.set(id, invoke<string | null>('subsonic_cover', { id }).catch(() => null))

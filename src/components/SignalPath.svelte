@@ -3,7 +3,7 @@
   import { mpv } from '../lib/player.svelte'
   import { queue } from '../lib/queue.svelte'
   import { settings } from '../lib/settings.svelte'
-  import { bitsOf, khz } from '../lib/signal'
+  import { bitsOf, khz, outputLabel } from '../lib/signal'
   import { signal } from '../lib/signal.svelte'
   import { quality } from '../lib/format'
   import { nav } from '../lib/nav.svelte'
@@ -65,7 +65,7 @@
       <li class="arrow"><Icon name="ArrowDown" size={12} /></li>
       <li>
         <span class="k">Output</span>
-        <span class="val">WASAPI {settings.bitPerfect ? 'exclusive' : 'shared'} · {carried(mpv.audioOut?.format)}{mpv.audioOut ? ` · ${khz(mpv.audioOut.samplerate)}` : ''}</span>
+        <span class="val">{outputLabel(mpv.ao, settings.bitPerfect, mpv.device ?? '')} · {carried(mpv.audioOut?.format)}{mpv.audioOut ? ` · ${khz(mpv.audioOut.samplerate)}` : ''}</span>
       </li>
       <li class="dev t-sub ellipsis">{device}</li>
     </ol>

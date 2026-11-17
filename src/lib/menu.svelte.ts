@@ -3,6 +3,7 @@ import { albumKey, albumArtist, createPlaylist, lib, love, setPlaylistItems, typ
 import { queue } from './queue.svelte'
 import { isPinned, togglePin } from './pins.svelte'
 import { quickDownload } from './downloads.svelte'
+import { startRadio } from './ytmusic.svelte'
 
 const YT = 'ytdl://' // YouTube tracks (youtube.svelte.ts)
 
@@ -43,6 +44,10 @@ export function trackMenu(tracks: Track[], album?: Album): MenuItem[] {
       { label: "Qur'an: Choose Surah…", action: () => (ui.quranPick = t) })
   }
   const yt = tracks.filter((x) => x.path.startsWith(YT))
-  if (yt.length) items.push('sep', { label: yt.length > 1 ? `Download ${yt.length} Songs` : 'Download', action: () => quickDownload(yt.map((x) => x.path.slice(YT.length))) })
+  if (yt.length) {
+    items.push('sep')
+    if (yt.length === 1) items.push({ label: 'Start Radio', action: () => startRadio(yt[0]) })
+    items.push({ label: yt.length > 1 ? `Download ${yt.length} Songs` : 'Download', action: () => quickDownload(yt.map((x) => x.path.slice(YT.length))) })
+  }
   return items
 }

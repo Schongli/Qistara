@@ -1,4 +1,5 @@
 <script lang="ts" module>
+  import { activate } from '../lib/touch'
   type Col = 'title' | 'artist' | 'album' | 'duration' | 'addedAt'
   // kept across visits, like the rest of the view's place
   let sort = $state<{ col: Col; desc: boolean }>({ col: 'title', desc: false })
@@ -59,7 +60,7 @@
         tabindex="-1"
         aria-selected={selected === i}
         onpointerdown={() => (selected = i)}
-        ondblclick={() => queue.play(songs, i)}
+        {...activate(() => queue.play(songs, i))}
         onkeydown={(e) => e.key === 'Enter' && queue.play(songs, i)}
         oncontextmenu={(e) => openMenu(e, trackMenu([t]))}
       >
@@ -97,5 +98,11 @@
   .q { flex: none; margin-left: auto; }
   .row.sel .q { color: inherit; border-color: currentColor; }
   .artist, .album, .duration { color: var(--text-2); }
+  /* phone width: title and length only (the artist is a tap away in the song's menu) */
+  @media (max-width: 600px) {
+    h1 { margin: 0 16px 12px; }
+    .cols, .row { grid-template-columns: minmax(0, 1fr) 52px; gap: 10px; margin: 0 8px; padding: 0 8px; }
+    .col.artist, .col.album, .row .artist, .row .album { display: none; }
+  }
   .duration { font-variant-numeric: tabular-nums; }
 </style>
