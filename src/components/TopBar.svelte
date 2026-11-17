@@ -55,8 +55,8 @@
   @media (max-width: 600px) {
     .bar { grid-template-columns: auto minmax(0, 1fr); gap: 8px; padding-left: 10px; }
     .search { min-width: 0; }
-    /* Caps.svelte's buttons are 36 px wide here */
-    .bar.caps { padding-right: 114px; }
+    /* Caps.svelte's buttons are 36 px wide here, and always over this bar (the pane is a sheet below it) */
+    :global(.has-caps) .bar { padding-right: 114px; }
     .menu { display: grid; }
     kbd { display: none; }
   }

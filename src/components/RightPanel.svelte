@@ -20,7 +20,7 @@
 
 <aside class="panel" aria-label={ui.panel === 'queue' ? 'Up Next' : ui.panel === 'session' ? 'Session' : 'Lyrics'}>
   <div class="backdrop" aria-hidden="true">{#if bg}<img src={bg} alt="" />{/if}</div>
-  <header>
+  <header data-tauri-drag-region>
     <div class="tabs" role="tablist" aria-label="Pane">
       {#each tabs as [id, label] (id)}
         <button role="tab" class="tab press" class:on={ui.panel === id} aria-selected={ui.panel === id} onclick={() => (ui.panel = id)}>{label}</button>
@@ -47,12 +47,14 @@
   .backdrop { position: absolute; inset: -20%; pointer-events: none; }
   .backdrop img { width: 100%; height: 100%; object-fit: cover; filter: blur(60px) saturate(1.5) brightness(0.5); transform: scale(1.2); }
   .backdrop::after { content: ''; position: absolute; inset: 0; background: rgba(0, 0, 0, 0.28); }
-  /* the window's caption buttons sit above the right of this header */
-  header { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 8px 146px 4px 12px; }
-  :global(.os-macos) header { padding-right: 12px; }
+  header { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 4px; }
+  /* the window's caption buttons (Caps.svelte) take the top right: the tabs go on a row below them */
+  :global(.has-caps) header { padding-top: 38px; }
   @media (max-width: 600px) {
     .panel { position: fixed; z-index: 45; inset: 0 0 var(--player-h) 0; width: auto; border-left: 0; }
-    header { padding-right: 12px; }
+    /* the sheet starts below the caption buttons, so they stay in reach */
+    :global(.has-caps) .panel { top: 32px; }
+    :global(.has-caps) header { padding-top: 8px; }
   }
   .tabs { display: flex; gap: 2px; min-width: 0; }
   .tab { height: 26px; padding: 0 9px; white-space: nowrap; border-radius: 13px; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.7); }

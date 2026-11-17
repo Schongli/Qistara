@@ -186,7 +186,7 @@
   </div>
   <PlayerBar />
   <!-- over the docked pane's dark backdrop the caption glyphs turn white -->
-  <Caps light={!!ui.panel} />
+  <Caps light={!!ui.panel} overPane />
 </div>
 {#if ui.mini}{:else if video}<VideoView />{:else}<NowPlaying />{/if}
 {#if ui.editor}
