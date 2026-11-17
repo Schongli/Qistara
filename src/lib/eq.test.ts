@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { afString, FLAT, filterOf, parseApo, preampOf, response, type Band, type Eq } from './eq'
+import { afString, clampBand, FLAT, filterOf, parseApo, preampOf, response, total, type Band, type Eq } from './eq'
 
 const band = (o: Partial<Band>): Band => ({ type: 'peak', f: 1000, g: 0, q: 1, on: true, ...o })
 
@@ -48,5 +48,32 @@ Filter 3: OFF HSC Fc 10000 Hz Gain 2.0 dB Q 0.70`)!
       { type: 'highshelf', f: 10000, g: 2, q: 0.7, on: false },
     ])
     expect(parseApo('nothing here')).toBeNull()
+  })
+})
+
+describe('clamping', () => {
+  it('keeps every number in range and never lets NaN or an emptied field through', () => {
+    expect(clampBand(band({ f: 5, g: 40, q: 0 }))).toEqual(band({ f: 20, g: 24, q: 0.1 }))
+    expect(clampBand(band({ f: 30000 }), 44100).f).toBe(19845)
+    const prev = band({ f: 440, g: 3, q: 2 })
+    expect(clampBand(band({ f: null as unknown as number, g: NaN, q: Infinity }), 48000, prev)).toEqual(band({ f: 440, g: 3, q: 2 }))
+    expect(clampBand({ ...band({}), type: 'bogus' as Band['type'] }).type).toBe('peak')
+  })
+  it('never puts a bad number into the mpv filter chain', () => {
+    const eq: Eq = { enabled: true, autoPreamp: false, preamp: NaN, bands: [band({ f: null as unknown as number, g: 99, q: -1 })] }
+    const af = afString(eq)
+    expect(af).not.toMatch(/NaN|null|Infinity/)
+    expect(af).toBe('@pre:lavfi=[volume=0dB],@eq0:lavfi=[equalizer=f=1000:t=q:w=0.1:g=24]')
+  })
+  it('draws with the sample rate that plays', () => {
+    const b = band({ type: 'highshelf', f: 12000, g: 6, q: 0.7 })
+    // the same filter sounds different near Nyquist at 44.1 kHz than at 96 kHz
+    expect(Math.abs(response(b, 18000, 44100) - response(b, 18000, 96000))).toBeGreaterThan(0.2)
+    const eq: Eq = { enabled: true, autoPreamp: true, preamp: 0, bands: [b] }
+    expect(total(eq, 1000, 96000)).toBeCloseTo(response(b, 1000, 96000), 6)
+    expect(preampOf(eq, 44100)).toBeLessThanOrEqual(0)
+  })
+  it('clamps imported AutoEQ bands too', () => {
+    expect(parseApo('Filter 1: ON PK Fc 5 Hz Gain 60 dB Q 50')!.bands[0]).toEqual(band({ f: 20, g: 24, q: 18 }))
   })
 })
