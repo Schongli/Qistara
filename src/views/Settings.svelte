@@ -15,7 +15,7 @@
   import Providers from './Providers.svelte'
   import { NAV } from '../components/Sidebar.svelte'
   import { ACCENTS } from '../lib/appearance.svelte'
-  import { LIGHT, OBSIDIAN, PRESETS, presetOf, type Palette, type ThemeId } from '../lib/themes'
+  import { FAMILIES, LIGHT, OBSIDIAN, presetOf, type Family, type Palette, type ThemeId } from '../lib/themes'
   import { connect, finish, lastfm, refresh } from '../lib/lastfm.svelte'
   import { defaultFolder } from '../lib/downloads.svelte'
   import { plural } from '../lib/format'
@@ -86,7 +86,9 @@
   const preview = (hex: string) => document.documentElement.style.setProperty('--accent', hex)
   const toggleNav = (id: string) =>
     (settings.hiddenNav = settings.hiddenNav.includes(id) ? settings.hiddenNav.filter((x) => x !== id) : [...settings.hiddenNav, id])
-  const themes: [ThemeId, string, Palette][] = [['light', 'Light', LIGHT], ['dark', 'Qistara Obsidian', OBSIDIAN], ...PRESETS.map((p): [ThemeId, string, Palette] => [p.id, p.label, p])]
+  const builtIn: [ThemeId, string, Palette][] = [['light', 'Light', LIGHT], ['dark', 'Obsidian', OBSIDIAN]]
+  // a family's card shows its chosen variant, or its first one
+  const shown_ = (f: Family) => f.variants.find((v) => v.id === settings.theme) ?? f.variants[0]
 
   // ---- library and downloads ----
   export async function pickFolder() {
@@ -235,11 +237,27 @@
           <span class="shot">{@render mini(OBSIDIAN)}<span class="half">{@render mini(LIGHT)}</span></span>
           <span class="name">Automatic</span>
         </button>
-        {#each themes as [id, label, p] (id)}
+        {#each builtIn as [id, label, p] (id)}
           <button class="theme press" role="radio" aria-checked={settings.theme === id} onclick={() => (settings.theme = id)}>
             <span class="shot">{@render mini(p)}</span>
             <span class="name">{label}</span>
           </button>
+        {/each}
+        {#each FAMILIES as f (f.id)}
+          {@const cur = shown_(f)}
+          {@const on = f.variants.some((v) => v.id === settings.theme)}
+          <div class="theme fam">
+            <button class="press pick" role="radio" aria-checked={on} aria-label="{f.label} {f.variants.length > 1 ? cur.label : ''}" title={f.note} onclick={() => (settings.theme = cur.id)}>
+              <span class="shot">{@render mini(cur)}</span>
+            </button>
+            {#if f.variants.length > 1}
+              <select class="variant" value={cur.id} aria-label="{f.label} variant" onchange={(e) => (settings.theme = e.currentTarget.value)}>
+                {#each f.variants as v (v.id)}<option value={v.id}>{f.label} · {v.label}</option>{/each}
+              </select>
+            {:else}
+              <span class="name">{f.label}</span>
+            {/if}
+          </div>
         {/each}
       </div>
       <div class="group">
@@ -255,7 +273,8 @@
           </div>
         </div>
         {#if preset && settings.accent}<div class="line"><span>Accent</span><button class="btn press" onclick={() => (settings.accent = '')}>Use the Theme's Own</button></div>{/if}
-        <Toggle bind:checked={settings.matchArtwork} label="Adaptive accent" hint="Takes the accent from the cover of what's playing; grey covers keep your accent." />
+        <Toggle bind:checked={settings.adaptiveTheme} label="Adaptive theme" hint="The whole window takes on the colours of what's playing, dark or light as your theme is. With nothing playing, or a grey cover, your theme comes back." />
+        <Toggle bind:checked={settings.matchArtwork} disabled={settings.adaptiveTheme} label="Adaptive accent" hint={settings.adaptiveTheme ? 'Part of the adaptive theme while it is on.' : "Takes the accent from the cover of what's playing; grey covers keep your accent."} />
       </div>
     </section>
 
@@ -488,6 +507,9 @@
   [aria-checked='true'] > .p-box { box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
   .themes, .corners { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 14px 12px; margin-bottom: 14px; }
   .theme, .corner { display: grid; gap: 7px; justify-items: center; }
+  .pick { display: block; width: 100%; border-radius: var(--r); }
+  .variant { max-width: 100%; height: 22px; padding: 0 4px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-2); font: inherit; font-size: 12px; text-align: center; cursor: pointer; }
+  .variant:hover, .variant:focus-visible { background: var(--fill); color: var(--text); }
   .shot, .c-box {
     position: relative; display: block; width: 100%; aspect-ratio: 16 / 10; border-radius: var(--r-lg); overflow: hidden;
     box-shadow: 0 0 0 1px var(--sep); transition: box-shadow 160ms var(--ease-out);

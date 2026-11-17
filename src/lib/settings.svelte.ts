@@ -5,7 +5,7 @@ import { queue } from './queue.svelte'
 import { kvLoad, kvSet } from './persist'
 import type { AudioQ, VideoQ } from './downloads.svelte'
 import { normalizeSources } from './lyricsources'
-import type { ThemeId } from './themes'
+import { RENAMED, type ThemeId } from './themes'
 
 // lyricsLanguage '' = the Windows display language
 // quranTranslations: ids from quran.svelte.ts TRANSLATIONS, shown under each ayah
@@ -15,7 +15,8 @@ const defaults = {
   // Settings › Lyrics: where lyrics come from, in order; preferWordSync keeps asking for word timing
   lyricsSources: normalizeSources(undefined), preferWordSync: false,
   // Appearance (appearance.svelte.ts): accent '' = the default brass; zoom scales the whole UI
-  theme: 'auto' as ThemeId, accent: '', matchArtwork: false, zoom: 1,
+  // adaptiveTheme: the whole palette follows the cover of what's playing (matchArtwork: the accent only)
+  theme: 'auto' as ThemeId, accent: '', matchArtwork: false, adaptiveTheme: false, zoom: 1,
   corners: 'rounded' as 'square' | 'subtle' | 'rounded' | 'round', blurUi: true,
   iconPack: 'phosphor' as 'phosphor' | 'lucide' | 'iconoir' | 'remix' | 'solar',
   density: 'comfortable' as 'comfortable' | 'compact', solidChrome: false, font: 'inter' as 'inter' | 'system',
@@ -48,6 +49,8 @@ kvLoad<Partial<Settings> & { onlineLyrics?: boolean; downloadPreset?: string }>(
     else settings.downloadAudio = old[1] as AudioQ
   }
   delete (settings as { downloadPreset?: string }).downloadPreset
+  // 0.4 gave the themes Qistara's own names
+  settings.theme = RENAMED[settings.theme] ?? settings.theme
   state.loaded = true
 })
 
