@@ -8,7 +8,7 @@ import { lyr } from './lyrics.svelte'
 import { mpv, seek, set } from './player.svelte'
 import { queue } from './queue.svelte'
 import { settings } from './settings.svelte'
-import { targetLanguage, tr } from './translate.svelte'
+import { gtx, targetLanguage, tr } from './translate.svelte'
 import { fileTrack } from './library.svelte'
 import { toast } from './nav.svelte'
 import { kvGet, kvLoad, kvSet } from './persist'
@@ -116,8 +116,7 @@ async function lookup(q: string, sl: string): Promise<Lookup> {
   const key = `dict:${sl}:${tl}:${q}`
   const hit = await kvGet<Lookup>(key)
   if (hit) return hit
-  const raw = await invoke<string>('google_translate', { text: q, from: sl, to: tl, dictionary: true })
-  const l = parseLookup(JSON.parse(raw))
+  const l = parseLookup(await gtx(q, sl, tl, true))
   kvSet(key, l)
   return l
 }

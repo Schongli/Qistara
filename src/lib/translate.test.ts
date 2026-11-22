@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { align, batches, hash, mapBack, parseGtx, sameLanguage, targetFor, uniqueLines } from './translate'
+import { align, alignSegments, batches, busyFor, hash, mapBack, parseGtx, sameLanguage, targetFor, uniqueLines } from './translate'
 
 // trimmed from a real reply of translate.googleapis.com/translate_a/single?client=gtx&dt=t
 const reply = [
@@ -21,6 +21,25 @@ describe('translate', () => {
     expect(align(['a', 'b'], 'A\nB')).toEqual(['A', 'B'])
     expect(align(['a', 'b'], 'A\nB\n')).toEqual(['A', 'B'])
     expect(align(['a', 'b'], 'A B')).toBeNull()
+  })
+
+  it('rebuilds lines from the reply pieces even when the translation loses its newlines', () => {
+    expect(alignSegments(['Hello darkness, my old friend', 'I have come to talk again'], reply)).toEqual(['Halo kegelapan, teman lamaku', 'Saya datang untuk berbicara lagi'])
+    // two sentences on one line, and a translation that dropped the newline
+    const merged = [[['Satu. ', 'One. '], ['Dua', 'Two\n'], ['Tiga', 'Three']], null, 'en']
+    expect(alignSegments(['One. Two', 'Three'], merged)).toEqual(['Satu. Dua', 'Tiga'])
+    // a piece spanning two lines can't be split, and a short reply doesn't count
+    expect(alignSegments(['a', 'b', 'c'], [[['A B', 'a\nb\n'], ['C', 'c']]])).toBeNull()
+    expect(alignSegments(['a', 'b'], [[['A', 'a']]])).toBeNull()
+    expect(alignSegments(['a'], { error: 1 })).toBeNull()
+    // a romanisation row (no translation) is skipped
+    expect(alignSegments(['a', 'b'], [[['A\n', 'a\n'], ['B', 'b'], [null, null, 'bi']]])).toEqual(['A', 'B'])
+  })
+
+  it('reads how long Google asked to wait', () => {
+    expect(busyFor('google-busy:30')).toBe(30)
+    expect(busyFor(new Error('google-busy:5'))).toBeNull() // only Rust's plain string answer
+    expect(busyFor('network: timed out')).toBeNull()
   })
 
   it('sends each distinct line once', () => {

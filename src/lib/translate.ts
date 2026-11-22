@@ -51,6 +51,35 @@ export function parseGtx(j: unknown): { text: string; source: string } {
   return { text, source: typeof j[2] === 'string' ? j[2] : '' }
 }
 
+/**
+ * Translations per sent line, rebuilt from the reply's pieces: each piece is [translation, original], and a line ends
+ * where its original ends in a newline. This holds even when Google drops or adds newlines in the translation, so a
+ * batch needs one request. Null when the pieces don't cover exactly the sent lines.
+ */
+export function alignSegments(sent: string[], j: unknown): string[] | null {
+  if (!Array.isArray(j) || !Array.isArray(j[0])) return null
+  const out: string[] = []
+  let cur = ''
+  for (const s of j[0] as unknown[]) {
+    if (!Array.isArray(s) || typeof s[0] !== 'string' || typeof s[1] !== 'string') continue
+    cur += s[0]
+    const breaks = s[1].split('\n').length - 1
+    if (breaks > 1) return null // one piece over several lines: its translation can't be split
+    if (breaks === 1) {
+      out.push(cur.trim())
+      cur = ''
+    }
+  }
+  if (cur.trim() || out.length === sent.length - 1) out.push(cur.trim())
+  return out.length === sent.length ? out : null
+}
+
+/** Seconds to wait from Rust's busy answer ("google-busy:<seconds>"), or null for any other error. */
+export function busyFor(e: unknown): number | null {
+  const m = /^google-busy:(\d+)/.exec(String(e))
+  return m ? Number(m[1]) : null
+}
+
 /** Translations for the sent lines, in order, or null when the reply has a different number of lines. */
 export function align(sent: string[], reply: string): string[] | null {
   const out = reply.replace(/\n+$/, '').split('\n').map((s) => s.trim())

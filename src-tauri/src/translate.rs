@@ -33,7 +33,13 @@ pub fn http1_client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder().http1_only().timeout(Duration::from_secs(20)).build().map_err(|e| e.to_string())
 }
 
-/// Google's raw JSON reply; the TypeScript side parses it (translate.ts, learn).
+/// Seconds Google asks us to wait (Retry-After), between 5 s and 10 min; 30 s when it doesn't say.
+pub fn retry_after(header: Option<&str>) -> u64 {
+    header.and_then(|v| v.trim().parse::<u64>().ok()).unwrap_or(30).clamp(5, 600)
+}
+
+/// Google's raw JSON reply; the TypeScript side parses it (translate.ts, learn). When Google is busy the error is
+/// `google-busy:<seconds to wait>`, which translate.svelte.ts reads to back off.
 #[tauri::command]
 pub async fn google_translate(text: String, from: String, to: String, dictionary: bool) -> Result<String, String> {
     if !(from == "auto" || valid_lang(&from)) || !valid_lang(&to) {
@@ -51,10 +57,11 @@ pub async fn google_translate(text: String, from: String, to: String, dictionary
         .await
         .map_err(|e| format!("network: {e}"))?;
     let status = r.status().as_u16();
+    let wait = retry_after(r.headers().get("retry-after").and_then(|v| v.to_str().ok()));
     let body = r.text().await.map_err(|e| e.to_string())?;
     match status {
         200 => Ok(body),
-        429 => Err("Google Translate is busy. Try again later.".into()),
+        429 | 503 => Err(format!("google-busy:{wait}")),
         s => Err(format!("Google Translate answered {s}")),
     }
 }
@@ -71,6 +78,15 @@ mod tests {
         for bad in ["", "e", "english", "en-", "en-US-x", "en&tl=x", "../x", "zh_CN"] {
             assert!(!valid_lang(bad), "{bad}");
         }
+    }
+
+    #[test]
+    fn waits_as_long_as_google_asks_within_limits() {
+        assert_eq!(retry_after(Some("120")), 120);
+        assert_eq!(retry_after(Some("1")), 5);
+        assert_eq!(retry_after(Some("99999")), 600);
+        assert_eq!(retry_after(Some("Wed, 21 Oct 2026 07:28:00 GMT")), 30);
+        assert_eq!(retry_after(None), 30);
     }
 
     #[test]
