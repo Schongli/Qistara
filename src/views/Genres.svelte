@@ -3,6 +3,7 @@
   import Artwork from '../components/Artwork.svelte'
   import { lib } from '../lib/library.svelte'
   import { nav } from '../lib/nav.svelte'
+  import { groupMenu, openMenu } from '../lib/menu.svelte'
   import { plural } from '../lib/format'
 
   let { genre }: { genre?: string } = $props()
@@ -15,7 +16,7 @@
   <h1 class="t-title">Genres</h1>
   <div class="grid">
     {#each lib.genres as gn (gn.name)}
-      <button class="card press" onclick={() => nav.go({ name: 'genres', genre: gn.name })}>
+      <button class="card press" onclick={() => nav.go({ name: 'genres', genre: gn.name })} oncontextmenu={(e) => openMenu(e, groupMenu(gn.albums.flatMap((a) => a.tracks), () => nav.go({ name: 'genres', genre: gn.name }), gn.name))}>
         <div class="stack">
           {#each gn.albums.slice(0, 3) as a, i (a.key)}
             <span style:--i={i}><Artwork art={a.art} size="72px" radius="6px" /></span>

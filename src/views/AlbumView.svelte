@@ -31,7 +31,7 @@
       <div class="actions">
         <button class="btn primary press" onclick={() => queue.play(a.tracks)}><Icon name="Play" size={14} weight="fill" />Play</button>
         <button class="btn press" onclick={() => queue.play(a.tracks, Math.floor(Math.random() * a.tracks.length), true)}><Icon name="Shuffle" size={14} weight="bold" />Shuffle</button>
-        <button class="icon-btn press" aria-label="More for {a.title}" onclick={(e) => openMenu(e, trackMenu(a.tracks, a))}><Icon name="DotsThree" size={20} weight="bold" /></button>
+        <button class="icon-btn press" aria-label="More for {a.title}" onclick={(e) => openMenu(e, trackMenu(a.tracks, { album: a }))}><Icon name="DotsThree" size={20} weight="bold" /></button>
       </div>
     </div>
   </header>
@@ -45,12 +45,12 @@
         class:on
         role="listitem"
         {...activate(() => queue.play(a.tracks, i))}
-        oncontextmenu={(e) => openMenu(e, trackMenu([t]))}
+        oncontextmenu={(e) => openMenu(e, trackMenu([t], { from: { list: a.tracks, index: i } }))}
       >
         <span class="num">{#if on}<Playing paused={mpv.pause} />{:else}{t.track ?? ''}{/if}</span>
         <span class="ttl ellipsis">{t.title}{#if mixed && t.artist !== a.artist}<span class="t-sub"> — {t.artist}</span>{/if}</span>
         <span class="tm">{time(t.duration)}</span>
-        <button class="more icon-btn" aria-label="More for {t.title}" onclick={(e) => openMenu(e, trackMenu([t]))}><Icon name="DotsThree" size={18} weight="bold" /></button>
+        <button class="more icon-btn" aria-label="More for {t.title}" onclick={(e) => openMenu(e, trackMenu([t], { from: { list: a.tracks, index: i } }))}><Icon name="DotsThree" size={18} weight="bold" /></button>
       </div>
     {/each}
   </div>

@@ -4,6 +4,7 @@
   import AlbumGrid from './AlbumGrid.svelte'
   import { lib } from '../lib/library.svelte'
   import { nav } from '../lib/nav.svelte'
+  import { groupMenu, openMenu } from '../lib/menu.svelte'
   import { queue } from '../lib/queue.svelte'
   import { plural } from '../lib/format'
 
@@ -17,7 +18,7 @@
 <div class="split">
   <div class="list" data-scroll role="listbox" aria-label="Artists">
     {#each lib.artists as ar (ar.name)}
-      <button class="item press" class:sel={ar.name === name} role="option" aria-selected={ar.name === name} onclick={() => nav.replace({ name: 'artists', artist: ar.name })}>
+      <button class="item press" class:sel={ar.name === name} role="option" aria-selected={ar.name === name} onclick={() => nav.replace({ name: 'artists', artist: ar.name })} oncontextmenu={(e) => openMenu(e, groupMenu(ar.albums.flatMap((al) => al.tracks), () => nav.replace({ name: 'artists', artist: ar.name }), ar.name))}>
         <Artwork art={ar.art} size="32px" radius="50%" shadow={false} />
         <span class="ellipsis">{ar.name}</span>
       </button>

@@ -34,7 +34,7 @@
     <h2 class="t-h2">Songs</h2>
     <div class="songs">
       {#each r.songs.slice(0, 12) as t, i (t.id)}
-        <button class="song" {...activate(() => queue.play(r.songs, i))} oncontextmenu={(e) => openMenu(e, trackMenu([t]))}>
+        <button class="song" {...activate(() => queue.play(r.songs, i))} oncontextmenu={(e) => openMenu(e, trackMenu([t], { from: { list: r.songs, index: i } }))}>
           <Artwork art={t.art} size="40px" radius="4px" shadow={false} />
           <span class="txt"><span class="ellipsis">{t.title}</span><span class="t-sub ellipsis">{t.artist} — {t.album}</span></span>
           <span class="t-sub">{time(t.duration)}</span>

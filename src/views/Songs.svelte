@@ -62,7 +62,7 @@
         onpointerdown={() => (selected = i)}
         {...activate(() => queue.play(songs, i))}
         onkeydown={(e) => e.key === 'Enter' && queue.play(songs, i)}
-        oncontextmenu={(e) => openMenu(e, trackMenu([t]))}
+        oncontextmenu={(e) => openMenu(e, trackMenu([t], { from: { list: songs, index: i } }))}
       >
         <span class="title">
           <span class="mini"><Artwork art={t.art} size="26px" radius="3px" shadow={false} /></span>

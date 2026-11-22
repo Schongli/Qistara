@@ -103,6 +103,8 @@ export const ui = $state({
   tagEditor: null as null | Track[],
   // "Qur'an: Choose Surah…" for this track
   quranPick: null as null | Track,
+  // the Keyboard Shortcuts sheet (Ctrl+/)
+  shortcuts: false,
   toast: '',
 })
 

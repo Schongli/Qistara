@@ -4,13 +4,14 @@
   import Icon from './Icon.svelte'
   import Artwork from './Artwork.svelte'
   import type { Item } from '../lib/ytmusic.svelte'
+  import { openMenu, ytmMenu } from '../lib/menu.svelte'
 
   let { items, row = false, onopen, onplay }: { items: Item[]; row?: boolean; onopen: (i: Item) => void; onplay: (i: Item) => void } = $props()
 </script>
 
 <div class="grid" class:row data-scroll={row || undefined} role="list">
   {#each items as it (it.kind + it.id)}
-    <div class="tile" class:round={it.kind === 'artist'} role="listitem">
+    <div class="tile" class:round={it.kind === 'artist'} role="listitem" oncontextmenu={(e) => openMenu(e, ytmMenu(it, onopen))}>
       <div class="cover">
         <button class="open press" aria-label="Open {it.title}" onclick={() => onopen(it)}>
           <Artwork art={it.thumb} radius={it.kind === 'artist' ? '50%' : undefined} />
