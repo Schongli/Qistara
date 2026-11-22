@@ -32,6 +32,9 @@ const defaults = {
   downloadToLibrary: true,
   // Settings › General › Updates: look for a new version once a day (update.svelte.ts)
   autoUpdate: true,
+  // lyrics translation (translate.svelte.ts): Google, this PC (mt.svelte.ts), or Google then this PC when it's busy;
+  // translateFrom: the lyrics' language for translating on this PC ('' = recognise it)
+  translateEngine: 'auto' as 'google' | 'local' | 'auto', translateFrom: '',
 }
 type Settings = typeof defaults
 
