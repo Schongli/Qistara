@@ -128,6 +128,24 @@ fn lyrics(path: String) -> Option<lyrics::Found> {
   lyrics::local(Path::new(&path))
 }
 
+/// The playing track's lyrics for notch, a separate app that reads `<app data>/notch/now-lyrics.json`.
+/// Local only; written atomically so notch never reads half a file.
+#[tauri::command]
+fn notch_lyrics(app: AppHandle, json: String) -> Res<()> {
+  share_with_notch(&app.path().app_local_data_dir().map_err(err)?.join("notch"), &json)
+}
+
+fn share_with_notch(dir: &Path, json: &str) -> Res<()> {
+  // a whole long surah with word times is a few hundred KB
+  if json.len() > 4 << 20 {
+    return Err("lyrics for notch are too large".into());
+  }
+  std::fs::create_dir_all(dir).map_err(err)?;
+  let tmp = dir.join("now-lyrics.json.tmp");
+  std::fs::write(&tmp, json).map_err(err)?;
+  std::fs::rename(&tmp, dir.join("now-lyrics.json")).map_err(err)
+}
+
 /// One online source's lyrics for a track ("" = it has none), cached in app data, never in the music folder.
 /// Network trouble is an error and isn't cached, so the next play tries again.
 #[tauri::command]
@@ -673,7 +691,7 @@ pub fn run() {
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
-      library, add_folder, remove_folder, cover, art_color, storage_usage, clear_streaming_cache, clear_lyrics_cache, rescan, extensions, screenshot_dir, lyrics, lyrics_fetch,
+      library, add_folder, remove_folder, cover, art_color, storage_usage, clear_streaming_cache, clear_lyrics_cache, rescan, extensions, screenshot_dir, lyrics, lyrics_fetch, notch_lyrics,
       playlist_create, playlist_update, playlist_items, playlist_delete, rate, love, played, skipped, top,
       tag_write, fetch_cover, stage_image, read_text, write_playlist, kv_get, kv_set,
       lastfm_status, lastfm_set_keys, lastfm_begin, lastfm_finish, lastfm_logout, lastfm_now_playing, lastfm_scrobble, media_keys::media_track, media_keys::media_state,
@@ -706,6 +724,17 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn shares_lyrics_with_notch_in_one_piece() {
+    let d = tempfile::tempdir().unwrap();
+    let dir = d.path().join("notch");
+    share_with_notch(&dir, r#"{"v":1}"#).unwrap();
+    share_with_notch(&dir, r#"{"v":1,"lines":[]}"#).unwrap();
+    assert_eq!(std::fs::read_to_string(dir.join("now-lyrics.json")).unwrap(), r#"{"v":1,"lines":[]}"#);
+    assert!(!dir.join("now-lyrics.json.tmp").exists(), "the temp file was renamed into place");
+    assert!(share_with_notch(&dir, &"x".repeat(5 << 20)).is_err(), "too large is refused");
+  }
 
   #[test]
   fn copies_the_old_library_once_and_leaves_it_in_place() {

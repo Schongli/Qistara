@@ -76,6 +76,9 @@ Phases and status: `ROADMAP.md`.
   checked), the model's SHA-256 checked, files to the worker as raw IPC bytes; CSP adds only `'wasm-unsafe-eval'`.
 - Lyrics (`lyrics_online.rs`): each source is a fixed endpoint and gets only title/artist/album/length (a server song's
   id goes only to your own server). Results are cached per (track, source); LRCLIB keeps its old cache key.
+- notch handoff (`notch.svelte.ts` → `notch_lyrics`): lyrics go only to `<app data>/notch/now-lyrics.json`, written
+  atomically, never over the network or with a path. Its shape (`notch.ts`) is a contract with notch's reader: keep it
+  backwards compatible or bump `v`.
 - Icons go through `Icon.svelte` (Phosphor names); a new icon needs an entry in `scripts/icon-map.json`, then
   `node scripts/gen-icons.mjs`. Colours with a meaning use the signal tokens in `app.css` (`--signal-pure` = verified
   bit-perfect only); radii use `--r-*` (scaled by Settings › Corners) and blur uses `--blur`.
