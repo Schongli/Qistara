@@ -60,6 +60,7 @@
   import './lib/sleep.svelte'
   import './lib/appearance.svelte'
   import './lib/discord.svelte'
+  import './lib/notch.svelte'
   import './lib/touch'
   import './lib/session.svelte'
   import './lib/update.svelte'

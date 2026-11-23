@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **notch:** the lyrics you see (word timing and translation included), or the ayahs of a recitation with their
+  translation, are shared with notch, a separate top-of-screen app, through a local file in Qistara's data folder
+  (`notch/now-lyrics.json`). Nothing is sent anywhere.
+
 ## 0.4.1 (2026-11-23)
 
 - **Translate on this PC.** Settings › Lyrics › Translation › Translate with: Google, then this PC when Google is busy
