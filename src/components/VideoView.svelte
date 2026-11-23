@@ -10,6 +10,7 @@
   import { menu, openMenu, type MenuItem } from '../lib/menu.svelte'
   import { nudgeVolume, setVolume, volume } from '../lib/settings.svelte'
   import { time } from '../lib/format'
+  import { hasVideo, linkFor, mv, nudge, toggleVideo } from '../lib/musicvideo.svelte'
 
   const win = getCurrentWindow()
   let fullscreen = $state(false)
@@ -198,6 +199,15 @@
         <div class="vol"><Icon name="SpeakerHigh" size={16} /><Slider label="Volume" value={volume()} max={100} live wheel={5} onchange={setVolume} /></div>
       </div>
       <div class="group">
+        {#if queue.current && queue.current.id > 0 && linkFor(queue.current) && mv.showing}
+          {@const off = linkFor(queue.current)!.offset}
+          <div class="sync" role="group" aria-label="Music video sync" title="When the video has an intro, the song starts later">
+            <button class="icon-btn press" aria-label="Song earlier" onclick={() => nudge(-0.1)}>−</button>
+            <button class="val" aria-label="Reset the sync" onclick={() => nudge(null)}>Sync {off > 0 ? '+' : ''}{off.toFixed(1)} s</button>
+            <button class="icon-btn press" aria-label="Song later" onclick={() => nudge(0.1)}>+</button>
+          </div>
+        {/if}
+        {#if hasVideo(queue.current)}<button class="icon-btn press" aria-label="Hide video" title="Hide video (Ctrl+Shift+V)" onclick={() => toggleVideo()}><Icon name="FilmStrip" size={19} /></button>{/if}
         {#if mpv.chapters.length}<button class="icon-btn press" aria-label="Chapters" onclick={chapterMenu}><Icon name="ListNumbers" size={19} /></button>{/if}
         <button class="icon-btn press" aria-label="Audio track" onclick={audioMenu} disabled={audio.length < 2}><Icon name="Waveform" size={19} /></button>
         <button class="icon-btn press" class:on={subs.some((x) => x.selected)} aria-label="Subtitles" onclick={subMenu}><Icon name="Subtitles" size={19} /></button>
@@ -260,4 +270,8 @@
   dt { color: rgba(255, 255, 255, 0.55); }
   dd { margin: 0; min-width: 0; font-variant-numeric: tabular-nums; }
   @media (prefers-reduced-motion: reduce) { .idle .top, .idle .bottom { transform: none; } }
+  .sync { display: flex; align-items: center; gap: 2px; margin-right: 6px; }
+  .sync .icon-btn { font-size: 18px; font-weight: 600; }
+  .val { min-width: 96px; height: 28px; padding: 0 8px; border-radius: var(--r-sm); font-size: 12.5px; font-variant-numeric: tabular-nums; color: inherit; }
+  .val:hover { background: rgba(255, 255, 255, 0.12); }
 </style>

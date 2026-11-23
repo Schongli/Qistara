@@ -7,6 +7,8 @@ import { quickDownload } from './downloads.svelte'
 import { playItem, startRadio, type Item } from './ytmusic.svelte'
 import { evaluate, type Rules } from './smart'
 import { exportPlaylist } from './playlistio'
+import { linkFor } from './musicvideo.svelte'
+import { listenTrack, watchTrack } from './youtube.svelte'
 
 const YT = 'ytdl://' // YouTube tracks (youtube.svelte.ts)
 
@@ -69,6 +71,11 @@ export function trackMenu(tracks: Track[], { album, from, play }: { album?: Albu
     ...(play ?? playItems(tracks, from)),
     'sep',
     ...(one && yt.length ? [{ label: 'Start Radio', action: () => startRadio(t) }] : []),
+    // a YouTube song with or without its picture; a local song with a music video of its own
+    ...(one && yt.length ? [t.kind === 'video'
+      ? { label: 'Listen Without Video', action: () => playVersion(t, listenTrack(t)) }
+      : { label: 'Watch Video', action: () => playVersion(t, watchTrack(t)), keys: queue.current === t ? 'Ctrl+Shift+V' : undefined }] : []),
+    ...(local ? [{ label: linkFor(t) ? 'Music Video…' : 'Add Music Video…', action: () => (ui.musicVideo = t) }] : []),
     ...(album ? [{ label: isPinned(album.key) ? 'Unpin from Sidebar' : 'Pin to Sidebar', action: () => togglePin({ key: album.key, title: album.title, art: album.art }) }] : []),
     ...(album ? [{ label: 'Go to Artist', action: () => nav.go({ name: 'artists', artist: album.artist }) }] : []),
     ...(local ? [{ label: 'Go to Album', action: () => nav.go({ name: 'album', key: albumKey(t) }) }, { label: 'Go to Artist', action: () => nav.go({ name: 'artists', artist: albumArtist(t) }) }] : []),
@@ -81,6 +88,13 @@ export function trackMenu(tracks: Track[], { album, from, play }: { album?: Albu
     'sep',
     ...(yt.length ? [{ label: yt.length > 1 ? `Download ${yt.length} Songs` : 'Download', action: () => quickDownload(yt.map((x) => x.path.slice(YT.length))) }] : []),
   ])
+}
+
+/** Plays the other version of a song: in place when it's the one playing, else on its own. */
+function playVersion(t: Track, other: Track | null) {
+  if (!other) return
+  if (queue.current === t) void queue.swap(other)
+  else void queue.play([other])
 }
 
 /** A playlist's songs: its items, or what its rules pick from the library. */

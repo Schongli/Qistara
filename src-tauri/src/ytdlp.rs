@@ -721,6 +721,42 @@ pub async fn download_probe(app: AppHandle, url: String, cookies: Option<Cookies
     Ok(probe(&serde_json::from_slice(&o.stdout).map_err(|_| "Unexpected reply from yt-dlp.")?))
 }
 
+/// The picture a music video adds over a local song (musicvideo.svelte.ts): video only, up to 1080p, H.264 when YouTube
+/// has it (every GPU decodes it). mpv opens the address yt-dlp prints with video-add (mpv.rs).
+const MUSIC_VIDEO_FORMAT: &str = "bestvideo[height<=?1080][vcodec^=avc1]/bestvideo[height<=?1080]";
+
+/// yt-dlp's arguments for a video's stream address: fixed, with the watch page after `--`.
+pub fn video_url_args(id: &str, js: Option<String>) -> Vec<String> {
+    let mut a: Vec<String> = ["--ignore-config", "--no-cache-dir", "--no-warnings", "--no-playlist", "-g", "-f", MUSIC_VIDEO_FORMAT].map(String::from).into();
+    if let Some(js) = js {
+        a.extend(["--js-runtimes".into(), js]);
+    }
+    a.extend(["--".into(), format!("https://www.youtube.com/watch?v={id}")]);
+    a
+}
+
+/// The stream address of a YouTube video's picture, for a music video over a local song. Only an https address on
+/// YouTube's own video host is passed on.
+#[tauri::command]
+pub async fn youtube_video_url(app: AppHandle, id: String, cookies: Option<Cookies>) -> Result<String, String> {
+    if !valid_video_id(&id) {
+        return Err("Not a YouTube video.".into());
+    }
+    let exe = ytdlp(&app)?;
+    let (mut argv, copy) = cookie_args(&cookies, &streaming_dir(&app, "session")?)?;
+    argv.extend(video_url_args(&id, js_runtime(&app).ok()));
+    let o = tauri::async_runtime::spawn_blocking(move || command(&exe).args(&argv).stdin(Stdio::null()).output()).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
+    drop(copy);
+    if !o.status.success() {
+        return Err(last_error(&o.stderr, "Couldn't open that video."));
+    }
+    let url = String::from_utf8_lossy(&o.stdout).lines().next().unwrap_or_default().trim().to_string();
+    match url::Url::parse(&url) {
+        Ok(u) if u.scheme() == "https" && u.host_str().is_some_and(|h| h.ends_with(".googlevideo.com")) => Ok(url),
+        _ => Err("YouTube didn't give a video address Qistara can play.".into()),
+    }
+}
+
 fn last_error(stderr: &[u8], fallback: &str) -> String {
     let err = String::from_utf8_lossy(stderr);
     err.lines().rev().find(|l| l.starts_with("ERROR")).map_or(fallback, |l| l).trim_start_matches("ERROR:").trim().to_string()
@@ -908,6 +944,16 @@ pub fn youtube_ready(app: AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn asks_for_a_music_videos_picture_with_fixed_arguments() {
+        let a = video_url_args("dQw4w9WgXcQ", Some("deno:/x/deno".into()));
+        assert_eq!(&a[..5], ["--ignore-config", "--no-cache-dir", "--no-warnings", "--no-playlist", "-g"]);
+        assert_eq!(a[6], MUSIC_VIDEO_FORMAT);
+        assert_eq!(&a[a.len() - 2..], ["--", "https://www.youtube.com/watch?v=dQw4w9WgXcQ"]);
+        assert!(a.windows(2).any(|w| w == ["--js-runtimes", "deno:/x/deno"]));
+        assert!(!video_url_args("dQw4w9WgXcQ", None).contains(&"--js-runtimes".to_string()));
+    }
 
     #[test]
     fn fuzz_progress_lines_never_panic() {

@@ -681,7 +681,7 @@ pub fn run() {
       spotify::spotify_tracks, spotify::spotify_player, spotify::spotify_control, japanese::japanese_words, japanese::japanese_install, japanese::japanese_remove,
       translate::google_translate,
       quran::quran_fetch, quran::quran_pauses, ytdlp::tools_status, ytdlp::tool_install, ytdlp::ytdlp_update,
-      ytdlp::download_add, ytdlp::download_cancel, ytdlp::youtube_search, ytdlp::youtube_list, ytdlp::youtube_ready, ytdlp::download_probe,
+      ytdlp::download_add, ytdlp::download_cancel, ytdlp::youtube_search, ytdlp::youtube_list, ytdlp::youtube_ready, ytdlp::download_probe, ytdlp::youtube_video_url,
       session::session_host, session::session_share, session::session_state, session::session_chat, session::session_kick,
       session::session_join, session::session_leave, session_art, discord::discord_set, discord::discord_ready,
       ytmusic::ytm_home, ytmusic::ytm_search, ytmusic::ytm_album, ytmusic::ytm_artist, ytmusic::ytm_playlist, ytmusic::ytm_radio,

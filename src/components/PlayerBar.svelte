@@ -14,6 +14,7 @@
   import { albumKey, lib, love } from '../lib/library.svelte'
   import { quality, time } from '../lib/format'
   import { setVolume, volume } from '../lib/settings.svelte'
+  import { hasVideo, toggleVideo, videoShowing } from '../lib/musicvideo.svelte'
 
   const t = $derived(queue.current)
   // the library's copy: Love patches it, not the queue's
@@ -69,6 +70,9 @@
   <div class="right">
     {#if t}
       <button bind:this={badge} class="badge sig" class:pure={signal.verdict.bitPerfect} aria-label={signal.verdict.bitPerfect ? 'Signal path: bit-perfect' : 'Signal path'} aria-expanded={signalOpen} title={q?.detail} onclick={() => (signalOpen = !signalOpen)}>{q?.badge ?? (t.codec || 'Info')}</button>
+    {/if}
+    {#if hasVideo(t)}
+      <button class="icon-btn press vid" class:on={videoShowing(t)} aria-label={videoShowing(t) ? 'Hide video' : 'Show video'} aria-pressed={videoShowing(t)} title="Video (Ctrl+Shift+V)" onclick={() => toggleVideo()}><Icon name="FilmStrip" size={18} /></button>
     {/if}
     <button class="icon-btn press" class:on={ui.panel === 'lyrics'} aria-label="Lyrics" aria-pressed={ui.panel === 'lyrics'} onclick={() => toggle('lyrics')}><Icon name="Quotes" size={17} weight="fill" /></button>
     <button class="icon-btn press" class:on={ui.panel === 'queue'} aria-label="Up Next" aria-pressed={ui.panel === 'queue'} onclick={() => toggle('queue')}><Icon name="ListBullets" size={18} weight="bold" /></button>

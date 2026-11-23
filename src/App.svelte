@@ -48,6 +48,8 @@
   import { newPlaylist } from './lib/menu.svelte'
   import { setVolume, volume } from './lib/settings.svelte'
   import ShortcutsSheet from './components/ShortcutsSheet.svelte'
+  import MusicVideoSheet from './components/MusicVideoSheet.svelte'
+  import { toggleVideo } from './lib/musicvideo.svelte'
   import { openFiles } from './lib/open'
   import './lib/media.svelte'
   import './lib/settings.svelte'
@@ -116,7 +118,8 @@
     'Ctrl+L': { run: () => (queue.current && queue.current.id > 0 ? love(queue.current) : false) },
     'Ctrl+Shift+L': { run: () => panel('lyrics') },
     'Ctrl+Shift+Q': { run: () => panel('queue') },
-    Esc: { run: () => (ui.shortcuts ? (ui.shortcuts = false) : ui.nowPlaying ? (ui.nowPlaying = false) : (ui.panel = '')) },
+    'Ctrl+Shift+V': { run: () => toggleVideo() },
+    Esc: { run: () => (ui.musicVideo ? (ui.musicVideo = null) : ui.shortcuts ? (ui.shortcuts = false) : ui.nowPlaying ? (ui.nowPlaying = false) : (ui.panel = '')) },
     'Alt+Left': { run: () => nav.back() },
     'Alt+Right': { run: () => nav.forward() },
   }
@@ -218,6 +221,9 @@
 {/if}
 {#if ui.tagEditor}
   <TagEditor tracks={ui.tagEditor} onclose={() => (ui.tagEditor = null)} />
+{/if}
+{#if ui.musicVideo}
+  <MusicVideoSheet track={ui.musicVideo} onclose={() => (ui.musicVideo = null)} />
 {/if}
 {#if ui.shortcuts}
   <ShortcutsSheet onclose={() => (ui.shortcuts = false)} />
