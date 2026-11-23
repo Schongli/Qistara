@@ -84,4 +84,17 @@ at 1280 and 390 px with mocked data. Not yet checked by hand (needs real hardwar
 - [ ] A release through SignPath, and an update from 0.4.0 to the next version
 - [ ] Touch on a Windows tablet; a phone build (`tauri android init`)
 
+## Phase 7: Qistara 0.4.1
+- [x] Readable select lists in every theme; Arabic and Hebrew titles in their own reading order
+- [x] Play, Shuffle, Play Next and Play Later in every right-click menu that stands for songs; playlist menus
+- [x] Keyboard shortcuts in one table, a Ctrl+/ sheet, and new keys (shuffle, repeat, volume, seek, love, panes)
+- [x] Google Translate no longer "busy": a batch per request, paced, with back-off and retry
+- [x] Translate on this PC: Firefox's translator with Mozilla's language packs (offline, switchable)
+- [x] YouTube songs with their video; music videos over local songs (the song stays bit-perfect); both in sessions
+
+Not yet checked by hand:
+- [ ] A language pack download and an offline translation in the installed app (WebView2, CSP)
+- [ ] Watch Video and a music video over a FLAC on Windows; Sync; gapless into the next song
+- [ ] Watching together between two PCs
+
 Not planned: fake-lossless checker, native DSD/DoP (mpv converts DSD to PCM), playing or downloading DRM streams.

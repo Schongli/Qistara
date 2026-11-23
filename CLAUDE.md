@@ -36,6 +36,10 @@ Phases and status: `ROADMAP.md`.
   command, property and value: a new one must be added there, with a test. Never grant `libmpv:default` or the plugin's
   command/set_property/init; options holding a path (script-opts, ytdl-raw-options, log/resume/screenshot dirs) are set in Rust.
   The hook's script-opts keep `ytdl_hook-exclude` for `127.0.0.1` (session URLs) and its raw options `ignore-config`.
+  loadfile's per-file options are only `start=` and `ytdl-format=` + `VIDEO_FORMAT` (the same constant in mpv.rs and
+  player.svelte.ts `loadTrack`, the one way the queue loads files). `video-add` only takes a local path, https on
+  `*.googlevideo.com` or the session's `127.0.0.1:<port>`. A music video never replaces the song: the song stays the
+  main file (bit-perfect, stats, lyrics) and the video is a picture-only track (`musicvideo.svelte.ts`).
 - Tag writes: copy → write → re-read → atomic rename. Never write tags in place.
 - SQL: column names from fixed enums, values always bound.
 - No personal data in HTTP requests (User-Agent is `UA` in lib.rs / `ua.ts`: `Qistara/<version>`). Lyrics translation sends only the lyric lines;
@@ -66,6 +70,10 @@ Phases and status: `ROADMAP.md`.
 - Rename: the data folder was `com.confluenceplayer.app`, before that `com.sonora.player` (`OLD_DATA` in lib.rs, newest
   first); `migrate()` copies the newest once and never deletes it, and `keys.rs` carries "Confluence Player …" and
   "Sonora …" Credential Manager entries over (and forgets all of them on sign-out).
+- Translation: Google calls go through `gtx()` (translate.svelte.ts): one at a time, a second apart, a batch per
+  request (`alignSegments`), backing off on `google-busy:<s>`; never line-by-line bursts. Offline translation
+  (`translate_local.rs`, `mt.worker.ts`): models only from Mozilla's fixed bucket (registry `baseUrl` must match, paths
+  checked), the model's SHA-256 checked, files to the worker as raw IPC bytes; CSP adds only `'wasm-unsafe-eval'`.
 - Lyrics (`lyrics_online.rs`): each source is a fixed endpoint and gets only title/artist/album/length (a server song's
   id goes only to your own server). Results are cached per (track, source); LRCLIB keeps its old cache key.
 - Icons go through `Icon.svelte` (Phosphor names); a new icon needs an entry in `scripts/icon-map.json`, then
@@ -80,6 +88,8 @@ Phases and status: `ROADMAP.md`.
 - Theme palettes (`themes.ts`) carry Qistara's own names (upstream schemes credited in the README) and must pass
   `themes.test.ts` contrast checks; `RENAMED` maps old ids. Adaptive theme = `adaptivePalette`, tested over all hues.
 - Layout: ≤900 px icon rail, ≤600 px drawer + sheet; rows play via `activate()` (`touch.ts`), not `ondblclick`.
+- Keys live in `shortcuts.ts` (one table: App dispatches it, the Ctrl+/ sheet lists it, the user guide copies it).
+  Menus that stand for songs start with `playItems` (Play, Shuffle, Play Next, Play Later) in `menu.svelte.ts`.
   The root's `has-caps` class means Caps.svelte draws the window buttons (not macOS, not phones).
 
 ## Skills (IWNOTS map)

@@ -14,6 +14,8 @@ Built with [Tauri 2](https://tauri.app), [Svelte 5](https://svelte.dev) and [lib
   A Signal Path view shows every step from file to DAC and says when something changes the sound.
 - **Plays almost anything.** FLAC, ALAC, WAV, AIFF, APE, WavPack, DSD (as PCM), Opus, MP3, AAC and more.
   Video works like VLC: subtitles, audio tracks, chapters, speed, A-B loop, frame step, screenshots, resume.
+  YouTube songs play with their video on request, and your own songs can show a music video over them while what
+  you hear stays your lossless file.
 - **Library.** Watched folders, plus Home, Albums, Artists, Genres, Composers, Songs, Videos, History and search.
   Albums pinned to the sidebar, Lossless and Hi-Res badges, and a duplicate finder.
 - **Playback.** Gapless queue with Up Next, shuffle, repeat and Autoplay. A player bar, a lyrics and Up Next pane
@@ -21,7 +23,8 @@ Built with [Tauri 2](https://tauri.app), [Svelte 5](https://svelte.dev) and [lib
 - **Lyrics.**
   - Synced lyrics from TTML, LRC, embedded tags, your Navidrome/Subsonic server, [LRCLIB](https://lrclib.net),
     NetEase or Kugou, asked in the order you set, with word-by-word highlight (and an option to prefer word timing).
-  - Translation under each line.
+  - Translation under each line: with Google, or offline on this PC with Firefox's translator and language packs from
+    Mozilla (Google first and this PC when it's busy, by default).
   - Learn mode: tap a word for its meaning. Japanese also gets furigana, romaji and a vocabulary review.
   - Qur'an: recitations are recognised by their titles (surahs, Juz 'Amma, Hafs or Shu'bah). Uthmani text with
     word meanings, transliteration and the Kemenag, Saheeh International and Clear Quran translations, the ayah
@@ -112,7 +115,8 @@ Qistara has no account, no telemetry and no servers of its own. It only contacts
 | LRCLIB | a song has no local lyrics | title, artist, album, length |
 | NetEase Cloud Music, Kugou | you turn them on in Settings › Lyrics and a song has no lyrics higher in the list | title, artist, length |
 | MusicBrainz, Cover Art Archive | you look up tags or artwork | album and artist |
-| Google Translate | you turn on translation or Learn mode | the lyric lines, or the one word you tap |
+| Google Translate | you turn on translation or Learn mode (unless you translate on this PC only) | the lyric lines, or the one word you tap |
+| Mozilla (storage.googleapis.com) | you add a language pack for translating on this PC | nothing but the download |
 | Radio Browser | you search for stations | your search text |
 | quran.com, GitHub (fawazahmed0 quran-api) | a Qur'an recitation plays | the surah number |
 | YouTube (through yt-dlp) | you search, play or download | your search text or link; your cookies only if you sign in |
@@ -140,6 +144,8 @@ folders are left as they were, and the old app can be uninstalled.
 - Playback by [mpv](https://mpv.io) / FFmpeg.
 - Tags by [lofty](https://github.com/Serial-ATA/lofty-rs).
 - Japanese analysis by [Lindera](https://github.com/lindera/lindera) with the IPADIC dictionary.
+- Offline translation by [Bergamot](https://browser.mt) (Firefox Translations, MPL-2.0) with Mozilla's
+  [translation models](https://github.com/mozilla/translations); language detection by [franc](https://github.com/wooorm/franc).
 - Downloads and YouTube by [yt-dlp](https://github.com/yt-dlp/yt-dlp), with [Deno](https://deno.com) as its JavaScript runtime; Qur'an text from [quran.com](https://quran.com)
   and [fawazahmed0/quran-api](https://github.com/fawazahmed0/quran-api); Arabic font: [Amiri Quran](https://www.amirifont.org).
 - Icons by [Phosphor](https://phosphoricons.com) (MIT), [Lucide](https://lucide.dev) (ISC), [Iconoir](https://iconoir.com) (MIT),
