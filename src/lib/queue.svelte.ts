@@ -1,7 +1,7 @@
 // Up Next. The queue here is the truth; mpv's playlist only ever holds [current, next] so
 // track changes are gapless, and every queue edit re-syncs the "next" slot.
 import { untrack } from 'svelte'
-import { cmd, load, lock, mpv, seek, set } from './player.svelte'
+import { cmd, loadTrack, lock, mpv, seek, set } from './player.svelte'
 import { autoplayPicks, indexAfterMove, insertAfter, move, nextIndex, shuffleRest, type Repeat } from './queue'
 import { lib, type Track } from './library.svelte'
 import { kvGet, kvSet } from './persist'
@@ -48,7 +48,7 @@ class Queue {
   async follow(cur: Track, next: Track | null, at: number) {
     this.items = next ? [cur, next] : [cur]
     this.index = 0
-    await cmd('loadfile', cur.path, 'replace', -1, `start=${Math.max(0, at)}`)
+    await loadTrack(cur, 'replace', at)
     await set('pause', false)
     await this.#syncNext()
   }
@@ -190,7 +190,7 @@ class Queue {
     this.autoplay = s.autoplay ?? true
     this.#order = items.map((t) => t.id)
     await set('pause', true)
-    await cmd('loadfile', items[index].path, 'replace', -1, `start=${Math.max(0, s.time - 2)}`)
+    await loadTrack(items[index], 'replace', s.time - 2)
     await this.#syncNext()
   }
 
@@ -199,7 +199,16 @@ class Queue {
     const t = this.current
     if (!t || mpv.idle) return
     const at = mpv.time
-    await cmd('loadfile', t.path, 'replace', -1, `start=${at}`)
+    await loadTrack(t, 'replace', at)
+    await this.#syncNext()
+  }
+
+  /** Plays another version of the current song from the same moment (a YouTube song with or without its video). */
+  async swap(t: Track) {
+    if (this.#following() || this.index < 0) return
+    const at = mpv.time
+    this.items = this.items.map((x, i) => (i === this.index ? t : x))
+    await loadTrack(t, 'replace', at)
     await this.#syncNext()
   }
 
@@ -222,8 +231,12 @@ class Queue {
     await resumePoint()
     if (paused) {
       await set('pause', true)
-      await cmd('loadfile', t.path, 'replace')
-    } else await load(t.path)
+      await loadTrack(t, 'replace')
+    } else {
+      await loadTrack(t, 'replace')
+      // keep-open pauses at the end of a file, and the pause carries over to the next load
+      await set('pause', false)
+    }
     await this.#syncNext()
   }
 
@@ -261,7 +274,7 @@ class Queue {
       await set('loop-file', 'no')
       await cmd('playlist-clear')
       this.appended = this.items[this.index + 1] ?? null
-      if (this.appended) await load(this.appended.path, 'append')
+      if (this.appended) await loadTrack(this.appended, 'append')
       return
     }
     await set('loop-file', this.repeat === 'one' ? 'inf' : 'no')
@@ -276,7 +289,7 @@ class Queue {
     }
     if (n < 0 && this.autoplay && this.repeat === 'off' && t.id <= 0) this.#extend(t)
     this.appended = n >= 0 && this.repeat !== 'one' && !this.stopAfterCurrent ? this.items[n] : null
-    if (this.appended) await load(this.appended.path, 'append')
+    if (this.appended) await loadTrack(this.appended, 'append')
   }
 }
 

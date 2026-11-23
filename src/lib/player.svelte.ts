@@ -47,6 +47,7 @@ const PROPS = [
   ['audio-device-list', 'node'],
   ['audio-device', 'string'],
   ['sub-delay', 'double'],
+  ['audio-delay', 'double'],
   ['sub-scale', 'double'],
   ['ab-loop-a', 'node'],
   ['ab-loop-b', 'node'],
@@ -88,6 +89,7 @@ export const mpv = $state({
   devices: [] as MpvDevice[],
   device: 'auto',
   subDelay: 0,
+  audioDelay: 0,
   subScale: 1,
   abA: 'no' as number | string,
   abB: 'no' as number | string,
@@ -107,7 +109,7 @@ const KEY: Record<(typeof PROPS)[number][0], keyof typeof mpv> = {
   'audio-out-params': 'audioOut', 'audio-codec-name': 'codec', 'current-ao': 'ao', af: 'af', volume: 'volume',
   'ao-volume': 'aoVolume', mute: 'mute', speed: 'speed', 'track-list': 'tracks', 'chapter-list': 'chapters',
   chapter: 'chapter', 'video-params': 'video', 'hwdec-current': 'hwdec', 'audio-device-list': 'devices',
-  'audio-device': 'device', 'sub-delay': 'subDelay', 'sub-scale': 'subScale', 'ab-loop-a': 'abA',
+  'audio-device': 'device', 'sub-delay': 'subDelay', 'audio-delay': 'audioDelay', 'sub-scale': 'subScale', 'ab-loop-a': 'abA',
   'ab-loop-b': 'abB', 'container-fps': 'fps', 'video-codec': 'videoCodec', 'video-bitrate': 'videoBitrate',
   'audio-bitrate': 'audioBitrate', 'file-format': 'container', 'video-aspect-override': 'aspect', panscan: 'panscan',
   'eof-reached': 'eof',
@@ -163,6 +165,20 @@ export async function startMpv() {
     mpv.error = String(e)
     console.error('mpv start failed:', e)
   }
+}
+
+/** The one video format a YouTube video plays in, with its sound (mpv.rs VIDEO_FORMAT allows only this). */
+export const VIDEO_FORMAT = 'bestvideo[height<=?1080]+bestaudio/best[height<=?1080]'
+
+/**
+ * Loads a track with what it needs for this file only: a start time, and for a YouTube video (youtube.svelte.ts
+ * watchTrack) the video format; other YouTube tracks keep the sound-only default.
+ */
+export async function loadTrack(t: { path: string; kind: 'audio' | 'video' }, mode: 'replace' | 'append', start?: number) {
+  const opts = [start !== undefined && `start=${Math.max(0, start)}`, t.kind === 'video' && t.path.startsWith('ytdl://') && `ytdl-format=${VIDEO_FORMAT}`]
+    .filter(Boolean)
+    .join(',')
+  await (opts ? cmd('loadfile', t.path, mode, -1, opts) : cmd('loadfile', t.path, mode))
 }
 
 export async function load(path: string, mode: 'replace' | 'append' | 'append-play' = 'replace') {

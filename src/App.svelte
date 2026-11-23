@@ -40,10 +40,16 @@
   import TagEditor from './components/TagEditor.svelte'
   import { createPlaylist, updatePlaylist } from './lib/library.svelte'
   import type { Rules } from './lib/smart'
-  import { lib } from './lib/library.svelte'
+  import { lib, love } from './lib/library.svelte'
   import { nav, ui } from './lib/nav.svelte'
   import { queue } from './lib/queue.svelte'
-  import { mpv, startMpv, togglePause } from './lib/player.svelte'
+  import { mpv, seek, startMpv, togglePause } from './lib/player.svelte'
+  import { combo } from './lib/shortcuts'
+  import { newPlaylist } from './lib/menu.svelte'
+  import { setVolume, volume } from './lib/settings.svelte'
+  import ShortcutsSheet from './components/ShortcutsSheet.svelte'
+  import MusicVideoSheet from './components/MusicVideoSheet.svelte'
+  import { toggleVideo } from './lib/musicvideo.svelte'
   import { openFiles } from './lib/open'
   import './lib/media.svelte'
   import './lib/settings.svelte'
@@ -88,21 +94,42 @@
     tick().then(() => content && restore(content, to))
   })
 
+  // shortcuts.ts names every key; `any`: also while typing in a field. A handler returning false leaves the key alone
+  // (VideoView handles the arrows, Shift+arrows and Ctrl+S while a video plays).
+  const panel = (p: 'lyrics' | 'queue') => (ui.panel = ui.panel === p ? '' : p)
+  const KEYS: Record<string, { any?: boolean; run: () => unknown }> = {
+    'Ctrl+F': { any: true, run: () => (nav.route.name === 'settings' ? ui.settingsSearch++ : ui.search++) },
+    'Ctrl+O': { any: true, run: openFiles },
+    'Ctrl+N': { any: true, run: newPlaylist },
+    'Ctrl+,': { any: true, run: () => nav.root({ name: 'settings' }) },
+    'Ctrl+/': { any: true, run: () => (ui.shortcuts = !ui.shortcuts) },
+    'Ctrl+Shift+M': { any: true, run: () => (ui.mini ? exitMini() : enterMini()) },
+    'Ctrl+I': { any: true, run: () => (queue.current && queue.current.id > 0 && !video ? (ui.tagEditor = [queue.current]) : false) },
+    '?': { run: () => (ui.shortcuts = true) },
+    Space: { run: () => queue.current && togglePause() },
+    'Ctrl+Right': { run: () => queue.next() },
+    'Ctrl+Left': { run: () => queue.prev() },
+    'Shift+Right': { run: () => (video || !queue.current ? false : seek(mpv.time + 5)) },
+    'Shift+Left': { run: () => (video || !queue.current ? false : seek(Math.max(0, mpv.time - 5))) },
+    'Ctrl+Up': { run: () => setVolume(Math.min(100, volume() + 5)) },
+    'Ctrl+Down': { run: () => setVolume(Math.max(0, volume() - 5)) },
+    'Ctrl+S': { run: () => (video ? false : queue.toggleShuffle()) },
+    'Ctrl+R': { run: () => queue.cycleRepeat() },
+    'Ctrl+L': { run: () => (queue.current && queue.current.id > 0 ? love(queue.current) : false) },
+    'Ctrl+Shift+L': { run: () => panel('lyrics') },
+    'Ctrl+Shift+Q': { run: () => panel('queue') },
+    'Ctrl+Shift+V': { run: () => toggleVideo() },
+    Esc: { run: () => (ui.musicVideo ? (ui.musicVideo = null) : ui.shortcuts ? (ui.shortcuts = false) : ui.nowPlaying ? (ui.nowPlaying = false) : (ui.panel = '')) },
+    'Alt+Left': { run: () => nav.back() },
+    'Alt+Right': { run: () => nav.forward() },
+  }
+
   function keys(e: KeyboardEvent) {
+    const k = KEYS[combo(e)]
     // sliders keep arrows for themselves, but Space still plays/pauses
     const typing = (e.target as HTMLElement).closest('input, select, textarea')
-    if (e.ctrlKey && e.key === 'f') return e.preventDefault(), nav.route.name === 'settings' ? ui.settingsSearch++ : ui.search++
-    if (e.ctrlKey && e.key === 'o') return e.preventDefault(), openFiles()
-    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'm') return e.preventDefault(), ui.mini ? exitMini() : enterMini()
-    if (e.ctrlKey && e.key === 'i' && queue.current && queue.current.id > 0 && !video) return e.preventDefault(), (ui.tagEditor = [queue.current])
-    if (typing) return
-    if (e.key === ' ') {
-      e.preventDefault()
-      if (queue.current) togglePause()
-    } else if (e.ctrlKey && e.key === 'ArrowRight') queue.next()
-    else if (e.ctrlKey && e.key === 'ArrowLeft') queue.prev()
-    else if (e.key === 'Escape') ui.nowPlaying ? (ui.nowPlaying = false) : (ui.panel = '')
-    else if (e.altKey && e.key === 'ArrowLeft') nav.back()
+    if (!k || (typing && !k.any)) return
+    if (k.run() !== false) e.preventDefault()
   }
   // a destination chosen from the drawer closes it
   $effect(() => {
@@ -194,6 +221,12 @@
 {/if}
 {#if ui.tagEditor}
   <TagEditor tracks={ui.tagEditor} onclose={() => (ui.tagEditor = null)} />
+{/if}
+{#if ui.musicVideo}
+  <MusicVideoSheet track={ui.musicVideo} onclose={() => (ui.musicVideo = null)} />
+{/if}
+{#if ui.shortcuts}
+  <ShortcutsSheet onclose={() => (ui.shortcuts = false)} />
 {/if}
 {#if ui.quranPick}
   <SurahPicker track={ui.quranPick} onclose={() => (ui.quranPick = null)} />

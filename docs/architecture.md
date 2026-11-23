@@ -39,7 +39,8 @@ Playback is [libmpv](https://mpv.io), and everything that touches files, the net
 | `mpv.rs` | The only way the page reaches mpv: an allowlist of commands, properties and values |
 | `lyrics.rs`, `lyrics_online.rs` | Local lyrics, online sources (LRCLIB, NetEase, Kugou) and their cache |
 | `japanese.rs` | Offline Japanese word analysis ([Lindera](https://github.com/lindera/lindera)); the IPADIC dictionary is an optional download, md5-checked and built on the PC |
-| `translate.rs`, `quran.rs` | Lyrics translation and Qur'an text, through fixed endpoints |
+| `translate.rs`, `quran.rs` | Lyrics translation (Google, paced) and Qur'an text, through fixed endpoints |
+| `translate_local.rs` | Language packs for translating on this PC: Mozilla's registry and models, SHA-256-checked; the page's `mt.worker.ts` runs them (Bergamot WebAssembly) |
 | `ytdlp.rs` | yt-dlp, ffmpeg and Deno install (checksum-verified), the JavaScript runtime check, downloads with fixed Video/Audio choices, per-run cookie copies |
 | `ytmusic.rs` | YT Music as a guest (InnerTube `WEB_REMIX`): Home, search, albums, artists, playlists, radio; ids validated, thumbnails only from Google's image hosts |
 | `session.rs` | Listen together: the host's server and the guest's loopback proxy (see below) |
@@ -62,6 +63,9 @@ Playback is [libmpv](https://mpv.io), and everything that touches files, the net
   bit-perfect.
 - **The EQ** is a chain of labelled FFmpeg biquad filters (`eq.ts`). Moving a band retunes its filter with
   `af-command`, so playback doesn't restart.
+- **Video with music.** A YouTube song can play as video (`ytdl-format` per file, `loadTrack`). A music video over a
+  local song is a picture-only track added with `video-add` (`musicvideo.svelte.ts`); the song stays the main file,
+  so the bit-perfect path, stats and lyrics are unchanged, and `audio-delay` keeps the two in step.
 - **Remote tracks** (YT Music, YouTube, your server, radio, a session) have negative ids, so they never reach play
   stats, playlists or the restored queue. YouTube plays as `ytdl://` URLs through mpv's ytdl hook and Qistara's own
   yt-dlp, which needs a JavaScript runtime: Deno from Downloads, or Node.js 20+.

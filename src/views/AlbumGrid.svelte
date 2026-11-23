@@ -13,7 +13,7 @@
 {#if title}<h1 class="t-title">{title}</h1>{/if}
 <div class="grid" class:row data-scroll={row || undefined}>
   {#each albums as a (a.key)}
-    <div class="tile" data-key={a.key} oncontextmenu={(e) => openMenu(e, trackMenu(a.tracks, a))} role="listitem">
+    <div class="tile" data-key={a.key} oncontextmenu={(e) => openMenu(e, trackMenu(a.tracks, { album: a }))} role="listitem">
       <div class="cover">
         <button class="open press" aria-label="Open {a.title}" onclick={() => nav.go({ name: 'album', key: a.key })}>
           <Artwork art={a.art} />

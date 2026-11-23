@@ -8,7 +8,9 @@ import { queue } from './queue.svelte'
 import { remoteTrack } from './radio.svelte'
 import { serverSongId } from './lyricsources'
 import { toast } from './nav.svelte'
-import { videoId, videoTrack } from './youtube.svelte'
+import { videoId, videoTrack, watchTrack } from './youtube.svelte'
+import { linkFor, mv, sessionLinks } from './musicvideo.svelte'
+import { parseVideoId } from './videolink'
 import { plan, type HostItem, type HostState } from './session'
 import type { Track } from './library.svelte'
 
@@ -48,11 +50,14 @@ const artCache = new Map<string, Promise<string | null>>()
 async function itemOf(t: Track): Promise<HostItem | null> {
   const base = { seq: seqOf(t), title: t.title, artist: t.artist, album: t.album, duration: t.duration }
   const yt = videoId(t)
-  if (yt) return { ...base, kind: 'yt', id: yt, art: t.art?.startsWith('https://') ? t.art : null }
+  if (yt) return { ...base, kind: 'yt', id: yt, video: t.kind === 'video', art: t.art?.startsWith('https://') ? t.art : null }
   if (t.id > 0) {
     if (t.art && !artCache.has(t.art)) artCache.set(t.art, invoke<string | null>('session_art', { art: t.art }).catch(() => null))
     const art = t.art ? await artCache.get(t.art)! : null
-    return { ...base, kind: 'file', art, codec: t.codec, sampleRate: t.sampleRate, bitDepth: t.bitDepth, lossless: t.lossless }
+    // a YouTube music video showing over the song goes along (one from your library stays here: it isn't shared)
+    const link = linkFor(t)
+    const shown = link?.yt && mv.on ? { mv: { yt: link.yt, offset: link.offset } } : {}
+    return { ...base, kind: 'file', art, codec: t.codec, sampleRate: t.sampleRate, bitDepth: t.bitDepth, lossless: t.lossless, ...shown }
   }
   if (/^https?:\/\//.test(t.path) && !serverSongId(t.path)) return { ...base, kind: 'url', url: t.path }
   return null
@@ -132,16 +137,24 @@ const bySeq = new Map<number, Track>()
 /** One track per host item for the whole session (stable ids keep the now-playing mark and the queue steady). */
 function trackOf(i: HostItem): Track {
   const known = bySeq.get(i.seq)
-  if (known) return known
+  if (known) return withVideo(known, i)
   const meta = { title: i.title, artist: i.artist, album: i.album, duration: i.duration, ...(i.art && { art: i.art }) }
   const t =
-    i.kind === 'yt' && i.id ? videoTrack(i.id, meta)
+    i.kind === 'yt' && i.id ? (i.video ? watchTrack(videoTrack(i.id, meta))! : videoTrack(i.id, meta))
     : i.kind === 'url' && i.url ? remoteTrack({ path: i.url, ...meta })
     : remoteTrack({
         path: `${proxy}${i.seq}`, ...meta, codec: i.codec ?? 'Stream', sampleRate: i.sampleRate ?? null,
         bitDepth: i.bitDepth ?? null, lossless: !!i.lossless,
       })
   bySeq.set(i.seq, t)
+  return withVideo(t, i)
+}
+
+/** The host's music video over a song: shown here too once the guest's own yt-dlp finds it (an id, checked). */
+function withVideo(t: Track, i: HostItem): Track {
+  const yt = i.mv && parseVideoId(i.mv.yt)
+  if (yt && Number.isFinite(i.mv!.offset)) sessionLinks.set(t.id, { yt, offset: Math.max(-30, Math.min(30, i.mv!.offset)) })
+  else sessionLinks.delete(t.id)
   return t
 }
 

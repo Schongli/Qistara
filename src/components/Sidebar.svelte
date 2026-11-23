@@ -5,9 +5,9 @@
   import Artwork from './Artwork.svelte'
   import { spotify } from '../lib/spotify.svelte'
   import { vocab } from '../lib/learn.svelte'
-  import { createPlaylist, lib } from '../lib/library.svelte'
+  import { lib } from '../lib/library.svelte'
   import { nav, ui, type Route } from '../lib/nav.svelte'
-  import { openMenu } from '../lib/menu.svelte'
+  import { newPlaylist, openMenu, playlistMenu, trackMenu } from '../lib/menu.svelte'
   import { importPlaylist } from '../lib/playlistio'
   import { openFiles } from '../lib/open'
   import { pins, togglePin } from '../lib/pins.svelte'
@@ -55,7 +55,7 @@
 
   const newMenu = (e: MouseEvent) =>
     openMenu(e, [
-      { label: 'New Playlist', action: async () => nav.root({ name: 'playlist', id: await createPlaylist('Untitled Playlist') }) },
+      { label: 'New Playlist', action: newPlaylist, keys: 'Ctrl+N' },
       { label: 'New Smart Playlist…', action: () => (ui.editor = { name: 'New Smart Playlist' }) },
       'sep',
       { label: 'Import Playlist (M3U)…', action: importPlaylist },
@@ -99,7 +99,7 @@
     </div>
     {#if !closed.Playlists}
       {#each lib.playlists as p (p.id)}
-        <button class="item press" class:sel={nav.route.name === 'playlist' && nav.route.id === p.id} onclick={() => nav.root({ name: 'playlist', id: p.id })}>
+        <button class="item press" class:sel={nav.route.name === 'playlist' && nav.route.id === p.id} onclick={() => nav.root({ name: 'playlist', id: p.id })} oncontextmenu={(e) => openMenu(e, playlistMenu(p))}>
           <span class="ic">{#if p.rules}<Icon name="Sparkle" size={16} />{:else}<Icon name="Playlist" size={17} />{/if}</span><span class="ellipsis">{p.name}</span>
         </button>
       {/each}
@@ -112,7 +112,10 @@
           class="pin press"
           class:sel={nav.route.name === 'album' && nav.route.key === p.key}
           onclick={() => nav.root({ name: 'album', key: p.key })}
-          oncontextmenu={(e) => openMenu(e, [{ label: 'Unpin from Sidebar', action: () => togglePin(p) }])}
+          oncontextmenu={(e) => {
+            const a = lib.albums.find((x) => x.key === p.key)
+            openMenu(e, a ? trackMenu(a.tracks, { album: a }) : [{ label: 'Unpin from Sidebar', action: () => togglePin(p) }])
+          }}
         >
           <Artwork art={p.art} size="34px" radius="5px" shadow={false} />
           <span class="pt"><span class="ellipsis">{p.title}</span><span class="t-sub">Album</span></span>

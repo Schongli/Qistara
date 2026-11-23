@@ -1,5 +1,7 @@
 <script lang="ts">
   import { menu } from '../lib/menu.svelte'
+  import { display } from '../lib/shortcuts'
+  import { OS } from '../lib/os'
 
   let el = $state<HTMLDivElement>()
   let pos = $state({ x: 0, y: 0 })
@@ -43,7 +45,7 @@
       {#if it === 'sep'}
         <div class="sep"></div>
       {:else}
-        <button role="menuitem" disabled={it.disabled} onclick={() => { close(); it.action() }}>{it.label}</button>
+        <button role="menuitem" disabled={it.disabled} aria-keyshortcuts={it.keys} onclick={() => { close(); it.action() }}><span>{it.label}</span>{#if it.keys}<kbd>{display(it.keys, OS === 'macos')}</kbd>{/if}</button>
       {/if}
     {/each}
   </div>
@@ -57,7 +59,9 @@
     animation: pop 140ms var(--ease-out);
   }
   @keyframes pop { from { opacity: 0; transform: scale(0.96); } }
-  button { display: block; width: 100%; text-align: left; padding: 5px 10px; border-radius: var(--r-xs); }
+  button { display: flex; justify-content: space-between; gap: 24px; width: 100%; text-align: left; padding: 5px 10px; border-radius: var(--r-xs); }
+  kbd { font: inherit; font-size: 12px; color: var(--text-3); }
+  button:hover kbd, button:focus-visible kbd { color: inherit; opacity: 0.75; }
   button:hover, button:focus-visible { background: var(--accent); color: var(--on-accent); outline: none; }
   button:disabled { color: var(--text-3); background: none; }
   .sep { height: 1px; margin: 4px 8px; background: var(--sep); }

@@ -29,6 +29,8 @@
   import { mb } from '../lib/format'
   import { getVersion } from '@tauri-apps/api/app'
   import { checkUpdate, installUpdate, update } from '../lib/update.svelte'
+  import { installPack, loadCatalog, mt, removePack } from '../lib/mt.svelte'
+  import { mozCode, pairName } from '../lib/mt'
 
   let { tab = 'general' }: { tab?: string } = $props()
 
@@ -108,7 +110,7 @@
   }
 
   // ---- storage: the library's own data apart from what streaming leaves behind (lib.rs storage_usage) ----
-  type Usage = { libraryArt: number; lyrics: number; streaming: number; tools: number; dictionary: number }
+  type Usage = { libraryArt: number; lyrics: number; streaming: number; tools: number; dictionary: number; languagePacks: number }
   let usage = $state<Usage | null>(null)
   const refreshUsage = () => invoke<Usage>('storage_usage').then((u) => (usage = u), () => (usage = null))
   $effect(() => {
@@ -140,6 +142,15 @@
     : update.checked ? `Up to date · checked ${ago(update.checked)}`
     : 'Not checked yet',
   )
+
+  // ---- language packs for translating on this PC (mt.svelte.ts) ----
+  let packPick = $state('')
+  async function addPack() {
+    const [from, to] = packPick.split('-')
+    packPick = ''
+    await installPack({ from, to }).catch(() => {})
+    refreshUsage()
+  }
 
   // ---- Japanese dictionary (optional download, japanese.rs) ----
   let dict = $state<{ installed: boolean; bytes: number } | null>(null)
@@ -246,7 +257,7 @@
           <button class="btn press" onclick={clearLyrics}>Clear</button>
         </div>
         <div class="line"><span class="txt"><span>Library artwork</span><span class="hint">Rebuilt from your files when needed{usage ? ` · ${mb(usage.libraryArt)}` : ''}</span></span></div>
-        <div class="line"><span class="txt"><span>Tools and dictionary</span><span class="hint">yt-dlp, ffmpeg, Deno; the Japanese dictionary{usage ? ` · ${mb(usage.tools + usage.dictionary)}` : ''}</span></span></div>
+        <div class="line"><span class="txt"><span>Tools, dictionary and language packs</span><span class="hint">yt-dlp, ffmpeg, Deno; the Japanese dictionary; translation packs{usage ? ` · ${mb(usage.tools + usage.dictionary + usage.languagePacks)}` : ''}</span></span></div>
       </div>
     </section>
 
@@ -432,7 +443,7 @@
     <section>
       <h2 class="t-h2">Translation</h2>
       <div class="group">
-        <Toggle bind:checked={settings.translateLyrics} label="Translate lyrics" hint="Shows a translation under each line. Only the lyric lines are sent to Google Translate; translations are cached." />
+        <Toggle bind:checked={settings.translateLyrics} label="Translate lyrics" hint="Shows a translation under each line. Google gets only the lyric lines; on this PC nothing is sent. Translations are cached." />
         <label class="line">
           <span>Translate to</span>
           <select bind:value={settings.lyricsLanguage}>
@@ -440,7 +451,54 @@
             {#each LANGUAGES as [code, name] (code)}<option value={code}>{name}</option>{/each}
           </select>
         </label>
+        <label class="line">
+          <span class="txt"><span>Translate with</span><span class="hint">On this PC uses language packs from Mozilla (Firefox's translator), downloaded once.</span></span>
+          <select bind:value={settings.translateEngine}>
+            <option value="auto">Google, then this PC when Google is busy</option>
+            <option value="google">Google Translate (online)</option>
+            <option value="local">This PC only (offline)</option>
+          </select>
+        </label>
+        {#if settings.translateEngine !== 'google'}
+          <label class="line">
+            <span class="txt"><span>Lyrics are in</span><span class="hint">For translating on this PC; Qistara recognises it by itself.</span></span>
+            <select bind:value={settings.translateFrom}>
+              <option value="">Recognise automatically</option>
+              {#each LANGUAGES as [code, name] (code)}<option value={mozCode(code)}>{name}</option>{/each}
+            </select>
+          </label>
+        {/if}
       </div>
+      {#if settings.translateEngine !== 'google'}
+        <h3 class="sub">Language packs</h3>
+        <div class="group">
+          {#each mt.installed as p (p.from + p.to)}
+            <div class="line">
+              <span class="txt"><span>{pairName(p)}</span><span class="hint">{mb(p.bytes)}</span></span>
+              <button class="btn press" onclick={() => removePack(p)}>Remove</button>
+            </div>
+          {:else}
+            <p class="line hint">None yet. Lyrics that need one offer it, or add one here.</p>
+          {/each}
+          <div class="line">
+            {#if mt.installing}
+              <span class="txt"><span>Downloading {mt.installing}…</span><span class="hint">{Math.round(mt.progress * 100)}%</span></span>
+            {:else if mt.catalog}
+              <select bind:value={packPick} aria-label="Language pack to add">
+                <option value="">Add a language pack…</option>
+                {#each mt.catalog.filter((c) => !mt.installed.some((i) => i.from === c.from && i.to === c.to)) as c (c.from + c.to)}
+                  <option value="{c.from}-{c.to}">{pairName(c)} · {mb(c.bytes)}</option>
+                {/each}
+              </select>
+              <button class="btn primary press" disabled={!packPick} onclick={addPack}>Download</button>
+            {:else}
+              <span class="txt"><span>Add a language pack</span><span class="hint">Lists what Mozilla offers: about 100 pairs, each to or from English.</span></span>
+              <button class="btn press" onclick={() => loadCatalog().catch((e) => (mt.error = String(e)))}>Show Packs</button>
+            {/if}
+          </div>
+          {#if mt.error}<p class="line hint bad">{mt.error}</p>{/if}
+        </div>
+      {/if}
     </section>
 
     <section>
@@ -554,6 +612,8 @@
   .hint { font-size: 12px; color: var(--text-2); }
   .btns { display: flex; gap: 8px; flex: none; }
   .hint.bad { color: var(--signal-veil); }
+  h3.sub { margin: 16px 0 8px; font-size: 12px; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-2); }
+  p.line { margin: 0; }
   .notes { max-height: 180px; overflow: auto; padding: 10px 14px; border-bottom: 1px solid var(--sep); font-size: 12.5px; line-height: 1.5; color: var(--text-2); white-space: pre-wrap; }
   .actions { display: flex; gap: 10px; margin-top: 12px; }
   .btn:disabled { opacity: 0.6; }

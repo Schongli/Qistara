@@ -122,6 +122,8 @@ const PROPS: &[(&str, Kind)] = &[
     ("panscan", Num), ("audio-device", Device), ("af", Af), ("audio-exclusive", Flag),
     ("replaygain", One(&["no", "track", "album"])), ("audio-spdif", One(&["", "ac3,eac3,dts,dts-hd,truehd"])),
     ("hwdec", One(&["auto-safe", "no"])),
+    // a music video over a local song (musicvideo.svelte.ts): its sync, and hiding it again
+    ("audio-delay", Num), ("vid", Track),
     // start options (startMpv)
     ("ao", Ao), ("vo", One(&["gpu-next"])), ("target-colorspace-hint", Flag),
     ("video-sync", One(&["audio"])), ("idle", Flag), ("force-window", Flag), ("keep-open", Flag),
@@ -188,6 +190,36 @@ pub fn local_on(os: Os, p: &str) -> bool {
 }
 
 
+/// The one video format the page may ask the ytdl hook for (youtube.svelte.ts watchTrack): up to 1080p with its audio.
+pub const VIDEO_FORMAT: &str = "bestvideo[height<=?1080]+bestaudio/best[height<=?1080]";
+
+/// loadfile's per-file options: a start time and the video format, each at most once; nothing else.
+fn file_options(s: &str) -> bool {
+    let (mut start, mut format) = (false, false);
+    s.split(',').all(|o| match o.split_once('=') {
+        Some(("start", v)) if !start && num(v) => {
+            start = true;
+            true
+        }
+        Some(("ytdl-format", v)) if !format && v == VIDEO_FORMAT => {
+            format = true;
+            true
+        }
+        _ => false,
+    })
+}
+
+/// What `video-add` may open over a song: a video file, YouTube's own video host (musicvideo.svelte.ts gets the URL
+/// from yt-dlp), or a listening session's loopback proxy.
+fn video_source(os: Os, s: &str) -> bool {
+    local_on(os, s)
+        || url::Url::parse(s).is_ok_and(|u| match u.scheme() {
+            "https" => u.host_str().is_some_and(|h| h.ends_with(".googlevideo.com")),
+            "http" => u.host_str() == Some("127.0.0.1") && u.port().is_some(),
+            _ => false,
+        })
+}
+
 /// A local file, a stream or a ytdl:// web page: never mpv's other protocols (av://, lavf://, edl://, fd://…).
 fn media(os: Os, p: &str) -> bool {
     let l = p.to_ascii_lowercase();
@@ -228,8 +260,9 @@ pub fn check_command_on(os: Os, name: &str, args: &[Value]) -> Result<(), String
     let ok = match (name, a.as_slice()) {
         ("set", [p, _]) => return check_prop_on(os, p, &args[1]),
         ("loadfile", [p] | [p, "replace" | "append" | "append-play"]) => media(os, p),
-        // resume and reload (queue.svelte.ts): per-file options are only ever the start time
-        ("loadfile", [p, "replace", "-1", start]) => media(os, p) && start.strip_prefix("start=").is_some_and(num),
+        // resume, reload and YouTube as video (player.svelte.ts loadTrack): a start time and the video format
+        ("loadfile", [p, "replace" | "append", "-1", opts]) => media(os, p) && file_options(opts),
+        ("video-add", [src, "select"]) => video_source(os, src),
         ("seek", [t, "absolute" | "relative"]) => num(t),
         ("sub-add", [p, "select"]) => local_on(os, p),
         ("af-command", ["pre", "volume", v]) => v.strip_suffix("dB").is_some_and(num),
@@ -429,6 +462,12 @@ mod tests {
             ("loadfile", json!([r"\\nas\music\b.flac", "append"])),
             ("loadfile", json!(["ytdl://https://www.youtube.com/watch?v=dQw4w9WgXcQ", "append-play"])),
             ("loadfile", json!(["https://stream.example/radio.mp3", "replace", -1, "start=12.5"])),
+            ("loadfile", json!(["ytdl://https://www.youtube.com/watch?v=dQw4w9WgXcQ", "append", -1, format!("ytdl-format={VIDEO_FORMAT}")])),
+            ("loadfile", json!(["ytdl://https://www.youtube.com/watch?v=dQw4w9WgXcQ", "replace", -1, format!("start=61,ytdl-format={VIDEO_FORMAT}")])),
+            ("video-add", json!(["https://rr3---sn-a5mekn6s.googlevideo.com/videoplayback?expire=1&itag=137", "select"])),
+            ("video-add", json!([r"D:\Videos\Song (Official Video).mkv", "select"])),
+            ("video-add", json!(["http://127.0.0.1:52344/9f2c/7", "select"])),
+            ("set", json!(["audio-delay", "-1.3"])), ("set", json!(["vid", "no"])),
             ("seek", json!([42.1, "absolute"])), ("set", json!(["sub-margin-y", "96"])), ("set", json!(["sid", "no"])),
             ("set", json!(["aid", "2"])), ("set", json!(["chapter", "3"])), ("sub-add", json!([r"C:\subs\a.srt", "select"])),
             ("screenshot", json!(["video"])), ("cycle", json!(["audio"])), ("af-command", json!(["pre", "volume", "-3.50dB"])),
@@ -449,6 +488,13 @@ mod tests {
             ("set", json!(["input-ipc-server", r"\\.\pipe\x"])),
             ("loadfile", json!([r"C:\a.flac", "replace", -1, "script-opts=ytdl_hook-ytdl_path=calc.exe"])),
             ("loadfile", json!([r"C:\a.flac", "replace", -1, "start=1,stream-record=C:\\x.bat"])),
+            ("loadfile", json!(["ytdl://https://youtu.be/x", "replace", -1, "ytdl-format=bestvideo+bestaudio"])),
+            ("loadfile", json!(["ytdl://https://youtu.be/x", "replace", -1, "start=1,start=2"])),
+            ("loadfile", json!(["ytdl://https://youtu.be/x", "append-play", -1, "start=1"])),
+            ("video-add", json!(["https://evil.example/v.mp4", "select"])), ("video-add", json!(["https://googlevideo.com.evil.example/v", "select"])),
+            ("video-add", json!(["http://192.168.1.20:47800/x", "select"])), ("video-add", json!(["http://127.0.0.1/x", "select"])),
+            ("video-add", json!(["edl://C:\\x", "select"])), ("video-add", json!([r"\\.\pipe\x", "select"])),
+            ("video-add", json!(["https://rr3.googlevideo.com/v", "auto"])),
             ("loadfile", json!(["av://dshow:audio=Microphone", "replace"])), ("loadfile", json!([r"\\.\pipe\x", "replace"])),
             ("loadfile", json!(["ytdl://file:///C:/x", "replace"])), ("loadfile", json!(["edl://C:\\x", "replace"])),
             ("sub-add", json!(["https://evil.example/x.srt", "select"])), ("cycle", json!(["ytdl"])),

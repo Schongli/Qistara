@@ -81,6 +81,10 @@ img { display: block; }
 .t-h2 { font-size: 20px; font-weight: 650; letter-spacing: -0.016em; line-height: 1.2; }
 .t-sub { font-size: 12px; color: var(--text-2); }
 .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* titles in Arabic or Hebrew keep their own reading order; alignment still follows the layout around them */
+.ellipsis, .t-sub { unicode-bidi: plaintext; text-align: match-parent; }
+/* the open list of every <select> uses the theme's colours: transparent selects left it white on white */
+option, optgroup { background-color: var(--bg-2); color: var(--text); }
 
 /* press feedback lands on pointer-down */
 .press { transition: transform 120ms var(--ease-out), background-color 120ms; }

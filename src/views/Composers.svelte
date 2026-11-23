@@ -4,6 +4,7 @@
   import { lib } from '../lib/library.svelte'
   import { queue } from '../lib/queue.svelte'
   import { nav } from '../lib/nav.svelte'
+  import { groupMenu, openMenu } from '../lib/menu.svelte'
   import { collator, plural } from '../lib/format'
 
   let { composer }: { composer?: string } = $props()
@@ -19,7 +20,7 @@
 <div class="split">
   <div class="list" data-scroll role="listbox" aria-label="Composers">
     {#each lib.composers as x (x.name)}
-      <button class="item press" class:sel={x.name === name} role="option" aria-selected={x.name === name} onclick={() => nav.replace({ name: 'composers', composer: x.name })}>
+      <button class="item press" class:sel={x.name === name} role="option" aria-selected={x.name === name} onclick={() => nav.replace({ name: 'composers', composer: x.name })} oncontextmenu={(e) => openMenu(e, groupMenu(x.tracks, () => nav.replace({ name: 'composers', composer: x.name }), x.name))}>
         <span class="ellipsis">{x.name}</span><span class="t-sub">{x.tracks.length}</span>
       </button>
     {:else}

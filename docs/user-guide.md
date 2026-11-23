@@ -42,8 +42,11 @@ saved sign-ins. The old app's folder is left untouched, so you can uninstall the
 
 ## Playing music
 
-- **Up Next:** right-click songs for **Play Next** or **Play Later**. Open the queue with the Up Next button in the
-  player bar; drag rows to reorder.
+- **Right-click anything you can play** (a song, an album, a pinned album, a playlist, an artist, a genre, a
+  composer, a YT Music card) for **Play**, **Shuffle**, **Play Next** and **Play Later**, and what else fits it:
+  pin, go to the artist, add to a playlist, export or delete a playlist, Get Info, Music Video.
+- **Up Next:** open the queue with the Up Next button in the player bar; drag rows to reorder, right-click a row to
+  play it or take it out.
 - **Autoplay** (∞ in Up Next) keeps playing similar songs when the queue ends.
 - **Gapless:** albums play without gaps between tracks.
 - **Now Playing:** click the artwork in the player bar for full-screen Now Playing with lyrics.
@@ -117,8 +120,18 @@ with the song. Click a line to jump to it. With word-timed lyrics, each word lig
 **Prefer word-synced lyrics** keeps asking further down the list for word-timed lyrics, and falls back to line-timed
 ones. Online sources get only the title, artist, album and length, and what they find is saved on your PC.
 
-**Translation** (Settings › Lyrics › Translate lyrics) shows a translation under each line, in your Windows language
-or one you pick. Only the lyric lines are sent to Google Translate, and translations are cached.
+**Translation** (Settings › Lyrics › Translate lyrics) shows a translation under each line, in your system language
+or one you pick. Translations are cached, so a song is translated once. **Translate with** chooses how:
+
+- **Google, then this PC when Google is busy** (the default): Google Translate gets only the lyric lines. Qistara asks
+  one song at a time and waits when Google says it's busy, then tries again by itself; if you have the language pack,
+  this PC translates instead.
+- **Google Translate (online)** only.
+- **This PC only (offline):** Firefox's own translator, with language packs from Mozilla (about 15–50 MB each,
+  downloaded once and checked). About 100 pairs to and from English, Indonesian, Japanese, Arabic, Korean and Chinese
+  included; other pairs go through English (Japanese → Indonesian uses Japanese → English and English → Indonesian).
+  A song that needs a pack offers it above the lyrics; **Language packs** lists them with Remove. Qistara recognises the
+  lyrics' language by itself, or choose it under **Lyrics are in**. Nothing is sent anywhere.
 
 **Learn mode** (the graduation-cap button above the lyrics) turns every word into a button: tap one for its meaning.
 Japanese also gets furigana, romaji, dictionary forms and grammar notes, worked out offline with a dictionary that
@@ -137,6 +150,16 @@ including the surah names (Al-Fatihah, An-Naba', …) and the word meanings, and
 Video plays in the same window, like in VLC: subtitles, audio tracks, chapters, speed, A-B loop, frame step,
 screenshots and resume where you left off. See [Keyboard shortcuts](#keyboard-shortcuts) for the keys.
 Screenshots are saved to `Pictures\Qistara`.
+
+**YouTube with its video:** right-click a YouTube or YT Music song › **Watch Video**, or press the **Video** button in
+the player bar (Ctrl+Shift+V) while it plays: the same moment, now with the picture, up to 1080p. Press it again for
+sound only.
+
+**Music videos for your own songs:** right-click a song › **Add Music Video…**, then paste a YouTube link, choose
+**Find on YouTube**, or pick a video from your library. When the song plays, its video shows over it, without the
+video's own sound: what you hear is still your file, bit-perfect, counted in your play stats, with its lyrics. If the
+video has an intro or starts late, use **Sync** in the video's controls (in tenths of a second); Qistara remembers it.
+The **Video** button (Ctrl+Shift+V) hides or shows music videos.
 
 ## Playlists
 
@@ -228,7 +251,8 @@ Play music with friends: everyone hears the same song at the same moment, and th
    key: share the invite only with people you'd let in.
 3. **Join:** paste the invite into the Session tab and choose **Join**.
 
-What you play is what they hear: your own files too (they're read from your PC while they play, never saved on
+What you play is what they hear, and see: a YouTube song you watch plays as video for them, and a YouTube music
+video you show over a song shows for them too. Your own files play for them as well (they're read from your PC while they play, never saved on
 theirs), YT Music, YouTube and radio. Songs from your Navidrome/Subsonic server aren't shared, because their
 addresses carry your sign-in. Guests can't pause or seek while they follow you. Remove a guest (the × by their name) to
 disconnect them: the invite changes, so the old one stops working. Everything between you is encrypted.
@@ -276,28 +300,51 @@ choose **Install and Restart**. An update installs only if it carries Qistara's 
 
 ## Keyboard shortcuts
 
+Press **Ctrl+/** (or **?**) anywhere for this list in the app. On macOS, Ctrl is ⌘.
+
 | Keys | Action |
 |---|---|
 | Space | Play / pause |
-| Ctrl+→ / Ctrl+← | Next / previous song |
-| Ctrl+F | Search (on the Settings page: search settings) |
+| Ctrl+→ | Next song |
+| Ctrl+← | Previous song |
+| Shift+→ | Forward 5 seconds |
+| Shift+← | Back 5 seconds |
+| Ctrl+↑ | Volume up |
+| Ctrl+↓ | Volume down |
+| Ctrl+S | Shuffle on / off |
+| Ctrl+R | Repeat: off, all, one |
+| Ctrl+L | Love the playing song |
+| Ctrl+Shift+V | Show the playing song’s video |
+| Ctrl+F | Search (in Settings: search settings) |
+| Ctrl+N | New playlist |
 | Ctrl+O | Open files |
 | Ctrl+I | Get Info for the playing song |
+| Alt+← | Back |
+| Alt+→ | Forward |
+| Ctrl+Shift+L | Lyrics pane |
+| Ctrl+Shift+Q | Up Next pane |
 | Ctrl+Shift+M | MiniPlayer |
-| Alt+← or mouse back button | Back |
-| Esc | Close Now Playing or the side pane |
+| Ctrl+, | Settings |
+| Ctrl+/ | Keyboard shortcuts |
+| Esc | Close Now Playing, a sheet or the side pane |
 
 While a video plays:
 
 | Keys | Action |
 |---|---|
-| ← / → | Back / forward 5 s (Shift: 30 s) |
-| ↑ / ↓ | Volume |
-| F or F11 | Full screen (Esc leaves it) |
+| ← | Back 5 s (Shift: 30 s) |
+| → | Forward 5 s (Shift: 30 s) |
+| ↑ | Volume up |
+| ↓ | Volume down |
+| F | Full screen (F11 too) |
 | M | Mute |
-| V / B | Next subtitle / audio track |
-| [ / ] / = | Slower / faster / normal speed |
-| , / . | One frame back / forward |
+| V | Next subtitle |
+| B | Next audio track |
+| [ | Slower |
+| ] | Faster |
+| = | Normal speed |
+| , | One frame back |
+| . | One frame forward |
 | L | A-B loop |
 | I | File info |
 | Ctrl+S | Screenshot |
@@ -334,6 +381,10 @@ Open **Settings › System › Sound**, choose your device, open **More sound se
 tab, or in your DAC's control panel.
 
 **YouTube stopped working.** YouTube changes often. Open **Downloads › Tools** and choose **Check for Update** for yt-dlp.
+
+**"Google Translate is busy."** Qistara waits and tries again by itself. To stop depending on Google, add the language
+pack in Settings › Lyrics › Translation › Language packs: with the default setting, this PC takes over when Google is
+busy.
 
 **"YouTube needs a JavaScript runtime."** Choose **Get Deno** in Downloads › Tools, or install Node.js 20 or newer.
 

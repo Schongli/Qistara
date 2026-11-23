@@ -5,6 +5,9 @@
   import { lyr } from '../lib/lyrics.svelte'
   import { targetLanguage, tr } from '../lib/translate.svelte'
   import { card, installDictionary, learn, openWord } from '../lib/learn.svelte'
+  import { installAll, mt } from '../lib/mt.svelte'
+  import { pairName } from '../lib/mt'
+  import { mb } from '../lib/format'
   import { settings } from '../lib/settings.svelte'
   import { furigana, toHiragana } from '../lib/kana'
   import { activeLine, isGap, type Line, type Word } from '../lib/lyrics'
@@ -103,6 +106,19 @@
       {:else}
         <span>Readings and word forms for Japanese need a dictionary (a 12 MB download, built once on this PC).</span>
         <button class="get" onclick={installDictionary}>Install</button>
+      {/if}
+    </div>
+  {/if}
+  {#if tr.missing}
+    <div class="dict" role="status">
+      {#if mt.installing}
+        <span>Downloading the language pack… {Math.round(mt.progress * 100)}%</span>
+      {:else}
+        <span>
+          Translating this song on this PC needs {tr.missing.map(pairName).join(' and ')}
+          (about {mb(tr.missing.reduce((s, p) => s + p.bytes, 0))}, downloaded once from Mozilla).{#if mt.error} {mt.error}{/if}
+        </span>
+        <button class="get" onclick={() => installAll(tr.missing!).catch(() => {})}>Download</button>
       {/if}
     </div>
   {/if}

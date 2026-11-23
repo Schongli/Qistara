@@ -8,7 +8,9 @@ import { lyr } from './lyrics.svelte'
 import { mpv, seek, set } from './player.svelte'
 import { queue } from './queue.svelte'
 import { settings } from './settings.svelte'
-import { targetLanguage, tr } from './translate.svelte'
+import { gtx, targetLanguage, tr } from './translate.svelte'
+import { mozCode } from './mt'
+import { canTranslateLocally, translateLocal } from './mt.svelte'
 import { fileTrack } from './library.svelte'
 import { toast } from './nav.svelte'
 import { kvGet, kvLoad, kvSet } from './persist'
@@ -110,14 +112,31 @@ export const cardId = () => vocabId(sourceLanguage(), card.word)
 /**
  * One word's meanings; cached, so a word is looked up once per language pair. Only the word is sent.
  * The request goes out from Rust (translate.rs): Google refuses the HTTP plugin's HTTP/2 requests with 429.
+ * Translating on this PC (Settings › Lyrics › Translation, or when Google is busy) gives the word's translation only:
+ * the language packs have no dictionary entries.
  */
 async function lookup(q: string, sl: string): Promise<Lookup> {
   const tl = targetLanguage()
-  const key = `dict:${sl}:${tl}:${q}`
+  const engine = settings.translateEngine
+  const offline = () =>
+    cachedLookup(`dictl:${sl}:${tl}:${q}`, async () => {
+      if (sl === 'auto') throw new Error("Qistara couldn't tell which language this word is in.")
+      const [t] = await translateLocal([q], mozCode(sl), mozCode(tl))
+      return { translation: t, romaji: '', source: sl, senses: [] }
+    })
+  if (engine === 'local') return offline()
+  try {
+    return await cachedLookup(`dict:${sl}:${tl}:${q}`, async () => parseLookup(await gtx(q, sl, tl, true)))
+  } catch (e) {
+    if (engine === 'auto' && sl !== 'auto' && canTranslateLocally(mozCode(sl), mozCode(tl))) return offline()
+    throw e
+  }
+}
+
+async function cachedLookup(key: string, make: () => Promise<Lookup>): Promise<Lookup> {
   const hit = await kvGet<Lookup>(key)
   if (hit) return hit
-  const raw = await invoke<string>('google_translate', { text: q, from: sl, to: tl, dictionary: true })
-  const l = parseLookup(JSON.parse(raw))
+  const l = await make()
   kvSet(key, l)
   return l
 }

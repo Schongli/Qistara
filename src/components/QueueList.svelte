@@ -54,7 +54,7 @@
       ondrop={(e) => { e.preventDefault(); if (dragFrom !== null && dragFrom !== at) queue.reorder(dragFrom, at); dragFrom = over = null }}
       ondragend={() => (dragFrom = over = null)}
       {...activate(() => queue.jump(at))}
-      oncontextmenu={(e) => openMenu(e, trackMenu([t]))}
+      oncontextmenu={(e) => openMenu(e, trackMenu([t], { play: [{ label: 'Play', action: () => queue.jump(at) }, { label: 'Remove from Up Next', action: () => queue.remove(at), disabled: at === queue.index }] }))}
     >
       <span class="grip"><Icon name="DotsSixVertical" size={14} weight="bold" /></span>
       <Artwork art={t.art} size="40px" radius="4px" shadow={false} />

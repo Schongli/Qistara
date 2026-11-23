@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.1 (2026-11-23)
+
+- **Translate on this PC.** Settings › Lyrics › Translation › Translate with: Google, then this PC when Google is busy
+  (default); Google only; or this PC only. "This PC" is Firefox's own translator with Mozilla's language packs, about
+  100 pairs to and from English (Indonesian, Japanese, Arabic, Korean, Chinese, Malay…), downloaded once and checked;
+  then nothing is sent anywhere. The lyrics' language is recognised offline.
+- **Google Translate no longer "busy".** A song was sometimes sent line by line in a burst, which Google refuses.
+  Now each batch is one request, requests are spaced out, and when Google says it's busy Qistara waits and tries
+  again by itself.
+- **Watch YouTube songs with their video** (Watch Video, the Video button, Ctrl+Shift+V), and back to sound only.
+- **Music videos for your own songs:** link a YouTube video (pasted or found) or one from your library. It shows
+  over the song while you still hear your lossless file, bit-perfect, with a Sync control for intros.
+- **Watch together:** guests in a session see the YouTube video or music video the host shows.
+- **Right-click menus:** Play, Shuffle, Play Next and Play Later on albums, pinned albums, playlists, artists,
+  composers, genres, YT Music cards and songs; playlists also get Open, Export and Delete.
+- **Keyboard shortcuts:** Ctrl+/ lists them all. New: Ctrl+S shuffle, Ctrl+R repeat, Ctrl+↑/↓ volume, Shift+←/→
+  seek, Ctrl+L love, Ctrl+Shift+L / Q lyrics and Up Next, Ctrl+, settings, Ctrl+N new playlist, Alt+→ forward.
+- **Readability:** the theme variant list (and every dropdown) is readable in dark themes; Arabic and Hebrew titles
+  read in their own direction.
+- **Fixes:** hosting a listen-together session on Windows turned every guest away.
+
 ## 0.4.0 (2026-11-17)
 
 - **YT Music without an account:** Home, search by songs, albums, artists or playlists, album, artist and playlist

@@ -31,6 +31,27 @@ export function videoTrack(id: string, info: Partial<Track> & { title: string })
   return t
 }
 
+const watching = new Map<string, Track>()
+
+/** The video version of a YouTube song: the same page played with its picture (player.svelte.ts loadTrack). */
+export function watchTrack(t: Track): Track | null {
+  const id = videoId(t)
+  if (!id) return null
+  if (t.kind === 'video') return t
+  let w = watching.get(id)
+  if (!w) {
+    const { id: _, ...song } = t
+    watching.set(id, (w = remoteTrack({ ...song, kind: 'video' })))
+  }
+  return w
+}
+
+/** Back to the song, sound only. */
+export function listenTrack(t: Track): Track | null {
+  const id = videoId(t)
+  return id ? videoTrack(id, { title: t.title, artist: t.artist, duration: t.duration }) : null
+}
+
 export const ytTrack = (v: Video) => videoTrack(v.id, { title: v.title, artist: v.channel, duration: v.duration ?? 0 })
 /** The video id of a YouTube track, if it is one. */
 export const videoId = (t: Track) => t.path.match(/^ytdl:\/\/https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})$/)?.[1] ?? null

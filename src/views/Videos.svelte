@@ -15,7 +15,7 @@
 {/if}
 <div class="grid">
   {#each videos as v, i (v.id)}
-    <button class="tile press" onclick={() => queue.play(videos, i)} oncontextmenu={(e) => openMenu(e, trackMenu([v]))}>
+    <button class="tile press" onclick={() => queue.play(videos, i)} oncontextmenu={(e) => openMenu(e, trackMenu([v], { from: { list: videos, index: i } }))}>
       <div class="frame">
         <Icon name="FilmStrip" size={34} weight="light" />
         <span class="play"><Icon name="Play" size={16} weight="fill" /></span>

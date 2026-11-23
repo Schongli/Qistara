@@ -47,7 +47,7 @@
       ondrop={(e) => { e.preventDefault(); if (dragFrom !== null && dragFrom !== i) onreorder?.(dragFrom, i); dragFrom = over = null }}
       ondragend={() => (dragFrom = over = null)}
       {...activate(() => queue.play(tracks, i))}
-      oncontextmenu={(e) => openMenu(e, trackMenu([t]))}
+      oncontextmenu={(e) => openMenu(e, trackMenu([t], { from: { list: tracks, index: i } }))}
     >
       <span class="num">{#if on}<Playing paused={mpv.pause} />{:else}{counts ? i + 1 : ''}{/if}</span>
       <Artwork art={t.art} size="34px" radius="4px" shadow={false} />

@@ -9,6 +9,8 @@ export interface HostItem {
   album: string
   duration: number
   id?: string // yt: the video
+  video?: boolean // yt: played with its picture
+  mv?: { yt: string; offset: number } // file: the YouTube music video shown over it, in step
   url?: string // url: the stream
   art?: string | null // https (yt) or a small data:image/jpeg (file)
   codec?: string

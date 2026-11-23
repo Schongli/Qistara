@@ -1,7 +1,7 @@
 {
   "name": "qistara",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -28,12 +28,14 @@
     "vitest": "^5.1.0"
   },
   "dependencies": {
+    "@browsermt/bergamot-translator": "0.4.9",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource/amiri-quran": "^5.3.0",
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-dialog": "^2.8.4",
     "@tauri-apps/plugin-http": "^2.9.0",
     "@tauri-apps/plugin-opener": "^2.7.3",
+    "franc-min": "6.2.0",
     "tauri-plugin-libmpv-api": "^0.3.2"
   }
 }

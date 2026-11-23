@@ -16,6 +16,7 @@ mod subsonic;
 mod tags;
 mod tidal;
 mod translate;
+mod translate_local;
 mod update;
 mod user;
 mod ytdlp;
@@ -429,6 +430,7 @@ struct Storage {
   streaming: u64,
   tools: u64,
   dictionary: u64,
+  language_packs: u64,
 }
 
 fn dir_size(p: &Path) -> u64 {
@@ -444,6 +446,7 @@ async fn storage_usage(app: AppHandle) -> Res<Storage> {
     streaming: dir_size(&d.join("streaming")),
     tools: dir_size(&d.join("bin")),
     dictionary: dir_size(&d.join("dict")),
+    language_packs: dir_size(&d.join("translate")),
   })
   .await
   .map_err(err)
@@ -678,7 +681,7 @@ pub fn run() {
       spotify::spotify_tracks, spotify::spotify_player, spotify::spotify_control, japanese::japanese_words, japanese::japanese_install, japanese::japanese_remove,
       translate::google_translate,
       quran::quran_fetch, quran::quran_pauses, ytdlp::tools_status, ytdlp::tool_install, ytdlp::ytdlp_update,
-      ytdlp::download_add, ytdlp::download_cancel, ytdlp::youtube_search, ytdlp::youtube_list, ytdlp::youtube_ready, ytdlp::download_probe,
+      ytdlp::download_add, ytdlp::download_cancel, ytdlp::youtube_search, ytdlp::youtube_list, ytdlp::youtube_ready, ytdlp::download_probe, ytdlp::youtube_video_url,
       session::session_host, session::session_share, session::session_state, session::session_chat, session::session_kick,
       session::session_join, session::session_leave, session_art, discord::discord_set, discord::discord_ready,
       ytmusic::ytm_home, ytmusic::ytm_search, ytmusic::ytm_album, ytmusic::ytm_artist, ytmusic::ytm_playlist, ytmusic::ytm_radio,
@@ -687,7 +690,8 @@ pub fn run() {
       subsonic::subsonic_stream, subsonic::subsonic_cover, tidal::tidal_status, tidal::tidal_set_client, tidal::tidal_begin,
       tidal::tidal_logout, tidal::tidal_playlists, tidal::tidal_tracks, apple::apple_status, apple::apple_setup, apple::apple_begin,
       apple::apple_logout, apple::apple_playlists, apple::apple_tracks, mpv::mpv_init, mpv::mpv_command, mpv::mpv_set,
-      mpv::mpv_ytdl_sign_in, update::update_check, update::update_install
+      mpv::mpv_ytdl_sign_in, update::update_check, update::update_install, translate_local::mt_catalog, translate_local::mt_install,
+      translate_local::mt_status, translate_local::mt_remove, translate_local::mt_file
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application")
