@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { KEY_STORE, SYSTEM } from '../lib/os'
+  import { KEY_STORE, SHOWS_VIDEO, SYSTEM } from '../lib/os'
   import { tick } from 'svelte'
   import { open } from '@tauri-apps/plugin-dialog'
   import { invoke } from '@tauri-apps/api/core'
-  import { openUrl } from '@tauri-apps/plugin-opener'
+  import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
   import Icon from '../components/Icon.svelte'
   import { addFolder, lib, removeFolder, rescan } from '../lib/library.svelte'
   import { mpv, OS, set } from '../lib/player.svelte'
@@ -273,6 +273,10 @@
         </div>
         {#if update.found?.notes}<div class="notes">{update.found.notes}</div>{/if}
         <Toggle bind:checked={settings.autoUpdate} label="Check for updates automatically" hint="Once a day, from Qistara’s releases on GitHub. Nothing is downloaded until you choose Install." />
+        <div class="line">
+          <span class="txt"><span>Log</span><span class="hint">What went wrong, for a bug report. It stays on this computer until you send it.</span></span>
+          <button class="btn press" onclick={() => invoke<string>('log_file').then(revealItemInDir).catch(() => {})}>Show Log</button>
+        </div>
       </div>
     </section>
   {/if}
@@ -423,6 +427,7 @@
 
     <section>
       <h2 class="t-h2">Video</h2>
+      {#if !SHOWS_VIDEO}<p class="t-sub">On {SYSTEM}, videos play their sound for now: the picture comes in a later version.</p>{/if}
       <div class="group">
         <Toggle bind:checked={settings.hwdec} label="Hardware decoding" hint="Decodes on your GPU. Output is identical; turn off only if a file shows glitches." />
       </div>

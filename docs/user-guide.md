@@ -17,8 +17,19 @@
 
 ## Getting started
 
-1. Download `Qistara_x.y.z_x64-setup.exe` from [Releases](https://github.com/Schongli/Qistara/releases) and run it. Until the installer is code-signed,
-   Windows may say "Windows protected your PC": choose **More info → Run anyway**.
+1. Install Qistara from [Releases](https://github.com/Schongli/Qistara/releases):
+   - **Windows 10 or 11:** run `Qistara_x.y.z_x64-setup.exe`. Until the installer is code-signed, Windows may say
+     "Windows protected your PC": choose **More info → Run anyway**.
+   - **macOS 13 or newer, Apple Silicon (M1 and later):** open `Qistara_x.y.z_aarch64.dmg` and drag Qistara to
+     Applications. Qistara plays through mpv from [Homebrew](https://brew.sh): install Homebrew if you don't have it,
+     then run `brew install mpv` in Terminal. Qistara isn't signed by Apple yet, so the first time you open it macOS
+     says it can't check it: open **System Settings › Privacy & Security**, scroll down and choose **Open Anyway**.
+   - **Linux (x86-64):** on Ubuntu 24.04 or newer, Debian 12 or newer, Mint and similar, install the `.deb`:
+     `sudo apt install ./Qistara_x.y.z_amd64.deb` (it brings libmpv with it). Anywhere else, use the `.AppImage`:
+     install your system's libmpv first (Fedora `sudo dnf install mpv-libs`, Arch `sudo pacman -S mpv`, openSUSE
+     `sudo zypper install libmpv2`), make the file executable (`chmod +x Qistara_*.AppImage`) and run it.
+
+   If playback isn't set up, Qistara says so when it starts and shows the command to copy.
 2. On the welcome screen, choose **Add Music Folder…** and pick the folder that holds your music and videos.
    You can add more folders later in **Settings › General › Library**.
 3. Qistara scans the folder and keeps watching it, so new and changed files show up on their own.
@@ -147,7 +158,10 @@ including the surah names (Al-Fatihah, An-Naba', …) and the word meanings, and
 
 ## Video
 
-Video plays in the same window, like in VLC: subtitles, audio tracks, chapters, speed, A-B loop, frame step,
+On macOS and Linux, videos play their sound for now, and the video features below are Windows-only: showing the
+picture inside Qistara's window there comes in a later version.
+
+On Windows, video plays in the same window, like in VLC: subtitles, audio tracks, chapters, speed, A-B loop, frame step,
 screenshots and resume where you left off. See [Keyboard shortcuts](#keyboard-shortcuts) for the keys.
 Screenshots are saved to `Pictures\Qistara`.
 
@@ -297,10 +311,12 @@ the pane becomes a sheet. On a touch screen, one tap plays a song and a long pre
 **Settings › General › Updates** checks Qistara's GitHub releases once a day (turn off **Check for updates
 automatically** to stop it) and says when a new version is out, with what's new. Nothing is downloaded until you
 choose **Install and Restart**. An update installs only if it carries Qistara's release signature for that version.
+This works for the Windows installer, the macOS app, the AppImage and the `.deb` (which asks for your password).
 
 ## Keyboard shortcuts
 
-Press **Ctrl+/** (or **?**) anywhere for this list in the app. On macOS, Ctrl is ⌘.
+Press **Ctrl+/** (or **?**) anywhere for this list in the app. On macOS, Ctrl is ⌘. The video keys (Ctrl+Shift+V and
+those for while a video plays) are Windows-only for now.
 
 | Keys | Action |
 |---|---|
@@ -364,6 +380,10 @@ Everything Qistara keeps is in its app data folder: `%LOCALAPPDATA%\com.qistara.
 | `dict\` | The Japanese dictionary, if you installed it |
 | `streaming\` | Covers and lyrics for your server and YT Music, and download scratch space: Settings › General › Storage clears it |
 
+Qistara's log (what went wrong, for a bug report) is in `%LOCALAPPDATA%\com.qistara.app\logs` on Windows,
+`~/Library/Logs/com.qistara.app` on macOS and `~/.local/share/com.qistara.app/logs` on Linux: **Settings › General ›
+Updates › Show Log** opens it. It stays on your computer.
+
 Sign-ins and keys are in the OS secret store, under names starting with "Qistara".
 To start over, quit Qistara and delete that folder. Your music files are never changed, except when you save tags
 with Get Info.
@@ -396,5 +416,18 @@ guest changes it).
 prevents that. **Linux:** choose an `hw:` device in Settings › Playback › Output; `default` goes through the mixer.
 
 **Windows warns about the installer.** Until the installer is code-signed: choose **More info → Run anyway**.
+
+**"Install mpv to play music" (macOS) or "Install libmpv to play music" (Linux).** Run the command it shows (Copy, then
+paste it into Terminal), then **Restart Qistara**. On macOS that needs Homebrew first ([brew.sh](https://brew.sh)).
+
+**macOS: "Qistara can't be opened" or "Apple could not verify".** Qistara isn't signed by Apple yet. Open **System
+Settings › Privacy & Security** and choose **Open Anyway** (once). After an update macOS may ask again for access to
+your saved sign-ins in the Keychain: choose **Always Allow**.
+
+**Linux: sign-ins aren't kept.** They go to the system keyring (Secret Service): GNOME and KDE have one. On other
+desktops, install and start `gnome-keyring` or KeePassXC with Secret Service turned on.
+
+**Linux: the window stays blank.** Some graphics drivers (NVIDIA's in particular) don't work with WebKitGTK's
+renderer. Start Qistara with `WEBKIT_DISABLE_DMABUF_RENDERER=1 qistara`.
 
 Still stuck? [Open an issue](https://github.com/Schongli/Qistara/issues) and say what you did, what you expected and what happened instead.

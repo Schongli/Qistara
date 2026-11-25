@@ -326,7 +326,49 @@ pub async fn mpv_init(window: WebviewWindow, mut mpv_config: MpvConfig) -> Resul
         Err(e) => log::warn!("screenshots stay in the working folder: {e}"),
     }
     let label = window.label().to_string();
-    window.mpv().init(mpv_config, &label).map_err(|e| e.to_string())
+    // scripts/smoke.sh looks for "mpv started" to know a package finds libmpv
+    match window.mpv().init(mpv_config, &label) {
+        Ok(l) => {
+            log::info!("mpv started");
+            Ok(l)
+        }
+        Err(e) => {
+            // a missing libmpv only shows as "Failed to create mpv instance": find out why, so PlaybackSetup can say
+            // what to install (playbackhelp.ts). A missing wrapper is Qistara's own part and keeps its message.
+            let e = e.to_string();
+            let e = match libmpv_problem() {
+                Some(why) if !e.contains("libmpv-wrapper") => format!("libmpv library load failed: {why}"),
+                _ => e,
+            };
+            log::error!("mpv didn't start: {e}");
+            Err(e)
+        }
+    }
+}
+
+#[cfg(desktop)]
+/// libmpv as libmpv-wrapper looks for it: this name beside the wrapper, then by name through the system's loader.
+const LIBMPV: &str = if cfg!(windows) {
+    "libmpv-2.dll"
+} else if cfg!(target_os = "macos") {
+    "libmpv.dylib" // scripts/setup-libmpv.sh: re-exports Homebrew's libmpv
+} else {
+    "libmpv.so.2"
+};
+
+#[cfg(desktop)]
+/// Why libmpv can't be loaded, if it can't. The wrapper sits in the exe's folder or its lib/ (the plugin looks
+/// there) or, from the .deb, in /usr/lib/qistara (build.rs).
+fn libmpv_problem() -> Option<String> {
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    let beside = [dir.to_path_buf(), dir.join("lib"), dir.join("../lib/qistara")].into_iter().map(|d| d.join(LIBMPV)).find(|p| p.exists());
+    // SAFETY: only loads libmpv (its initialisers run, as when the wrapper loads it) and calls nothing in it
+    let loaded = match beside {
+        Some(p) => unsafe { libloading::Library::new(p) },
+        None => unsafe { libloading::Library::new(LIBMPV) },
+    };
+    loaded.err().map(|e| e.to_string())
 }
 
 #[cfg(desktop)]
@@ -432,6 +474,15 @@ mod tests {
         assert!(!local_on(Os::Windows, "/home/me/a.flac"));
         assert!(check_command_on(Os::Linux, "loadfile", &[json!("/home/me/a.flac"), json!("replace")]).is_ok());
         assert!(check_command_on(Os::Linux, "sub-add", &[json!("/proc/self/fd/0"), json!("select")]).is_err());
+    }
+
+    #[test]
+    fn starts_sound_only_where_video_isnt_shown() {
+        // player.svelte.ts: off Windows mpv starts with vid=no (os.ts SHOWS_VIDEO), so video files play their sound
+        for os in [Os::Mac, Os::Linux] {
+            assert!(check_prop_on(os, "vid", &json!("no")).is_ok());
+        }
+        assert!(check_prop("wid", &json!(0)).is_err(), "the window handle is the plugin's to set");
     }
 
     #[test]

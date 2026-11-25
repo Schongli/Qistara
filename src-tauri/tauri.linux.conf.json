@@ -26,7 +26,16 @@
       "deb": {
         "depends": [
           "libmpv2"
-        ]
+        ],
+        "section": "sound",
+        "files": {
+          "/usr/lib/qistara/libmpv-wrapper.so": "lib/libmpv-wrapper.so"
+        }
+      },
+      "appimage": {
+        "files": {
+          "/usr/bin/lib/libmpv-wrapper.so": "lib/libmpv-wrapper.so"
+        }
       }
     }
   }

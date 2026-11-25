@@ -52,6 +52,11 @@ Playback is [libmpv](https://mpv.io), and everything that touches files, the net
 
 ## Playback
 
+- **Where libmpv comes from.** The mpv plugin loads libmpv-wrapper, a small C library, which then loads libmpv
+  itself. Windows ships both beside the exe. On macOS and Linux the wrapper is one pinned release
+  (`scripts/setup-libmpv.sh`), and libmpv is the system's: Homebrew's on macOS, reached through a stub
+  `libmpv.dylib` beside the wrapper, and the distribution's `libmpv.so.2` on Linux (the .deb depends on it). When
+  libmpv can't be loaded, `mpv.rs` says why and the page shows how to install it (`PlaybackSetup.svelte`).
 - **The queue lives in TypeScript** (`queue.svelte.ts`). mpv's own playlist only ever holds the current and the next
   file, which gives gapless playback without mpv owning the order.
 - **State flows one way.** The page sets mpv properties through `mpv.rs` and reads state only from observed
@@ -63,6 +68,9 @@ Playback is [libmpv](https://mpv.io), and everything that touches files, the net
   bit-perfect.
 - **The EQ** is a chain of labelled FFmpeg biquad filters (`eq.ts`). Moving a band retunes its filter with
   `af-command`, so playback doesn't restart.
+- **Video in the window** is drawn by mpv under the transparent page, through the window's handle. That works on
+  Windows only: on macOS and Linux (`SHOWS_VIDEO` in `os.ts`) mpv starts with `vid=no`, video files play their
+  sound, and the video features are hidden.
 - **Video with music.** A YouTube song can play as video (`ytdl-format` per file, `loadTrack`). A music video over a
   local song is a picture-only track added with `video-add` (`musicvideo.svelte.ts`); the song stays the main file,
   so the bit-perfect path, stats and lyrics are unchanged, and `audio-delay` keeps the two in step.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { combo, display, SHORTCUTS } from './shortcuts'
+import { combo, display, SHORTCUTS, shortcutsFor } from './shortcuts'
 
 const k = (key: string, mods: Partial<Record<'ctrlKey' | 'metaKey' | 'shiftKey' | 'altKey', boolean>> = {}) =>
   ({ key, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false, ...mods })
@@ -24,6 +24,12 @@ describe('shortcuts', () => {
     const app = SHORTCUTS.filter((s) => s.group !== 'Video').map((s) => s.keys)
     expect(new Set(app).size).toBe(app.length)
     for (const s of SHORTCUTS) expect(combo(parse(s.keys)), s.keys).toBe(s.keys)
+  })
+  it('leave out the video ones where video isn’t shown in the window (macOS, Linux)', () => {
+    expect(shortcutsFor(true)).toBe(SHORTCUTS)
+    const without = shortcutsFor(false)
+    expect(without.some((s) => s.group === 'Video' || s.keys === 'Ctrl+Shift+V')).toBe(false)
+    expect(without.map((s) => s.keys)).toContain('Space')
   })
   it('read naturally on each OS', () => {
     expect(display('Ctrl+Shift+L')).toBe('Ctrl+Shift+L')

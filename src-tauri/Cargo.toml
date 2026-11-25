@@ -1,6 +1,6 @@
 [package]
 name = "qistara"
-version = "0.4.1"
+version = "0.5.0-beta.1"
 description = "Qistara: lossless music and media player"
 authors = []
 license = "MIT"
@@ -53,6 +53,8 @@ symphonia = { version = "0.5", default-features = false, features = ["aac", "ala
 # say what isn't ready yet (docs/mobile.md).
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-libmpv = "0.3.2"
+# mpv.rs libmpv_problem: why libmpv can't be loaded, which the plugin doesn't say (the same version it uses)
+libloading = "0.8.9"
 souvlaki = "0.9.3"
 # v1 picks the native store per OS: Credential Manager, macOS Keychain, Secret Service
 keyring = { version = "4.2.0", default-features = false, features = ["v1"] }

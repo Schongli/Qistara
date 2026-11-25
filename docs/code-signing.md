@@ -6,6 +6,7 @@ A release has two signatures, and they do different jobs:
 |---|---|---|---|
 | **Authenticode** (SignPath Foundation) | Windows shows "Qistara" as a verified publisher instead of "Windows protected your PC" | SignPath, on its own hardware | the installer is unsigned and SmartScreen warns |
 | **Updater** (minisign) | Settings › General › Updates installs only what you signed, for the version it says | you, as a GitHub secret | "This build can't update itself" |
+| **Apple** (Developer ID, notarized) | macOS opens Qistara without "Open Anyway" | you, as GitHub secrets ($99/year Apple account) | ad-hoc signed: users choose Open Anyway once ([below](#5-apple-signing-later-optional)) |
 
 `.github/workflows/release.yml` does both when you push a tag. Each part switches on once its secrets are in place, so
 you can release before either is set up.
@@ -113,7 +114,6 @@ The updater only accepts a file whose signature is bound to the version `latest.
 
 1. Set the same version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`, and add a
    `## X.Y.Z (date)` section to `CHANGELOG.md`. That section becomes the release notes, in the app too.
-   (0.4.0 is already set.)
 2. Merge into `main` and check that CI passes on the repository's **Actions** tab.
 3. Tag the commit and push the tag:
 
@@ -133,12 +133,21 @@ The updater only accepts a file whose signature is bound to the version `latest.
    git push origin v0.4.0
    ```
 
-4. **Actions › Release** builds the installer and checks the tag matches `tauri.conf.json`. It then:
-   - has SignPath sign the installer, when set up (approve the request in SignPath while it waits)
-   - signs the final file for the updater
-   - publishes the release with `latest.json`
+4. **Actions › Release** checks the tag matches `tauri.conf.json`, then builds three things side by side:
+   - **Windows:** the installer; SignPath signs it, when set up (approve the request in SignPath while it waits)
+   - **macOS (Apple Silicon):** the `.dmg`, and `Qistara.app.tar.gz`, which is what the updater installs
+   - **Linux:** the `.deb` and the `.AppImage`
+
+   Each is signed for the updater. The macOS and Linux packages are then started on a clean machine
+   (`scripts/smoke.sh`), and must find mpv. Only when everything has passed does it publish one release with
+   `latest.json`.
 
 Copies of a version update themselves from the next release on: 0.4.0 offers 0.4.1 when it's out.
+
+**A test release (beta)** for people trying macOS or Linux first: give it a version like `0.5.0-beta.1` (in the
+same three files) and tag `v0.5.0-beta.1`. The workflow then skips Windows and publishes a GitHub **pre-release**.
+The app only reads the latest full release, so nobody is offered a beta as an update. Its release notes come from the
+`## 0.5.0` section of the changelog.
 
 ## 4. SignPath Foundation (once; their review takes a while)
 
@@ -169,6 +178,24 @@ current rules before applying.
 The signing step runs only when `SIGNPATH_ORGANIZATION_ID` is set. It signs the installer. The `Qistara.exe` inside it
 isn't Authenticode-signed yet: that would take a `bundle.windows.signCommand` that sends each file to SignPath during
 the build.
+
+## 5. Apple signing (later, optional)
+
+Without it, the macOS app is ad-hoc signed: it runs, but macOS asks people to choose **Open Anyway** once. To remove
+that, you need an [Apple Developer](https://developer.apple.com/programs/) account ($99/year). Then:
+
+1. In Xcode or on developer.apple.com, create a **Developer ID Application** certificate and export it as a `.p12`
+   with a password.
+2. Create an app-specific password for your Apple ID at [account.apple.com](https://account.apple.com).
+3. Add GitHub secrets: `APPLE_CERTIFICATE` (the `.p12`, base64), `APPLE_CERTIFICATE_PASSWORD`,
+   `APPLE_SIGNING_IDENTITY` (`Developer ID Application: Your Name (TEAMID)`), `APPLE_ID`, `APPLE_PASSWORD` (the
+   app-specific one) and `APPLE_TEAM_ID`.
+4. Ask for the release workflow to be switched over. That means:
+   - passing those secrets to the macOS build, which then signs and notarizes;
+   - dropping `signingIdentity: "-"` in `tauri.macos.conf.json`;
+   - turning the hardened runtime back on, with the `com.apple.security.cs.disable-library-validation` entitlement:
+     Qistara loads Homebrew's libmpv, which Apple didn't sign;
+   - signing `src-tauri/lib/*.dylib` with the same identity before the build.
 
 ## Code signing policy
 

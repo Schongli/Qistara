@@ -62,26 +62,107 @@ jobs:
       - run: cargo clippy --all-targets --manifest-path src-tauri/Cargo.toml -- -D warnings
 
   bundle:
-    name: Windows installer
+    name: Package (${{ matrix.name }})
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     needs: [web, rust]
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Windows, os: windows-latest }
+          - { name: macOS, os: macos-latest }
+          # the oldest glibc the AppImage and .deb should run on (2.35); the smoke test runs them on 24.04
+          - { name: Linux, os: ubuntu-22.04 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libdbus-1-dev build-essential pkg-config file librsvg2-dev
+      # Homebrew's mpv: the re-export stub links against it, and the smoke test plays through it
+      - name: mpv (macOS)
+        if: runner.os == 'macOS'
+        run: brew install mpv
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx tauri-plugin-libmpv-api setup-lib
+      - name: libmpv (Windows)
+        if: runner.os == 'Windows'
+        run: npx tauri-plugin-libmpv-api setup-lib
+      - name: libmpv-wrapper (macOS, Linux)
+        if: runner.os != 'Windows'
+        run: bash scripts/setup-libmpv.sh
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-      # unsigned test build; release.yml signs releases
+      # unsigned test builds; release.yml signs releases
       - run: npm run tauri build
+      - name: The app is signed (ad-hoc) and the stub points at Homebrew's mpv
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          app=src-tauri/target/release/bundle/macos/Qistara.app
+          codesign --verify --deep --strict --verbose=2 "$app"
+          ls -l "$app/Contents/MacOS/lib"
+          otool -L "$app/Contents/MacOS/lib/libmpv.dylib"
+      - name: The app starts and finds mpv (macOS)
+        if: runner.os == 'macOS'
+        run: bash scripts/smoke.sh src-tauri/target/release/bundle/macos/Qistara.app/Contents/MacOS/qistara
+      - name: The wrapper is where the plugin and the loader look (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          deb=$(ls src-tauri/target/release/bundle/deb/*.deb)
+          dpkg -c "$deb" | grep -E 'usr/(bin/qistara|lib/qistara/libmpv-wrapper\.so)$'
+          dpkg -f "$deb" Depends | grep -q libmpv2
+          readelf -d src-tauri/target/release/qistara | grep -E 'RUNPATH.*lib/qistara'
       - uses: actions/upload-artifact@v4
         with:
-          name: qistara-windows-nsis
-          path: src-tauri/target/release/bundle/nsis/*.exe
+          name: qistara-${{ matrix.name }}
           if-no-files-found: error
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            smoke.png
+
+  linux-smoke:
+    name: Linux packages start (Ubuntu 24.04)
+    needs: bundle
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: qistara-Linux
+          path: pkg
+      # the artifact keeps the bundle's folders (src-tauri/target/release/bundle/…), so look the packages up
+      - name: Install the .deb (it brings libmpv2)
+        run: |
+          set -euo pipefail
+          deb=$(find "$PWD/pkg" -name '*.deb' | head -1)
+          sudo apt-get update
+          sudo apt-get install -y xvfb imagemagick "$deb"
+      - name: The .deb starts and finds mpv
+        run: xvfb-run -a bash scripts/smoke.sh qistara && mv smoke.png smoke-deb.png
+      - name: The AppImage starts and finds mpv
+        run: |
+          set -euo pipefail
+          app=$(find "$PWD/pkg" -name '*.AppImage' | head -1)
+          chmod +x "$app"
+          xvfb-run -a bash scripts/smoke.sh "$app" --appimage-extract-and-run
+          mv smoke.png smoke-appimage.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qistara-linux-screens
+          path: smoke-*.png

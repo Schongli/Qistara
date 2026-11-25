@@ -2,7 +2,8 @@
 // Keys are written the Windows way ("Ctrl+Shift+L"); on macOS Ctrl shows, and is pressed, as ⌘.
 
 export type Group = 'Playback' | 'Library' | 'Window' | 'Video'
-export interface Shortcut { keys: string; label: string; group: Group }
+/** video: only where video shows in the window (os.ts SHOWS_VIDEO), like the whole Video group. */
+export interface Shortcut { keys: string; label: string; group: Group; video?: true }
 
 export const SHORTCUTS: Shortcut[] = [
   { keys: 'Space', label: 'Play / pause', group: 'Playback' },
@@ -15,7 +16,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: 'Ctrl+S', label: 'Shuffle on / off', group: 'Playback' },
   { keys: 'Ctrl+R', label: 'Repeat: off, all, one', group: 'Playback' },
   { keys: 'Ctrl+L', label: 'Love the playing song', group: 'Playback' },
-  { keys: 'Ctrl+Shift+V', label: 'Show the playing song’s video', group: 'Playback' },
+  { keys: 'Ctrl+Shift+V', label: 'Show the playing song’s video', group: 'Playback', video: true },
   { keys: 'Ctrl+F', label: 'Search (in Settings: search settings)', group: 'Library' },
   { keys: 'Ctrl+N', label: 'New playlist', group: 'Library' },
   { keys: 'Ctrl+O', label: 'Open files', group: 'Library' },
@@ -46,6 +47,9 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: 'I', label: 'File info', group: 'Video' },
   { keys: 'Ctrl+S', label: 'Screenshot', group: 'Video' },
 ]
+
+/** The shortcuts that do something here: without video in the window, none of the video ones. */
+export const shortcutsFor = (video: boolean) => (video ? SHORTCUTS : SHORTCUTS.filter((s) => s.group !== 'Video' && !s.video))
 
 const NAMES: Record<string, string> = { ' ': 'Space', ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', Escape: 'Esc' }
 
