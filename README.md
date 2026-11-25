@@ -1,6 +1,6 @@
 # Qistara
 
-A lossless music and media player for Windows (macOS and Linux build from source) that keeps your music in true
+A lossless music and media player for Windows, macOS and Linux that keeps your music in true
 balance: what reaches your DAC is what is in the file. Your files, your music server and YT Music in one place, and
 friends listening along.
 Built with [Tauri 2](https://tauri.app), [Svelte 5](https://svelte.dev) and [libmpv](https://mpv.io).
@@ -77,9 +77,18 @@ The screenshots show the demo library that `scripts/make-test-media.sh` makes: t
 
 ## Install
 
-Download `Qistara_x.y.z_x64-setup.exe` from [Releases](https://github.com/Schongli/Qistara/releases) and run it.
-- **Requirements:** 64-bit Windows 10 or 11. macOS and Linux: build from source (below).
+From [Releases](https://github.com/Schongli/Qistara/releases):
+
+| System | Download | Also needs |
+|---|---|---|
+| Windows 10 or 11, 64-bit | `Qistara_x.y.z_x64-setup.exe` | nothing |
+| macOS 13 or newer, Apple Silicon | `Qistara_x.y.z_aarch64.dmg` | mpv from [Homebrew](https://brew.sh): `brew install mpv` |
+| Ubuntu 24.04+, Debian 12+, Mint 22+ | `Qistara_x.y.z_amd64.deb`: `sudo apt install ./Qistara_x.y.z_amd64.deb` | nothing (it brings libmpv) |
+| Other Linux, x86-64 | `Qistara_x.y.z_amd64.AppImage` | the system's libmpv: Fedora `mpv-libs`, Arch `mpv`, openSUSE `libmpv2` |
+
 - **Windows warning:** until code signing is set up ([docs/code-signing.md](docs/code-signing.md)), Windows shows "Windows protected your PC". Choose **More info → Run anyway**.
+- **macOS warning:** Qistara isn't signed by Apple yet. The first time, macOS won't open it: choose **System Settings › Privacy & Security › Open Anyway**.
+- **macOS and Linux play music first:** video files play their sound; showing the picture in the window is Windows-only for now.
 - **Updates:** Settings › General › Updates checks once a day and installs signed updates when you choose to.
 
 ## Build from source
@@ -87,19 +96,19 @@ Download `Qistara_x.y.z_x64-setup.exe` from [Releases](https://github.com/Schong
 You need:
 - [Node.js](https://nodejs.org) 22 or newer and [Rust](https://rustup.rs) (stable)
 - Windows 10/11 x64: Visual Studio Build Tools with the "Desktop development with C++" workload
-- macOS: Xcode command line tools and `brew install mpv`
-- Linux: `libwebkit2gtk-4.1-dev libdbus-1-dev build-essential pkg-config libmpv2` (Debian/Ubuntu names)
+- macOS (Apple Silicon): Xcode command line tools and `brew install mpv`
+- Linux: `libwebkit2gtk-4.1-dev libdbus-1-dev build-essential pkg-config file libmpv2` (Debian/Ubuntu names)
 
 ```bash
 npm install
 npx tauri-plugin-libmpv-api setup-lib   # Windows: puts libmpv-2.dll and libmpv-wrapper.dll in src-tauri/lib
-                                        # macOS/Linux: mkdir -p src-tauri/lib && touch src-tauri/lib/.placeholder
+bash scripts/setup-libmpv.sh            # macOS/Linux: the libmpv wrapper (pinned, checked) in src-tauri/lib
 npm run tauri dev                       # run the app
-npm run tauri build                     # installer in src-tauri/target/release/bundle/nsis
+npm run tauri build                     # packages in src-tauri/target/release/bundle (nsis, dmg, deb, appimage)
 ```
 
-On macOS and Linux, `tauri dev` uses the system libmpv; packaged installers for them aren't set up yet. The Japanese
-dictionary isn't part of the build: Learn mode downloads it when first used. Phones: [docs/mobile.md](docs/mobile.md).
+macOS and Linux play through the system's libmpv (Homebrew's on macOS). The Japanese dictionary isn't part of the
+build: Learn mode downloads it when first used. Phones: [docs/mobile.md](docs/mobile.md).
 Releases: [docs/code-signing.md](docs/code-signing.md).
 
 Tests: `npx vitest run` and `cargo test --lib --manifest-path src-tauri/Cargo.toml`. More in [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -1,29 +1,43 @@
 # Qistara
 
-Lossless music + media player (formerly Confluence Player, before that Sonora). Tauri 2 (Rust) + Svelte 5 + libmpv. Windows-first;
-macOS and Linux build and run from source (system libmpv), phones have a build scaffold only (`docs/mobile.md`).
+Lossless music + media player (formerly Confluence Player, before that Sonora). Tauri 2 (Rust) + Svelte 5 + libmpv. Windows,
+macOS (Apple Silicon, Homebrew's mpv) and Linux (.deb, AppImage; system libmpv); phones have a build scaffold only (`docs/mobile.md`).
 Phases and status: `ROADMAP.md`.
 
 ## Commands
-- `npm run tauri dev`: run the app (Windows needs `src-tauri/lib/*.dll`: `npx tauri-plugin-libmpv-api setup-lib`;
-  macOS/Linux need any file in `src-tauri/lib/` for the resource glob, e.g. `.placeholder`)
+- `npm run tauri dev`: run the app. `src-tauri/lib/` first: Windows `npx tauri-plugin-libmpv-api setup-lib`;
+  macOS/Linux `bash scripts/setup-libmpv.sh` (macOS needs `brew install mpv` first)
 - `npx vitest run` (TS logic) and `cargo test --lib --manifest-path src-tauri/Cargo.toml` (Rust).
   While `tauri dev` runs, add `--target-dir src-tauri/target-test`: the build step re-copies the libmpv DLL the app holds open.
   A Cargo.toml change rebuilds while the app runs and fails the same way: close the app, then restart `tauri dev`.
 - IPADIC isn't embedded: `japanese_install` downloads it at runtime (fixed URL, md5 + size checked) and builds `dict/ipadic/`.
-- Releases: tag `vX.Y.Z` → `.github/workflows/release.yml` (SignPath + updater signature); setup in `docs/code-signing.md`.
+- Releases: tag `vX.Y.Z` → `.github/workflows/release.yml` (Windows + SignPath, macOS, Linux, updater signatures, smoke
+  tests); `vX.Y.Z-beta.N` skips Windows and publishes a pre-release. Setup in `docs/code-signing.md`.
+- `scripts/smoke.sh <app>`: starts a packaged build and passes when its log says "mpv started" (Linux: under `xvfb-run`).
 - `bash scripts/make-test-media.sh`: regenerate `test-media/` (FLAC 16/44.1 + 24/96, HEVC10 MKV w/ subs, chapters)
-- `npm run tauri build`: NSIS installer (unsigned; CI: `.github/workflows/ci.yml` on all three OSes)
+- `npm run tauri build`: this OS's packages, unsigned (NSIS; app + dmg; deb + AppImage). CI packages and smoke-tests
+  all three on main and on manual runs.
 
 ## Debugging
 - Webview `console.*` and unhandled rejections are forwarded into the `tauri dev` output.
 - Dev builds write mpv's own log to `%LOCALAPPDATA%\com.qistara.app\mpv.log` (WASAPI format negotiation, filter chain).
+- Every build logs to the OS log folder (`<log dir>/Qistara.log`, Settings › Show Log): plugin loading, "mpv started"
+  or why not. A libmpv that can't be loaded is reported by `mpv.rs` `libmpv_problem` (the plugin only says "Failed
+  to create mpv instance"), which `playbackhelp.ts` turns into install steps.
 - Don't call `getProperty` from tauri-plugin-libmpv-api: it crashes libmpv-wrapper. State comes from observed properties.
 - Integer mpv properties (sid, aid, chapter, sub-margin-y) must be set as text via `cmd('set', name, String(v))`.
 - Tests from Claude's shell run inside an MSIX container: `%LOCALAPPDATA%` writes are redirected, Pictures and Music
   aren't writable (screenshots, the default Downloads folder fail there, not in the installed app).
 
 ## Invariants
+- libmpv per OS. Windows: setup-lib's DLLs beside the exe. macOS/Linux: `scripts/setup-libmpv.sh` puts one pinned
+  libmpv-wrapper release (SHA-256 checked; bump `VERSION` and the hashes together) in `src-tauri/lib/`. The wrapper
+  loads libmpv itself, beside it or by name. macOS: a stub `libmpv.dylib` re-exporting Homebrew's
+  `opt/mpv/lib/libmpv.2.dylib`, in `Contents/MacOS/lib`. Linux: the .deb puts the wrapper in `/usr/lib/qistara`, found
+  through the binary's RUNPATH (`build.rs`); the AppImage in `usr/bin/lib`. Bundled libmpv is not shipped there.
+- Video in the window is Windows-only: `SHOWS_VIDEO` (`os.ts`). Off it, mpv starts with `vid=no`, so the plugin skips
+  embedding and video files play their sound; Watch Video, music videos, the Video button and video keys are hidden.
+  The plugin can't embed on Linux (checked under X11) and it's untried on macOS.
 - Bit-perfect mode is the default: `BIT_PERFECT` in `src/lib/player.svelte.ts`. Never set `audio-samplerate`,
   `audio-format`, filters, volume != 100 or speed != 1 while it is on. In this mode volume goes to `ao-volume`.
   `ao` is per OS (`AO` in signal.ts): wasapi, coreaudio (exclusive → `coreaudio_exclusive`, hog mode), alsa.

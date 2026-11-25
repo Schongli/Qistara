@@ -9,6 +9,7 @@ import { evaluate, type Rules } from './smart'
 import { exportPlaylist } from './playlistio'
 import { linkFor } from './musicvideo.svelte'
 import { listenTrack, watchTrack } from './youtube.svelte'
+import { SHOWS_VIDEO } from './os'
 
 const YT = 'ytdl://' // YouTube tracks (youtube.svelte.ts)
 
@@ -65,6 +66,7 @@ export function trackMenu(tracks: Track[], { album, from, play }: { album?: Albu
   const t = tracks[0]
   const one = tracks.length === 1
   const local = one && t.id > 0 && t.kind === 'audio'
+  const video = one && SHOWS_VIDEO // os.ts: no video in the window on macOS and Linux yet
   const yt = tracks.filter((x) => x.path.startsWith(YT))
   const editable = tracks.filter((x) => x.id > 0 && x.kind === 'audio')
   return tidy([
@@ -72,10 +74,10 @@ export function trackMenu(tracks: Track[], { album, from, play }: { album?: Albu
     'sep',
     ...(one && yt.length ? [{ label: 'Start Radio', action: () => startRadio(t) }] : []),
     // a YouTube song with or without its picture; a local song with a music video of its own
-    ...(one && yt.length ? [t.kind === 'video'
+    ...(video && yt.length ? [t.kind === 'video'
       ? { label: 'Listen Without Video', action: () => playVersion(t, listenTrack(t)) }
       : { label: 'Watch Video', action: () => playVersion(t, watchTrack(t)), keys: queue.current === t ? 'Ctrl+Shift+V' : undefined }] : []),
-    ...(local ? [{ label: linkFor(t) ? 'Music Video…' : 'Add Music Video…', action: () => (ui.musicVideo = t) }] : []),
+    ...(local && video ? [{ label: linkFor(t) ? 'Music Video…' : 'Add Music Video…', action: () => (ui.musicVideo = t) }] : []),
     ...(album ? [{ label: isPinned(album.key) ? 'Unpin from Sidebar' : 'Pin to Sidebar', action: () => togglePin({ key: album.key, title: album.title, art: album.art }) }] : []),
     ...(album ? [{ label: 'Go to Artist', action: () => nav.go({ name: 'artists', artist: album.artist }) }] : []),
     ...(local ? [{ label: 'Go to Album', action: () => nav.go({ name: 'album', key: albumKey(t) }) }, { label: 'Go to Artist', action: () => nav.go({ name: 'artists', artist: albumArtist(t) }) }] : []),

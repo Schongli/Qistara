@@ -8,6 +8,7 @@ import { kvLoad, kvSet } from './persist'
 import { lib, type Track } from './library.svelte'
 import { ytCookies } from './downloads.svelte'
 import { toast } from './nav.svelte'
+import { SHOWS_VIDEO } from './os'
 import { listenTrack, videoId, watchTrack } from './youtube.svelte'
 export { parseVideoId } from './videolink'
 
@@ -57,7 +58,7 @@ let attaching = 0
 /** Adds the song's video over it, in step. */
 async function attach(t: Track) {
   const link = linkFor(t)
-  if (!link || !mv.on) return detach()
+  if (!link || !mv.on || !SHOWS_VIDEO) return detach()
   const mine = ++attaching
   mv.busy = true
   try {
@@ -93,14 +94,14 @@ onMpvEvent((e) => {
 })
 
 /** Whether the playing song has a video to show: its own (YouTube) or a linked one. */
-export const hasVideo = (t: Track | null) => !!t && (!!videoId(t) || !!linkFor(t))
+export const hasVideo = (t: Track | null) => SHOWS_VIDEO && !!t && (!!videoId(t) || !!linkFor(t))
 /** Whether that video shows now. */
-export const videoShowing = (t: Track | null) => !!t && ((!!videoId(t) && t.kind === 'video') || (!!linkFor(t) && mv.showing))
+export const videoShowing = (t: Track | null) => SHOWS_VIDEO && !!t && ((!!videoId(t) && t.kind === 'video') || (!!linkFor(t) && mv.showing))
 
 /** Ctrl+Shift+V and the player bar's Video button: the playing song with or without its video. */
 export async function toggleVideo(): Promise<boolean> {
   const t = queue.current
-  if (!t) return false
+  if (!t || !SHOWS_VIDEO) return false
   if (videoId(t)) {
     const other = t.kind === 'video' ? listenTrack(t) : watchTrack(t)
     if (other) await queue.swap(other)

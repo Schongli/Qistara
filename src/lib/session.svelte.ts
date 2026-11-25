@@ -3,7 +3,7 @@
 // YouTube, and radio from the station itself.
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { cmd, lock, mpv, set } from './player.svelte'
+import { cmd, lock, mpv, set, SHOWS_VIDEO } from './player.svelte'
 import { queue } from './queue.svelte'
 import { remoteTrack } from './radio.svelte'
 import { serverSongId } from './lyricsources'
@@ -140,7 +140,7 @@ function trackOf(i: HostItem): Track {
   if (known) return withVideo(known, i)
   const meta = { title: i.title, artist: i.artist, album: i.album, duration: i.duration, ...(i.art && { art: i.art }) }
   const t =
-    i.kind === 'yt' && i.id ? (i.video ? watchTrack(videoTrack(i.id, meta))! : videoTrack(i.id, meta))
+    i.kind === 'yt' && i.id ? (i.video && SHOWS_VIDEO ? watchTrack(videoTrack(i.id, meta))! : videoTrack(i.id, meta))
     : i.kind === 'url' && i.url ? remoteTrack({ path: i.url, ...meta })
     : remoteTrack({
         path: `${proxy}${i.seq}`, ...meta, codec: i.codec ?? 'Stream', sampleRate: i.sampleRate ?? null,

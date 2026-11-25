@@ -97,4 +97,20 @@ Not yet checked by hand:
 - [ ] Watch Video and a music video over a FLAC on Windows; Sync; gapless into the next song
 - [ ] Watching together between two PCs
 
+## Phase 8: Qistara 0.5 (macOS and Linux)
+- [x] macOS app for Apple Silicon (`.dmg`, macOS 13+), playing through Homebrew's mpv; ad-hoc signed
+- [x] Linux `.deb` (Ubuntu 24.04+, Debian 12+) and AppImage, playing through the system's libmpv
+- [x] libmpv-wrapper pinned and SHA-256 checked; a card that says how to install mpv when it's missing; a log file
+- [x] Releases build, sign, smoke-test and publish all three; beta tags become pre-releases
+- [x] Music-first on macOS and Linux: video files play their sound, video features are Windows-only
+
+Checked here: the .deb and AppImage built and installed in an Ubuntu 24.04 container, driven through WebDriver:
+library scan, Hi-Res FLAC, ALAC and 24/192 playback in real time, the Signal Path, a video file as sound only, the
+missing-libmpv card. macOS: built, signature-checked and started in CI. Not yet checked by hand:
+- [ ] The .dmg on a real Mac: Open Anyway, `brew install mpv`, playback, CoreAudio hog mode with a DAC
+- [ ] ALSA `hw:` with a DAC on Linux; PipeWire and PulseAudio desktops; Wayland sessions
+- [ ] Now Playing / MPRIS media keys, Discord, Keychain and Secret Service sign-ins on macOS and Linux
+- [ ] An in-app update on macOS and Linux (first possible from 0.5.0 to the next version)
+- [ ] Video inside the window on macOS (needs a Mac to try)
+
 Not planned: fake-lossless checker, native DSD/DoP (mpv converts DSD to PCM), playing or downloading DRM streams.

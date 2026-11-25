@@ -1,10 +1,11 @@
 <script lang="ts">
   // Keyboard Shortcuts (Ctrl+/ or ?): everything in shortcuts.ts, grouped, with the keys as this OS writes them.
-  import { SHORTCUTS, display, type Group } from '../lib/shortcuts'
-  import { OS } from '../lib/os'
+  import { display, shortcutsFor, type Group } from '../lib/shortcuts'
+  import { OS, SHOWS_VIDEO } from '../lib/os'
 
   let { onclose }: { onclose: () => void } = $props()
   const GROUPS: [Group, string][] = [['Playback', 'Playback'], ['Library', 'Library'], ['Window', 'Window'], ['Video', 'While a video plays']]
+  const shortcuts = shortcutsFor(SHOWS_VIDEO)
   let sheet = $state<HTMLDivElement>()
   $effect(() => sheet?.focus())
 </script>
@@ -13,11 +14,11 @@
 <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title" tabindex="-1" bind:this={sheet} onkeydown={(e) => e.key === 'Escape' && onclose()}>
   <h2 class="t-h2" id="shortcuts-title">Keyboard Shortcuts</h2>
   <div class="cols">
-    {#each GROUPS as [g, title] (g)}
+    {#each GROUPS.filter(([g]) => shortcuts.some((s) => s.group === g)) as [g, title] (g)}
       <section>
         <h3>{title}</h3>
         <dl>
-          {#each SHORTCUTS.filter((s) => s.group === g) as s (s.keys + s.label)}
+          {#each shortcuts.filter((s) => s.group === g) as s (s.keys + s.label)}
             <dt>{s.label}</dt>
             <dd><kbd>{display(s.keys, OS === 'macos')}</kbd></dd>
           {/each}

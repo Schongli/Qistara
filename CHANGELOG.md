@@ -1,7 +1,19 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (beta)
 
+- **Qistara on macOS and Linux.** A `.dmg` for Macs with Apple Silicon (macOS 13 or newer), and a `.deb` and an
+  `.AppImage` for Linux. Your library, bit-perfect playback (CoreAudio hog mode on a Mac, an ALSA `hw:` device on
+  Linux), lyrics and translation, YT Music, listening sessions, Discord and in-app updates all come along.
+  - **macOS** plays through mpv from Homebrew (`brew install mpv`). Qistara isn't signed by Apple yet: the first
+    time, choose System Settings › Privacy & Security › Open Anyway.
+  - **Linux:** the `.deb` (Ubuntu 24.04+, Debian 12+, Mint) brings libmpv with it. The AppImage uses your
+    system's (Fedora `mpv-libs`, Arch `mpv`).
+  - **Music first:** on macOS and Linux, video files play their sound for now. Watch Video and music videos stay
+    Windows-only until video can show inside the window there.
+- **"Install mpv to play music".** When the player can't start, Qistara says why and how to fix it, with the command
+  to copy and a Restart button, instead of staying silent.
+- **A log file** for bug reports: Settings › General › Updates › Show Log. It stays on your computer.
 - **notch:** the lyrics you see (word timing and translation included), or the ayahs of a recitation with their
   translation, are shared with notch, a separate top-of-screen app, through a local file in Qistara's data folder
   (`notch/now-lyrics.json`). Nothing is sent anywhere.

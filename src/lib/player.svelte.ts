@@ -3,7 +3,7 @@
 import { destroy, listenEvents, observeProperties, type MpvObservableProperty } from 'tauri-plugin-libmpv-api'
 import { invoke } from '@tauri-apps/api/core'
 import { AO, type AudioParams } from './signal'
-import { OS } from './os'
+import { OS, SHOWS_VIDEO } from './os'
 
 export interface MpvTrack {
   id: number
@@ -116,7 +116,7 @@ const KEY: Record<(typeof PROPS)[number][0], keyof typeof mpv> = {
 }
 const EMPTY: Partial<Record<keyof typeof mpv, unknown>> = { time: 0, duration: 0, af: [], tracks: [], chapters: [], devices: [], abA: 'no', abB: 'no', eof: false }
 
-export { OS }
+export { OS, SHOWS_VIDEO }
 
 // Bit-perfect profile: the OS's exclusive output (WASAPI exclusive, CoreAudio hog mode, ALSA) at the file's own
 // rate/format, nothing in between.
@@ -146,6 +146,8 @@ export async function startMpv() {
       mpvConfig: {
         initialOptions: {
           ...BIT_PERFECT,
+          // no video in the window here (os.ts): video files play their sound, and mpv never opens a window
+          ...(SHOWS_VIDEO ? {} : { vid: 'no' }),
           vo: 'gpu-next', hwdec: 'auto-safe', 'target-colorspace-hint': 'yes', 'video-sync': 'audio',
           idle: 'yes', 'force-window': 'no', 'keep-open': 'yes',
           'gapless-audio': 'weak', 'prefetch-playlist': 'yes', 'audio-display': 'no', 'cover-art-auto': 'no',

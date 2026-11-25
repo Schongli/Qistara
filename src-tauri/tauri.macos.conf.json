@@ -23,6 +23,15 @@
     "targets": [
       "app",
       "dmg"
-    ]
+    ],
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "signingIdentity": "-",
+      "hardenedRuntime": false,
+      "files": {
+        "MacOS/lib/libmpv-wrapper.dylib": "lib/libmpv-wrapper.dylib",
+        "MacOS/lib/libmpv.dylib": "lib/libmpv.dylib"
+      }
+    }
   }
 }

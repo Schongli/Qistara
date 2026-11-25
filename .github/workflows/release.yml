@@ -1,6 +1,9 @@
-# Release: push a tag vX.Y.Z (the version in tauri.conf.json) and this builds the Windows installer, has
-# SignPath sign it when SignPath is set up, signs it for the in-app updater, and publishes a GitHub release
-# with latest.json, which Settings › General › Updates reads. docs/code-signing.md has the one-time setup.
+# Release: push a tag vX.Y.Z (the version in tauri.conf.json). This builds the Windows installer, the macOS app
+# (Apple Silicon) and the Linux .deb and AppImage; has SignPath sign the Windows installer when SignPath is set up;
+# signs every download for the in-app updater; checks that the macOS and Linux packages start and find mpv
+# (scripts/smoke.sh); and publishes one GitHub release with latest.json, which Settings › General › Updates reads.
+# A tag with a pre-release part (v0.5.0-beta.1) skips Windows and becomes a GitHub pre-release: the updater only
+# reads the latest full release, so nobody is offered it. docs/code-signing.md has the one-time setup.
 name: Release
 
 on:
@@ -15,25 +18,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  windows:
-    name: Windows installer
-    runs-on: windows-latest
-    permissions:
-      contents: write # create the release
-      actions: read # SignPath fetches the unsigned artifact
-    defaults:
-      run:
-        shell: bash
+  check:
+    name: The tag matches the app version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
-      - name: The tag matches the app version
+      - id: v
         run: |
           set -euo pipefail
           version=$(node -p "require('./src-tauri/tauri.conf.json').version")
           if [ "v$version" != "$GITHUB_REF_NAME" ]; then
             echo "::error::tag $GITHUB_REF_NAME but tauri.conf.json says $version"; exit 1
           fi
-          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          case "$version" in *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;; *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;; esac
+
+  windows:
+    name: Windows installer
+    needs: check
+    if: needs.check.outputs.prerelease == 'false'
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      actions: read # SignPath fetches the unsigned artifact
+    defaults:
+      run:
+        shell: bash
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -83,23 +100,193 @@ jobs:
         run: |
           set -euo pipefail
           for f in out/*-setup.exe; do npx tauri signer sign --app-version "$VERSION" "$f"; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: out/*
+          if-no-files-found: error
+
+  macos:
+    name: macOS app (Apple Silicon)
+    needs: check
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Homebrew's mpv: the re-export stub links against it (scripts/setup-libmpv.sh), the smoke test plays through it
+      - run: brew install mpv
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: bash scripts/setup-libmpv.sh
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --lib --manifest-path src-tauri/Cargo.toml
+      # createUpdaterArtifacts: Qistara.app.tar.gz, what the updater installs, signed with the updater key
+      - name: Build
+        env:
+          QISTARA_DISCORD_ID: ${{ vars.QISTARA_DISCORD_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri build -- --config '{"bundle":{"createUpdaterArtifacts":true}}'
+      - name: The app is signed (ad-hoc) and the stub points at Homebrew's mpv
+        run: |
+          set -euo pipefail
+          app=src-tauri/target/release/bundle/macos/Qistara.app
+          codesign --verify --deep --strict --verbose=2 "$app"
+          otool -L "$app/Contents/MacOS/lib/libmpv.dylib"
+      - name: The app starts and finds mpv
+        run: bash scripts/smoke.sh src-tauri/target/release/bundle/macos/Qistara.app/Contents/MacOS/qistara
+      - name: Collect
+        run: |
+          set -euo pipefail
+          mkdir out
+          cp src-tauri/target/release/bundle/dmg/*.dmg out/
+          cp src-tauri/target/release/bundle/macos/Qistara.app.tar.gz src-tauri/target/release/bundle/macos/Qistara.app.tar.gz.sig out/
+          ls -l out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: out/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-macos
+          path: smoke.png
+          if-no-files-found: ignore
+
+  linux:
+    name: Linux .deb and AppImage
+    needs: check
+    # the oldest glibc the packages run on (2.35); linux-smoke runs them on 24.04, which has libmpv2
+    runs-on: ubuntu-22.04
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libdbus-1-dev build-essential pkg-config file librsvg2-dev
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: bash scripts/setup-libmpv.sh
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --lib --manifest-path src-tauri/Cargo.toml
+      - name: Build
+        env:
+          QISTARA_DISCORD_ID: ${{ vars.QISTARA_DISCORD_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri build -- --config '{"bundle":{"createUpdaterArtifacts":true}}'
+      - name: Collect, with an updater signature for each package
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mkdir out
+          cp src-tauri/target/release/bundle/deb/*.deb src-tauri/target/release/bundle/appimage/*.AppImage out/
+          for f in out/*.deb out/*.AppImage; do
+            src="src-tauri/target/release/bundle/$( [ "${f##*.}" = deb ] && echo deb || echo appimage )/$(basename "$f").sig"
+            if [ -f "$src" ]; then cp "$src" out/; else npx tauri signer sign --app-version "$VERSION" "$f"; fi
+          done
+          ls -l out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: out/*
+          if-no-files-found: error
+
+  linux-smoke:
+    name: Linux packages start (Ubuntu 24.04)
+    needs: linux
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-linux
+          path: pkg
+      - name: Install the .deb (it brings libmpv2)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb imagemagick ./pkg/*.deb
+      - name: The .deb starts and finds mpv
+        run: xvfb-run -a bash scripts/smoke.sh qistara && mv smoke.png smoke-deb.png
+      - name: The AppImage starts and finds mpv
+        run: |
+          chmod +x pkg/*.AppImage
+          xvfb-run -a bash scripts/smoke.sh "$(ls pkg/*.AppImage)" --appimage-extract-and-run
+          mv smoke.png smoke-appimage.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-linux
+          path: smoke-*.png
+          if-no-files-found: ignore
+
+  publish:
+    name: Publish the release
+    needs: [check, windows, macos, linux, linux-smoke]
+    # Windows is skipped for a pre-release; everything else must have passed
+    if: >-
+      always() && needs.check.result == 'success' && needs.macos.result == 'success' &&
+      needs.linux.result == 'success' && needs.linux-smoke.result == 'success' &&
+      (needs.windows.result == 'success' || (needs.windows.result == 'skipped' && needs.check.outputs.prerelease == 'true'))
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # create the release
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      PRERELEASE: ${{ needs.check.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: out
       - name: Release notes and latest.json
         run: |
           set -euo pipefail
-          # this version's section of CHANGELOG.md
-          awk -v v="$VERSION" '$0 ~ "^## \\[?"v"\\]?" {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
-          exe=$(cd out && ls *-setup.exe)
+          # this version's section of CHANGELOG.md; a pre-release uses its version's section (0.5.0 for 0.5.0-beta.1)
+          for v in "$VERSION" "${VERSION%%-*}"; do
+            awk -v v="$v" '$0 ~ "^## \\[?"v"\\]?( |$)" {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
+            [ -s notes.md ] && break
+          done
+          [ -s notes.md ] || { echo "::error::CHANGELOG.md has no section for $VERSION"; exit 1; }
           node -e '
-            const fs = require("fs"), [v, exe, repo, tag] = process.argv.slice(1)
-            const sig = fs.readFileSync(`out/${exe}.sig`, "utf8").trim()
-            const url = `https://github.com/${repo}/releases/download/${tag}/${encodeURIComponent(exe)}`
+            const fs = require("fs"), [v, repo, tag, pre] = process.argv.slice(1)
+            const files = fs.readdirSync("out")
+            // the updater looks for {os}-{arch}-{package} first, then {os}-{arch}
+            const want = { "windows-x86_64": /-setup\.exe$/, "darwin-aarch64": /\.app\.tar\.gz$/, "linux-x86_64-appimage": /\.AppImage$/, "linux-x86_64-deb": /\.deb$/ }
+            const platforms = {}
+            for (const [key, re] of Object.entries(want)) {
+              const f = files.find((n) => re.test(n))
+              if (!f) {
+                if (key === "windows-x86_64" && pre === "true") continue
+                throw new Error(`no file for ${key}`)
+              }
+              if (!files.includes(`${f}.sig`)) throw new Error(`${f} has no updater signature`)
+              platforms[key] = {
+                signature: fs.readFileSync(`out/${f}.sig`, "utf8").trim(),
+                url: `https://github.com/${repo}/releases/download/${tag}/${encodeURIComponent(f)}`,
+              }
+            }
             fs.writeFileSync("out/latest.json", JSON.stringify({
-              version: v, notes: fs.readFileSync("notes.md", "utf8").trim(), pub_date: new Date().toISOString(),
-              platforms: { "windows-x86_64": { signature: sig, url } },
+              version: v, notes: fs.readFileSync("notes.md", "utf8").trim(), pub_date: new Date().toISOString(), platforms,
             }, null, 2))
-          ' "$VERSION" "$exe" "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME"
+          ' "$VERSION" "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" "$PRERELEASE"
           cat out/latest.json
+          ls -l out
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" out/* --title "Qistara $VERSION" --notes-file notes.md --verify-tag
+        run: |
+          set -euo pipefail
+          pre=(); [ "$PRERELEASE" = true ] && pre=(--prerelease)
+          gh release create "$GITHUB_REF_NAME" out/* --title "Qistara $VERSION" --notes-file notes.md --verify-tag "${pre[@]}"

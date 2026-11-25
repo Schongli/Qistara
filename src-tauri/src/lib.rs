@@ -113,6 +113,21 @@ fn screenshot_dir(app: AppHandle) -> Res<String> {
   Ok(d.to_string_lossy().into_owned())
 }
 
+/// Settings › Show Log: Qistara's log file (tauri-plugin-log writes `<name>.log` in the OS's log folder), or that
+/// folder before anything was written.
+#[tauri::command]
+fn log_file(app: AppHandle) -> Res<String> {
+  let dir = app.path().app_log_dir().map_err(err)?;
+  let file = dir.join(format!("{}.log", app.package_info().name));
+  Ok(if file.exists() { file } else { dir }.to_string_lossy().into_owned())
+}
+
+/// The playback card's Restart: a libmpv that failed to load is only looked for again by a new process.
+#[tauri::command]
+fn app_restart(app: AppHandle) {
+  app.restart()
+}
+
 /// Lyrics found online for a library song stay with the library; those for a server song ("sub:<id>"), a
 /// YouTube video or a stream go to streaming/lyrics, which Settings › Storage can clear on its own.
 fn lyrics_dir(lib: &Lib, key: &str) -> std::path::PathBuf {
@@ -646,13 +661,9 @@ pub fn run() {
     .manage(discord::Discord::default())
     .manage(update::Pending::default())
     .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
+      // a small log file in the OS's log folder (Settings › General › Updates › Show Log), for bug reports and
+      // the packaging smoke test (scripts/smoke.sh). It stays on this computer.
+      app.handle().plugin(tauri_plugin_log::Builder::default().level(log::LevelFilter::Info).build())?;
       let dir = app.path().app_local_data_dir()?;
       // only the newest old library: if copying it fails, the next start tries it again (never an older one)
       if let Some(old) = OLD_DATA.iter().filter_map(|n| dir.parent().map(|p| p.join(n))).find(|o| o.join("library.db").exists()) {
@@ -691,7 +702,7 @@ pub fn run() {
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
-      library, add_folder, remove_folder, cover, art_color, storage_usage, clear_streaming_cache, clear_lyrics_cache, rescan, extensions, screenshot_dir, lyrics, lyrics_fetch, notch_lyrics,
+      library, add_folder, remove_folder, cover, art_color, storage_usage, log_file, app_restart, clear_streaming_cache, clear_lyrics_cache, rescan, extensions, screenshot_dir, lyrics, lyrics_fetch, notch_lyrics,
       playlist_create, playlist_update, playlist_items, playlist_delete, rate, love, played, skipped, top,
       tag_write, fetch_cover, stage_image, read_text, write_playlist, kv_get, kv_set,
       lastfm_status, lastfm_set_keys, lastfm_begin, lastfm_finish, lastfm_logout, lastfm_now_playing, lastfm_scrobble, media_keys::media_track, media_keys::media_state,

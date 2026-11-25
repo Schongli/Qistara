@@ -43,12 +43,13 @@
   import { lib, love } from './lib/library.svelte'
   import { nav, ui } from './lib/nav.svelte'
   import { queue } from './lib/queue.svelte'
-  import { mpv, seek, startMpv, togglePause } from './lib/player.svelte'
+  import { mpv, seek, SHOWS_VIDEO, startMpv, togglePause } from './lib/player.svelte'
   import { combo } from './lib/shortcuts'
   import { newPlaylist } from './lib/menu.svelte'
   import { setVolume, volume } from './lib/settings.svelte'
   import ShortcutsSheet from './components/ShortcutsSheet.svelte'
   import MusicVideoSheet from './components/MusicVideoSheet.svelte'
+  import PlaybackSetup from './components/PlaybackSetup.svelte'
   import { toggleVideo } from './lib/musicvideo.svelte'
   import { openFiles } from './lib/open'
   import './lib/media.svelte'
@@ -67,6 +68,8 @@
   import { capture, restore } from './lib/scrollmemo'
 
   startMpv().then(() => lib.load()).then(() => queue.restore(lib.byId))
+  /** "Not Now" on the card that says how to get playback working (PlaybackSetup) */
+  let setupClosed = $state(false)
 
   let content = $state<HTMLDivElement>()
   const r = $derived(nav.route)
@@ -84,7 +87,7 @@
 
   const video = $derived(
     // a stream (YouTube) may list video tracks it isn't playing: only a selected one counts
-    !mpv.idle && !!queue.current && (queue.current.kind === 'video' || mpv.tracks.some((x) => x.type === 'video' && !x.image && x.selected)),
+    SHOWS_VIDEO && !mpv.idle && !!queue.current && (queue.current.kind === 'video' || mpv.tracks.some((x) => x.type === 'video' && !x.image && x.selected)),
   )
 
   // Back/Forward return to where the page was; a new page starts at the top
@@ -228,6 +231,9 @@
 {/if}
 {#if ui.shortcuts}
   <ShortcutsSheet onclose={() => (ui.shortcuts = false)} />
+{/if}
+{#if mpv.error && !setupClosed}
+  <PlaybackSetup error={mpv.error} onclose={() => (setupClosed = true)} />
 {/if}
 {#if ui.quranPick}
   <SurahPicker track={ui.quranPick} onclose={() => (ui.quranPick = null)} />
