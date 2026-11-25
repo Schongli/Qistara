@@ -145,16 +145,21 @@ jobs:
         with:
           name: qistara-Linux
           path: pkg
+      # the artifact keeps the bundle's folders (src-tauri/target/release/bundle/…), so look the packages up
       - name: Install the .deb (it brings libmpv2)
         run: |
+          set -euo pipefail
+          deb=$(find "$PWD/pkg" -name '*.deb' | head -1)
           sudo apt-get update
-          sudo apt-get install -y xvfb imagemagick ./pkg/deb/*.deb
+          sudo apt-get install -y xvfb imagemagick "$deb"
       - name: The .deb starts and finds mpv
         run: xvfb-run -a bash scripts/smoke.sh qistara && mv smoke.png smoke-deb.png
       - name: The AppImage starts and finds mpv
         run: |
-          chmod +x pkg/appimage/*.AppImage
-          xvfb-run -a bash scripts/smoke.sh "$(ls pkg/appimage/*.AppImage)" --appimage-extract-and-run
+          set -euo pipefail
+          app=$(find "$PWD/pkg" -name '*.AppImage' | head -1)
+          chmod +x "$app"
+          xvfb-run -a bash scripts/smoke.sh "$app" --appimage-extract-and-run
           mv smoke.png smoke-appimage.png
       - uses: actions/upload-artifact@v4
         if: always()
