@@ -40,7 +40,8 @@ use crate::ytdlp;
 
 #[cfg(desktop)]
 /// The ytdl hook's yt-dlp options: never a config file, the same cache as ytdlp.rs gives it (streaming/), our
-/// JavaScript runtime by path, and the sign-in: Firefox's cookies, or the hook's copy of a cookies.txt.
+/// JavaScript runtime by path, and the sign-in: Firefox's cookies, or the hook's copy of the account's cookies or of
+/// a cookies.txt.
 fn ytdl_raw(app: &tauri::AppHandle, cookies: &str) -> String {
     let mut o = vec!["ignore-config=".to_string()];
     if let Ok(dir) = ytdlp::streaming_dir(app, "ytdlp-cache") {

@@ -72,8 +72,14 @@ Phases and status: `ROADMAP.md`.
   yt-dlp/ffmpeg/Deno are fetched only from their GitHub releases and must match the release's SHA-256 list.
 - Streaming data lives in `streaming/` (art as `stream:<name>`, lyrics for `sub:`/`ytdl://`/`http`/`session:` keys,
   cookies, tmp), never in the library's `art/`/`lyrics/`; it must stay clearable without touching the library.
-- YT Music (`ytmusic.rs`): fixed InnerTube endpoints, no cookies, no stored visitor id, ids validated (`valid_*`),
-  thumbnails only from `THUMB_HOSTS` (same hosts in the CSP).
+- YT Music (`ytmusic.rs`): fixed InnerTube endpoints, no stored visitor id, ids validated (`valid_*`; `LM` only
+  when signed in), thumbnails only from `THUMB_HOSTS` (same hosts in the CSP). As a guest: no cookies. Signed in:
+  the account's youtube.com cookies and a SAPISIDHASH go to music.youtube.com's InnerTube only (`call_as`).
+- YouTube account (`account.rs`): Google's sign-in in the `youtube-sign-in` window: incognito, in no capability
+  (remote pages can't reach commands), `on_navigation` limited to https Google/YouTube hosts (`allowed`). Cookies
+  are kept only AES-256-GCM-encrypted in `streaming/account.bin` (key in the OS secret store, `Qistara YouTube`;
+  the cache clear leaves it), and reach yt-dlp/mpv's hook only as `CookieCopy`/hook copies (`Cookies::Account`,
+  `"account"`). The page gets name, handle and picture, never cookies. Sign-out removes file, key and hook copy.
 - Sessions (`session.rs`): the host shares track ids, never paths (`db::path_of` + `mpv::local`), and never Subsonic
   URLs (they carry the token). Frames are AES-256-GCM per direction with counter nonces, ≤ 1 MiB; guests ≤ 16, chat
   ≤ 500 chars. Kick bans the address and rekeys. The guest proxy listens on 127.0.0.1 only and checks Host.

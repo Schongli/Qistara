@@ -24,8 +24,10 @@ const defaults = {
   hiddenNav: [] as string[],
   // Discord Rich Presence (discord.svelte.ts): off until turned on; local covers looked up on MusicBrainz
   discord: false, discordLocalArt: false,
-  // YouTube sign-in for yt-dlp: '' guest, 'firefox' (its cookies), or the path of a cookies.txt file
-  ytCookies: '',
+  // YouTube sign-in: '' guest, 'account' (signed in in Qistara's window, account.svelte.ts), 'firefox' (its
+  // cookies), or the path of a cookies.txt file. ytQuality 'premium': signed-in songs through yt-dlp, for
+  // Premium's 256 kbps audio (they start a little later)
+  ytCookies: '', ytQuality: 'standard' as 'standard' | 'premium',
   // Downloads: the folder ('' = Music/Qistara Downloads), video or audio and the quality of each, and whether
   // new downloads join the library
   downloadFolder: '', downloadKind: 'audio' as 'audio' | 'video', downloadVideo: '1080' as VideoQ, downloadAudio: 'original' as AudioQ,
@@ -41,7 +43,8 @@ type Settings = typeof defaults
 export const settings = $state<Settings>({ ...defaults })
 // nothing is saved or applied until the stored values are in, so they are never overwritten by defaults
 const state = $state({ loaded: false })
-kvLoad<Partial<Settings> & { onlineLyrics?: boolean; downloadPreset?: string }>('settings').then((v) => {
+/** Settles once the stored settings are in. */
+export const settingsLoaded = kvLoad<Partial<Settings> & { onlineLyrics?: boolean; downloadPreset?: string }>('settings').then((v) => {
   if (v) Object.assign(settings, v)
   // the one "Find lyrics online" switch became the source list
   settings.lyricsSources = normalizeSources(v?.lyricsSources, v?.onlineLyrics)

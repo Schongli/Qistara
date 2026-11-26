@@ -80,8 +80,8 @@ pub struct Engine {
     /// the client that worked last
     client: AtomicUsize,
     warming: Mutex<HashSet<String>>,
-    /// the sign-in yt-dlp falls back with: the one the page last asked with
-    cookies: Mutex<Option<crate::ytdlp::Cookies>>,
+    /// the sign-in yt-dlp uses and whether Premium quality is wanted: what the page last asked with
+    wants: Mutex<(Option<crate::ytdlp::Cookies>, bool)>,
     /// one lookup per song at a time
     busy: Mutex<HashMap<String, Arc<tauri::async_runtime::Mutex<()>>>>,
     /// songs no engine could open lately, and why: asked again at once, they fail at once (mpv then plays them
@@ -209,11 +209,23 @@ impl Engine {
         Ok(Stream { expires: expires(&url), url, user_agent: c.user_agent.into(), mime, len, engine: c.name, ahead: None })
     }
 
-    /// A song's sound: the guest clients (the one that worked last first), each address checked; then yt-dlp.
+    /// A song's sound: the guest clients (the one that worked last first), each address checked; then yt-dlp with
+    /// the user's sign-in. With Premium quality chosen and a sign-in, yt-dlp is asked first.
     async fn resolve(&self, app: &AppHandle, id: &str) -> Result<Stream, String> {
         let started = Instant::now();
-        let first = self.client.load(SeqCst) % CLIENTS.len();
+        let (cookies, premium) = self.wants.lock().unwrap().clone();
+        let premium = premium && cookies.is_some();
         let mut why = Vec::new();
+        if premium {
+            match with_ytdlp(app, id, &cookies).await {
+                Ok(s) => {
+                    log::info!("stream {id}: yt-dlp (Premium quality) in {} ms", started.elapsed().as_millis());
+                    return Ok(s);
+                }
+                Err(e) => why.push(format!("yt-dlp: {e}")),
+            }
+        }
+        let first = self.client.load(SeqCst) % CLIENTS.len();
         for i in (0..CLIENTS.len()).map(|n| (first + n) % CLIENTS.len()) {
             match self.guest(&CLIENTS[i], id).await {
                 Ok(s) if probe(&s).await => {
@@ -225,20 +237,35 @@ impl Engine {
                 Err(e) => why.push(format!("{}: {e}", CLIENTS[i].name)),
             }
         }
-        let cookies = self.cookies.lock().unwrap().clone();
-        match crate::ytdlp::audio_stream(app, id, &cookies).await {
-            Ok(a) => {
-                log::info!("stream {id}: yt-dlp in {} ms ({})", started.elapsed().as_millis(), why.join("; "));
-                let user_agent = a.user_agent.unwrap_or_else(|| "Mozilla/5.0".into());
-                Ok(Stream { expires: expires(&a.url), url: a.url, user_agent, mime: a.mime, len: a.len, engine: "yt-dlp", ahead: None })
-            }
-            Err(e) => {
-                why.push(format!("yt-dlp: {e}"));
-                let why = why.join("; ");
-                log::warn!("stream {id} failed: {why}");
-                Err(why)
+        if !premium {
+            match with_ytdlp(app, id, &cookies).await {
+                Ok(s) => {
+                    log::info!("stream {id}: yt-dlp in {} ms ({})", started.elapsed().as_millis(), why.join("; "));
+                    return Ok(s);
+                }
+                Err(e) => why.push(format!("yt-dlp: {e}")),
             }
         }
+        let why = why.join("; ");
+        log::warn!("stream {id} failed: {why}");
+        Err(why)
+    }
+
+    /// The sign-in and quality the page asks with; a change drops what was found with the old ones.
+    fn ask_with(&self, cookies: Option<crate::ytdlp::Cookies>, premium: bool) {
+        let mut wants = self.wants.lock().unwrap();
+        if *wants != (cookies.clone(), premium) {
+            *wants = (cookies, premium);
+            drop(wants);
+            self.forget_all();
+        }
+    }
+
+    /// Everything found so far, and every failure, is forgotten (a sign-in or a quality change).
+    pub fn forget_all(&self) {
+        self.streams.lock().unwrap().clear();
+        self.order.lock().unwrap().clear();
+        self.failed.lock().unwrap().clear();
     }
 
     fn cached(&self, id: &str) -> Option<Stream> {
@@ -326,6 +353,13 @@ impl Engine {
     fn url(&self, id: &str) -> Option<String> {
         self.server.get().map(|(port, token)| format!("http://127.0.0.1:{port}/{token}/yt/{id}"))
     }
+}
+
+/// The stream yt-dlp finds, with the user's sign-in.
+async fn with_ytdlp(app: &AppHandle, id: &str, cookies: &Option<crate::ytdlp::Cookies>) -> Result<Stream, String> {
+    let a = crate::ytdlp::audio_stream(app, id, cookies).await?;
+    let user_agent = a.user_agent.unwrap_or_else(|| "Mozilla/5.0".into());
+    Ok(Stream { expires: expires(&a.url), url: a.url, user_agent, mime: a.mime, len: a.len, engine: "yt-dlp", ahead: None })
 }
 
 fn get(s: &Stream, start: u64, end: u64) -> Result<reqwest::RequestBuilder, String> {
@@ -522,12 +556,12 @@ fn pump(out: &TcpStream, mut stream: Stream, mut at: u64, end: u64, mut renew: i
 /// up now and the server waits for it when mpv asks, so a song lined up next costs nothing until it plays. A song
 /// no engine can open fails in mpv, and the page plays it through mpv's ytdl hook instead (youtube.svelte.ts).
 #[tauri::command]
-pub fn ytstream_url(app: AppHandle, engine: State<'_, Engine>, id: String, cookies: Option<crate::ytdlp::Cookies>) -> Result<String, String> {
+pub fn ytstream_url(app: AppHandle, engine: State<'_, Engine>, id: String, cookies: Option<crate::ytdlp::Cookies>, premium: bool) -> Result<String, String> {
     if !valid_id(&id) {
         return Err("Not a YouTube video.".into());
     }
     start_server(&app, &engine)?;
-    *engine.cookies.lock().unwrap() = cookies;
+    engine.ask_with(cookies, premium);
     let url = engine.url(&id).ok_or("The stream server isn't running.")?;
     tauri::async_runtime::spawn(async move { app.state::<Engine>().warm(&app, &id).await });
     Ok(url)
@@ -536,8 +570,8 @@ pub fn ytstream_url(app: AppHandle, engine: State<'_, Engine>, id: String, cooki
 /// Songs that will probably play soon (the next in the queue, the one under the pointer): looked up and their
 /// first megabyte fetched, two at a time, so they start at once.
 #[tauri::command]
-pub fn ytstream_warm(app: AppHandle, engine: State<'_, Engine>, ids: Vec<String>, cookies: Option<crate::ytdlp::Cookies>) {
-    *engine.cookies.lock().unwrap() = cookies;
+pub fn ytstream_warm(app: AppHandle, engine: State<'_, Engine>, ids: Vec<String>, cookies: Option<crate::ytdlp::Cookies>, premium: bool) {
+    engine.ask_with(cookies, premium);
     for id in ids.into_iter().filter(|i| valid_id(i)).take(2) {
         let app = app.clone();
         tauri::async_runtime::spawn(async move { app.state::<Engine>().warm(&app, &id).await });
@@ -554,9 +588,9 @@ pub struct TestResult {
 
 /// Settings › Streaming › Test: looks a known video up afresh and reads its start, timing both.
 #[tauri::command]
-pub async fn ytstream_test(app: AppHandle, engine: State<'_, Engine>, cookies: Option<crate::ytdlp::Cookies>) -> Result<TestResult, String> {
+pub async fn ytstream_test(app: AppHandle, engine: State<'_, Engine>, cookies: Option<crate::ytdlp::Cookies>, premium: bool) -> Result<TestResult, String> {
     const ID: &str = "jNQXAC9IVRw"; // "Me at the zoo": public, short, there for good
-    *engine.cookies.lock().unwrap() = cookies;
+    engine.ask_with(cookies, premium);
     engine.forget(ID);
     let started = Instant::now();
     let s = engine.resolve(&app, ID).await?;

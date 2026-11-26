@@ -984,14 +984,27 @@ fn last_error(stderr: &[u8], fallback: &str) -> String {
 
 // ---- YouTube: search and lists for the YouTube view; mpv's ytdl hook plays the results ----
 
-/// How yt-dlp signs in to YouTube: guest (None), Firefox's cookies, or a cookies.txt export.
+/// How yt-dlp signs in to YouTube: guest (None), the account signed in in Qistara's window (account.rs),
+/// Firefox's cookies, or a cookies.txt export.
 /// (Chrome and Edge encrypt their cookies to the browser itself on Windows, so yt-dlp can't read them.)
 #[derive(Deserialize, Clone, Debug, PartialEq)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum Cookies {
+    Account,
     Firefox,
     File { path: String },
 }
+
+/// The text of a sign-in that is a cookies.txt: the account's (kept in streaming/, `session`'s parent), or a file.
+fn sign_in_text(source: &str, session: &Path) -> Result<String, String> {
+    if source == ACCOUNT {
+        return crate::account::cookies_txt(session.parent().ok_or("no data folder")?);
+    }
+    cookie_text(source)
+}
+
+/// What the page passes mpv.rs for the account (a cookies file's path always ends in .txt).
+pub const ACCOUNT: &str = "account";
 
 /// A copy of a cookies file, deleted when dropped. yt-dlp writes its cookie jar back into the --cookies file
 /// when it ends, so it only ever gets a copy of its own (owner-only on Unix), gone once the run is over.
@@ -1034,9 +1047,9 @@ fn write_private(to: &Path, text: &str) -> Result<(), String> {
     o.open(to).and_then(|mut f| f.write_all(text.as_bytes())).map_err(|e| e.to_string())
 }
 
-/// A one-run copy of a cookies export in `session` (streaming/session).
+/// A one-run copy of a cookies export, or of the account's cookies, in `session` (streaming/session).
 pub fn cookie_file(path: &str, session: &Path) -> Result<CookieCopy, String> {
-    let text = cookie_text(path)?;
+    let text = sign_in_text(path, session)?;
     std::fs::create_dir_all(session).map_err(|e| e.to_string())?;
     let mut r = [0u8; 8];
     getrandom::fill(&mut r).map_err(|e| e.to_string())?;
@@ -1050,6 +1063,10 @@ pub fn cookie_args(c: &Option<Cookies>, session: &Path) -> Result<(Vec<String>, 
     Ok(match c {
         None => (vec![], None),
         Some(Cookies::Firefox) => (vec!["--cookies-from-browser".into(), "firefox".into()], None),
+        Some(Cookies::Account) => {
+            let copy = cookie_file(ACCOUNT, session)?;
+            (vec!["--cookies".into(), copy.path().display().to_string()], Some(copy))
+        }
         Some(Cookies::File { path }) => {
             let copy = cookie_file(path, session)?;
             (vec!["--cookies".into(), copy.path().display().to_string()], Some(copy))
@@ -1068,7 +1085,7 @@ pub fn hook_cookies(app: &AppHandle, path: Option<&str>) -> Result<Option<PathBu
         let _ = std::fs::remove_file(&to);
         return Ok(None);
     };
-    let text = cookie_text(path)?;
+    let text = sign_in_text(path, &session)?;
     std::fs::create_dir_all(&session).map_err(|e| e.to_string())?;
     write_private(&to, &text)?;
     Ok(Some(to))
@@ -1460,6 +1477,9 @@ mod tests {
         let session = d.path().join("session");
         assert!(cookie_args(&None, &session).unwrap().0.is_empty());
         assert_eq!(cookie_args(&Some(Cookies::Firefox), &session).unwrap().0, ["--cookies-from-browser", "firefox"]);
+        // the account signed in in Qistara's window, once it's gone (signed out elsewhere): says so, never a guest run
+        assert!(cookie_args(&Some(Cookies::Account), &session).unwrap_err().contains("no longer signed in"));
+        assert_eq!(serde_json::from_str::<Cookies>(r#"{"kind":"account"}"#).unwrap(), Cookies::Account);
         assert!(cookie_args(&Some(Cookies::File { path: r"C:\nope\cookies.txt".into() }), &session).is_err());
         let f = d.path().join("cookies.txt");
         std::fs::write(&f, "# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t0\tSID\tx\n").unwrap();

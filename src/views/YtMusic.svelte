@@ -1,10 +1,12 @@
 <script lang="ts">
-  // YT Music as a guest: Home shelves to start from, and search by songs, albums, artists or playlists.
+  // YT Music: Home shelves to start from (yours when signed in), your Library, and search by songs, albums, artists
+  // or playlists.
   import Icon from '../components/Icon.svelte'
   import TrackTable from '../components/TrackTable.svelte'
   import RemoteGrid from '../components/RemoteGrid.svelte'
   import { nav } from '../lib/nav.svelte'
-  import { loadHome, playItem, search, songTrack, ytm, type Filter, type Item, type Shelf } from '../lib/ytmusic.svelte'
+  import { loadHome, loadLibrary, playItem, search, songTrack, ytm, type Filter, type Item, type Shelf } from '../lib/ytmusic.svelte'
+  import { account } from '../lib/account.svelte'
 
   const FILTERS: [Filter, string][] = [['', 'All'], ['songs', 'Songs'], ['albums', 'Albums'], ['artists', 'Artists'], ['playlists', 'Playlists']]
   // the search stays put across Back and Forward (module state outlives the view)
@@ -13,6 +15,12 @@
   let found = $state<Shelf[] | null>(last.found)
   let busy = $state(false)
   let err = $state('')
+  // Home or your Library (signed in); a search shows its results instead
+  let view = $state<'home' | 'library'>(last.view)
+  $effect(() => {
+    last.view = view
+    if (view === 'library' && account.info) loadLibrary()
+  })
 
   loadHome()
 
@@ -37,12 +45,13 @@
     if (i.kind === 'song') return playItem(i)
     nav.go(i.kind === 'album' ? { name: 'ytmAlbum', id: i.id } : i.kind === 'artist' ? { name: 'ytmArtist', id: i.id } : { name: 'ytmPlaylist', id: i.id })
   }
-  const shelves = $derived(found ?? ytm.home ?? [])
+  const library = $derived(view === 'library' && !!account.info && !found)
+  const shelves = $derived(found ?? (library ? (ytm.library ?? []) : (ytm.home ?? [])))
   const songs = (s: Shelf) => s.items.every((i) => i.kind === 'song')
 </script>
 
 <script module lang="ts">
-  const last = { q: '', filter: '' as Filter, found: null as Shelf[] | null }
+  const last = { q: '', filter: '' as Filter, found: null as Shelf[] | null, view: 'home' as 'home' | 'library' }
 </script>
 
 <div class="head">
@@ -51,6 +60,13 @@
     <Icon name="YoutubeLogo" size={15} />Links & Videos
   </button>
 </div>
+
+{#if account.info}
+  <div class="views" role="tablist" aria-label="YT Music">
+    <button class="view press" role="tab" aria-selected={view === 'home' || !!found} class:on={view === 'home' && !found} onclick={() => ((view = 'home'), (q = ''), run())}>Home</button>
+    <button class="view press" role="tab" aria-selected={library} class:on={library} onclick={() => ((view = 'library'), (q = ''), run())}>Library</button>
+  </div>
+{/if}
 
 <form class="search" onsubmit={(e) => (e.preventDefault(), run())}>
   <Icon name="MagnifyingGlass" size={15} />
@@ -63,10 +79,12 @@
   {/each}
 </div>
 
-{#if err || (!found && ytm.error)}
-  <p class="err">{err || ytm.error}</p>
-{:else if !found && ytm.loading}
+{#if err || (!found && !library && ytm.error) || (library && ytm.libraryError)}
+  <p class="err">{err || (library ? ytm.libraryError : ytm.error)}</p>
+{:else if !found && !library && ytm.loading}
   <p class="t-sub">Loading YT Music…</p>
+{:else if library && !ytm.library}
+  <p class="t-sub">Loading your library…</p>
 {:else if found && !found.length}
   <p class="t-sub">Nothing found for “{q.trim()}”.</p>
 {/if}
@@ -81,7 +99,10 @@
     {/if}
   </section>
 {/each}
-<p class="t-sub note">From YouTube Music, without signing in. Songs stream straight from YouTube through Qistara’s streaming engine.</p>
+<p class="t-sub note">
+  {#if account.info}From YouTube Music, signed in as {account.info.name}.{:else}From YouTube Music, without signing in: <button class="link" onclick={() => nav.root({ name: 'providers' })}>sign in</button> for your Home and Library.{/if}
+  Songs stream straight from YouTube through Qistara’s streaming engine.
+</p>
 
 <style>
   .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
@@ -96,4 +117,9 @@
   section h2 { margin: 0 0 12px; }
   .err { color: var(--signal-veil); }
   .note { margin-top: 10px; }
+  .views { display: flex; gap: 4px; margin-bottom: 14px; }
+  .view { height: 30px; padding: 0 14px; border-radius: 15px; font-weight: 600; font-size: 13px; color: var(--text-2); }
+  .view:hover { color: var(--text); background: var(--fill); }
+  .view.on { color: var(--text); background: var(--fill-2); }
+  .link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 </style>

@@ -1,11 +1,15 @@
-// YT Music as a guest: home shelves, search, albums, artists, playlists and radio through YouTube Music's own web
-// API (InnerTube, the WEB_REMIX client, no sign-in). Only what to show comes from here; the songs play through
-// mpv's ytdl hook like any YouTube video (youtube.svelte.ts).
-// One fixed endpoint; every id is checked before it goes into a request; no cookies, and the visitor id YouTube
-// hands out isn't kept. Replies are read by walking for the renderers YT Music draws with, wherever they're
-// nested, so a new wrapper around a shelf doesn't break the page.
+// YT Music: home shelves, search, albums, artists, playlists, radio and (signed in) your library through YouTube
+// Music's own web API (InnerTube, the WEB_REMIX client). Only what to show comes from here; the songs play from the
+// streaming engine (ytstream.rs).
+// One fixed endpoint; every id is checked before it goes into a request. As a guest: no cookies, and the visitor id
+// YouTube hands out isn't kept. Signed in (account.rs): the account's cookies and SAPISIDHASH, to this API only.
+// Replies are read by walking for the renderers YT Music draws with, wherever they're nested, so a new wrapper
+// around a shelf doesn't break the page.
+use crate::account::Signed;
 use serde::Serialize;
 use serde_json::{json, Value};
+use std::sync::Arc;
+use tauri::AppHandle;
 
 const BASE: &str = "https://music.youtube.com/youtubei/v1/";
 /// The web client's version this was written against; YouTube accepts older ones for a long time.
@@ -334,34 +338,59 @@ fn language(hl: &str) -> &'static str {
 }
 
 async fn call(endpoint: &str, hl: &str, extra: Value) -> Result<Value, String> {
+    call_as(None, endpoint, hl, extra).await
+}
+
+const ORIGIN: &str = "https://music.youtube.com";
+
+/// An InnerTube request, as a guest or (signed in, account.rs) with the account's cookies and the SAPISIDHASH
+/// YouTube's web player sends: those go to music.youtube.com's own API only.
+async fn call_as(account: Option<&Signed>, endpoint: &str, hl: &str, extra: Value) -> Result<Value, String> {
     use tauri_plugin_http::reqwest::Client;
     let mut body = json!({ "context": { "client": { "clientName": "WEB_REMIX", "clientVersion": CLIENT_VERSION, "hl": language(hl) } } });
     if let (Some(b), Some(e)) = (body.as_object_mut(), extra.as_object()) {
         b.extend(e.clone());
     }
     let client = Client::builder().user_agent(crate::UA).timeout(std::time::Duration::from_secs(15)).build().map_err(|e| e.to_string())?;
-    let r = client
+    let mut req = client
         .post(format!("{BASE}{endpoint}?prettyPrint=false"))
         .header("Content-Type", "application/json")
-        .header("Origin", "https://music.youtube.com")
+        .header("Origin", ORIGIN);
+    if let Some((a, auth)) = account.and_then(|a| a.authorization(ORIGIN).map(|h| (a, h))) {
+        req = req.header("Cookie", a.header()).header("Authorization", auth).header("X-Origin", ORIGIN).header("X-Goog-AuthUser", "0");
+    }
+    let r = req
         .body(body.to_string())
         .send()
         .await
         .map_err(|_| "YT Music didn't answer. Check your connection.".to_string())?;
     if !r.status().is_success() {
-        return Err(format!("YT Music refused the request ({}).", r.status().as_u16()));
+        return Err(match r.status().as_u16() {
+            401 | 403 if account.is_some() => "YouTube no longer accepts this sign-in. Sign in again in Providers.".to_string(),
+            n => format!("YT Music refused the request ({n})."),
+        });
     }
     let text = r.text().await.map_err(|_| "YT Music's reply was cut off.".to_string())?;
     serde_json::from_str(&text).map_err(|_| "Unexpected reply from YT Music.".to_string())
 }
 
-#[tauri::command]
-pub async fn ytm_home(hl: String) -> Result<Vec<Shelf>, String> {
-    Ok(parse_shelves(&call("browse", &hl, json!({ "browseId": "FEmusic_home" })).await?))
+/// The signed-in account, if there is one: YT Music is then yours (Home, your playlists, Liked Music).
+fn me(app: &AppHandle) -> Option<Arc<Signed>> {
+    crate::account::signed(app)
+}
+
+/// The name and picture of a freshly signed-in account (account.rs).
+pub async fn account_info(a: &Signed) -> Result<crate::account::Info, String> {
+    crate::account::parse_account_menu(&call_as(Some(a), "account/account_menu", "en", json!({})).await?).ok_or_else(|| "no account in YouTube's reply".into())
 }
 
 #[tauri::command]
-pub async fn ytm_search(query: String, filter: Option<String>, hl: String) -> Result<Vec<Shelf>, String> {
+pub async fn ytm_home(app: AppHandle, hl: String) -> Result<Vec<Shelf>, String> {
+    Ok(parse_shelves(&call_as(me(&app).as_deref(), "browse", &hl, json!({ "browseId": "FEmusic_home" })).await?))
+}
+
+#[tauri::command]
+pub async fn ytm_search(app: AppHandle, query: String, filter: Option<String>, hl: String) -> Result<Vec<Shelf>, String> {
     let q: String = query.chars().filter(|c| !c.is_control()).collect();
     let q = q.trim();
     if q.is_empty() || q.chars().count() > 200 {
@@ -372,32 +401,38 @@ pub async fn ytm_search(query: String, filter: Option<String>, hl: String) -> Re
         let params = FILTERS.iter().find(|(n, _)| *n == f).ok_or("Unknown search filter.")?.1;
         extra["params"] = json!(params);
     }
-    Ok(parse_shelves(&call("search", &hl, extra).await?))
+    Ok(parse_shelves(&call_as(me(&app).as_deref(), "search", &hl, extra).await?))
 }
 
 #[tauri::command]
-pub async fn ytm_album(id: String, hl: String) -> Result<Page, String> {
+pub async fn ytm_album(app: AppHandle, id: String, hl: String) -> Result<Page, String> {
     if !valid_album(&id) {
         return Err("bad album id".into());
     }
-    Ok(parse_page(&call("browse", &hl, json!({ "browseId": id })).await?))
+    Ok(parse_page(&call_as(me(&app).as_deref(), "browse", &hl, json!({ "browseId": id })).await?))
 }
 
 #[tauri::command]
-pub async fn ytm_artist(id: String, hl: String) -> Result<Page, String> {
+pub async fn ytm_artist(app: AppHandle, id: String, hl: String) -> Result<Page, String> {
     if !valid_artist(&id) {
         return Err("bad artist id".into());
     }
-    Ok(parse_page(&call("browse", &hl, json!({ "browseId": id })).await?))
+    Ok(parse_page(&call_as(me(&app).as_deref(), "browse", &hl, json!({ "browseId": id })).await?))
 }
 
 #[tauri::command]
-pub async fn ytm_playlist(id: String, hl: String) -> Result<Page, String> {
-    if !valid_playlist(&id) {
+pub async fn ytm_playlist(app: AppHandle, id: String, hl: String) -> Result<Page, String> {
+    let account = me(&app);
+    // your Liked Music: only when signed in
+    if !(valid_playlist(&id) || (id == LIKED && account.is_some())) {
         return Err("bad playlist id".into());
     }
     let id = if id.starts_with("VL") { id } else { format!("VL{id}") };
-    Ok(parse_page(&call("browse", &hl, json!({ "browseId": id })).await?))
+    let mut page = parse_page(&call_as(account.as_deref(), "browse", &hl, json!({ "browseId": id })).await?);
+    if id == format!("VL{LIKED}") && page.title.is_empty() {
+        page.title = "Liked Music".into();
+    }
+    Ok(page)
 }
 
 /// The browse id of a song's lyrics page (MPLY…) in its "next" reply, if YT Music has lyrics for it.
@@ -434,12 +469,52 @@ pub async fn lyrics(id: &str) -> Result<String, String> {
 
 /// Songs that follow on from one: YT Music's own radio for it.
 #[tauri::command]
-pub async fn ytm_radio(id: String, hl: String) -> Result<Vec<Item>, String> {
+pub async fn ytm_radio(app: AppHandle, id: String, hl: String) -> Result<Vec<Item>, String> {
     if !valid_video(&id) {
         return Err("bad video id".into());
     }
-    let r = call("next", &hl, json!({ "videoId": id, "playlistId": format!("RDAMVM{id}"), "isAudioOnly": true })).await?;
+    let r = call_as(me(&app).as_deref(), "next", &hl, json!({ "videoId": id, "playlistId": format!("RDAMVM{id}"), "isAudioOnly": true })).await?;
     Ok(parse_radio(&r).into_iter().filter(|i| i.id != id).collect())
+}
+
+/// Liked Music, the playlist of songs you liked.
+const LIKED: &str = "LM";
+/// Your library's pages: the playlists, albums and artists you saved or follow.
+const LIBRARY: [(&str, &str); 3] = [("FEmusic_liked_playlists", "Playlists"), ("FEmusic_liked_albums", "Albums"), ("FEmusic_library_corpus_artists", "Artists")];
+
+/// Your library's shelves, Liked Music first, from what each library page holds.
+pub fn library_shelves(pages: Vec<(&str, Value)>) -> Vec<Shelf> {
+    let liked = Item { kind: "playlist", id: LIKED.into(), title: "Liked Music".into(), subtitle: "Songs you liked".into(), artists: vec![], album: None, duration: None, thumb: None };
+    let mut out = vec![];
+    for (title, v) in pages {
+        let mut items: Vec<Item> = parse_shelves(&v).into_iter().flat_map(|s| s.items).collect();
+        if title == "Playlists" {
+            items.retain(|i| i.id != LIKED);
+            items.insert(0, liked.clone());
+        }
+        if !items.is_empty() {
+            out.push(Shelf { title: title.into(), items });
+        }
+    }
+    out
+}
+
+/// Your YT Music library (signed in only).
+#[tauri::command]
+pub async fn ytm_library(app: AppHandle, hl: String) -> Result<Vec<Shelf>, String> {
+    let account = me(&app).ok_or("Sign in to YouTube in Providers to see your library.")?;
+    let asks: Vec<_> = LIBRARY
+        .iter()
+        .map(|(id, title)| {
+            let (a, hl) = (account.clone(), hl.clone());
+            (*title, tauri::async_runtime::spawn(async move { call_as(Some(&a), "browse", &hl, json!({ "browseId": id })).await }))
+        })
+        .collect();
+    let mut pages = vec![];
+    for (title, ask) in asks {
+        pages.push((title, ask.await.map_err(|e| e.to_string())??));
+    }
+    Ok(library_shelves(pages))
 }
 
 #[cfg(test)]
@@ -579,10 +654,28 @@ mod tests {
     #[test]
     #[ignore = "network: run on purpose to see YT Music still answers in the shapes this reads"]
     fn live_guest_api_answers() {
-        let home = tauri::async_runtime::block_on(ytm_home("en".into())).unwrap();
+        use tauri::async_runtime::block_on;
+        let home = parse_shelves(&block_on(call("browse", "en", json!({ "browseId": "FEmusic_home" }))).unwrap());
         assert!(!home.is_empty());
-        let found = tauri::async_runtime::block_on(ytm_search("Rick Astley".into(), Some("songs".into()), "en".into())).unwrap();
+        let found = parse_shelves(&block_on(call("search", "en", json!({ "query": "Rick Astley", "params": FILTERS[0].1 }))).unwrap());
         let song = found.iter().flat_map(|s| &s.items).find(|i| i.kind == "song").unwrap().clone();
-        assert!(!tauri::async_runtime::block_on(ytm_radio(song.id, "en".into())).unwrap().is_empty());
+        let radio = block_on(call("next", "en", json!({ "videoId": song.id, "playlistId": format!("RDAMVM{}", song.id), "isAudioOnly": true }))).unwrap();
+        assert!(!parse_radio(&radio).is_empty());
+    }
+
+    #[test]
+    fn shows_your_library_with_liked_music_first() {
+        let playlists = json!({ "gridRenderer": { "items": [
+            { "musicTwoRowItemRenderer": { "title": { "runs": [{ "text": "Liked Music" }] }, "navigationEndpoint": { "browseEndpoint": { "browseId": "VLLM" } } } },
+            { "musicTwoRowItemRenderer": { "title": { "runs": [{ "text": "Road trip" }] }, "subtitle": { "runs": [{ "text": "Playlist" }] },
+              "navigationEndpoint": { "browseEndpoint": { "browseId": "VLPLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG",
+                "browseEndpointContextSupportedConfigs": { "browseEndpointContextMusicConfig": { "pageType": "MUSIC_PAGE_TYPE_PLAYLIST" } } } } } },
+        ] } });
+        let shelves = library_shelves(vec![("Playlists", playlists), ("Albums", json!({})), ("Artists", json!({}))]);
+        assert_eq!(shelves.len(), 1, "empty pages make no shelf");
+        let ids: Vec<&str> = shelves[0].items.iter().map(|i| i.id.as_str()).collect();
+        assert_eq!(ids, [LIKED, "VLPLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG"]);
+        // even a library without playlists of its own has Liked Music
+        assert_eq!(library_shelves(vec![("Playlists", json!({}))])[0].items[0].title, "Liked Music");
     }
 }

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { account } from '../lib/account.svelte'
   import Icon from '../components/Icon.svelte'
   import TrackTable from '../components/TrackTable.svelte'
   import { likedMusic, lookUp, yt } from '../lib/youtube.svelte'
@@ -9,7 +10,9 @@
 
   let text = $state('')
   if (!dl.tools) refreshTools()
-  const signedIn = $derived(settings.ytCookies === 'firefox' ? 'Firefox' : settings.ytCookies ? 'a cookies file' : '')
+  const signedIn = $derived(
+    settings.ytCookies === 'account' ? (account.info ? `your Google account (${account.info.name})` : '') : settings.ytCookies === 'firefox' ? 'Firefox' : settings.ytCookies ? 'a cookies file' : '',
+  )
   const urls = () => yt.tracks.map((t) => t.path.replace(/^ytdl:\/\//, ''))
 </script>
 

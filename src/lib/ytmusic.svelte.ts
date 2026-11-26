@@ -1,9 +1,10 @@
-// YT Music as a guest (ytmusic.rs): what the Home shelves, search, album, artist and playlist pages show, and
-// turning songs into tracks. Songs play from the streaming engine (ytstream.rs, player.svelte.ts loadTrack).
+// YT Music (ytmusic.rs), as a guest or signed in (account.svelte.ts): what the Home shelves, your Library, search,
+// album, artist and playlist pages show, and turning songs into tracks. Songs play from the streaming engine (ytstream.rs, player.svelte.ts loadTrack).
 // Everything fetched stays in memory for the session (never in the database), like a browser tab would.
 import { invoke } from '@tauri-apps/api/core'
 import { queue } from './queue.svelte'
 import { warm } from './player.svelte'
+import { account } from './account.svelte'
 import { toast } from './nav.svelte'
 import { videoId, videoTrack } from './youtube.svelte'
 import type { Track } from './library.svelte'
@@ -32,7 +33,7 @@ export const artistNames = (i: { artists: Ref[] }) => i.artists.map((a) => a.nam
 export const songTrack = (i: Item): Track =>
   videoTrack(i.id, { title: i.title, artist: artistNames(i), album: i.album?.name ?? 'YT Music', duration: i.duration ?? 0, ...(i.thumb && { art: i.thumb }) })
 
-export const ytm = $state({ home: null as Shelf[] | null, loading: false, error: '' })
+export const ytm = $state({ home: null as Shelf[] | null, loading: false, error: '', library: null as Shelf[] | null, libraryError: '' })
 
 const pages = new Map<string, Promise<Page>>()
 const searches = new Map<string, Promise<Shelf[]>>()
@@ -53,6 +54,32 @@ export async function loadHome(again = false) {
     ytm.loading = false
   }
 }
+
+/** Your library (signed in): Liked Music and your playlists, then saved albums and followed artists. */
+export async function loadLibrary(again = false) {
+  if (ytm.library && !again) return
+  ytm.libraryError = ''
+  try {
+    ytm.library = await invoke<Shelf[]>('ytm_library', { hl: hl() })
+  } catch (e) {
+    ytm.libraryError = String(e)
+  }
+}
+
+// signing in or out changes what YT Music shows: Home is yours or a guest's, and pages may differ
+let who: string | null | undefined
+$effect.root(() => {
+  $effect(() => {
+    const now = account.info?.name ?? null
+    if (who !== undefined && who !== now) {
+      pages.clear()
+      searches.clear()
+      ytm.library = null
+      if (ytm.home) void loadHome(true)
+    }
+    who = now
+  })
+})
 
 export const search = (query: string, filter: Filter) =>
   once(searches, `${filter}:${query.trim().toLowerCase()}`, () => invoke<Shelf[]>('ytm_search', { query, filter: filter || null, hl: hl() }))

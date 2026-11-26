@@ -3,6 +3,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { remoteTrack } from './radio.svelte'
 import { ytCookies } from './downloads.svelte'
+import './account.svelte'
 import { engine, mpv, onMpvEvent } from './player.svelte'
 import { queue } from './queue.svelte'
 import { toast } from './nav.svelte'
@@ -80,6 +81,7 @@ $effect.root(() => {
   $effect(() => {
     const c = settings.ytCookies
     engine.cookies = ytCookies()
+    engine.premium = settings.ytQuality === 'premium'
     if (!mpv.ready) return
     invoke('mpv_ytdl_sign_in', { cookies: c }).catch((e) => console.warn('YouTube playback sign-in:', e))
   })

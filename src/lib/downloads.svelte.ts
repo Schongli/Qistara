@@ -144,4 +144,8 @@ export async function quickDownload(urls: string[]) {
 
 /** Settings › YouTube sign-in, as ytdlp.rs takes it. */
 export const ytCookies = () =>
-  settings.ytCookies === 'firefox' ? { kind: 'firefox' } : settings.ytCookies ? { kind: 'file', path: settings.ytCookies } : null
+  settings.ytCookies === 'firefox' || settings.ytCookies === 'account'
+    ? { kind: settings.ytCookies }
+    : settings.ytCookies
+      ? { kind: 'file', path: settings.ytCookies }
+      : null

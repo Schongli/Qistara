@@ -134,7 +134,7 @@
     testing = true
     streamTest = ''
     try {
-      const r = await invoke<{ engine: string; resolveMs: number; firstByteMs: number }>('ytstream_test', { cookies: ytCookies() })
+      const r = await invoke<{ engine: string; resolveMs: number; firstByteMs: number }>('ytstream_test', { cookies: ytCookies(), premium: settings.ytQuality === 'premium' })
       streamTest = `${ENGINES[r.engine] ?? r.engine}: found in ${r.resolveMs} ms, sound ${r.firstByteMs} ms later`
     } catch (e) {
       streamTest = `Couldn’t stream: ${e}`

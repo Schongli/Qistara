@@ -181,20 +181,21 @@ export async function startMpv() {
 export const VIDEO_FORMAT = 'bestvideo[height<=?1080]+bestaudio/best[height<=?1080]'
 
 /** YouTube songs play from the streaming engine's loopback server (ytstream.rs). A song it couldn't open plays
- *  through mpv's ytdl hook instead (youtube.svelte.ts); `cookies` is the sign-in its yt-dlp fallback uses. */
-export const engine = { cookies: null as unknown, viaHook: new Set<string>() }
+ *  through mpv's ytdl hook instead (youtube.svelte.ts); `cookies` is the sign-in its yt-dlp uses, and `premium`
+ *  asks for Premium quality through yt-dlp when signed in (youtube.svelte.ts keeps both current). */
+export const engine = { cookies: null as unknown, premium: false, viaHook: new Set<string>() }
 
 /** What mpv opens for a track: the engine's address for a YouTube song, else the track's own path. */
 async function source(t: { path: string; kind: 'audio' | 'video' }) {
   const id = t.kind === 'audio' && !engine.viaHook.has(t.path) ? youtubeSongId(t.path) : null
   if (!id) return t.path
-  return invoke<string>('ytstream_url', { id, cookies: engine.cookies }).catch((e) => (console.warn('streaming engine:', e), t.path))
+  return invoke<string>('ytstream_url', { id, cookies: engine.cookies, premium: engine.premium }).catch((e) => (console.warn('streaming engine:', e), t.path))
 }
 
 /** Looks the next YouTube songs up and fetches their start, so they play at once. */
 export function warm(tracks: ({ path: string; kind: 'audio' | 'video' } | null | undefined)[]) {
   const ids = tracks.flatMap((t) => (t && t.kind === 'audio' && !engine.viaHook.has(t.path) && youtubeSongId(t.path)) || [])
-  if (ids.length) invoke('ytstream_warm', { ids, cookies: engine.cookies }).catch(() => {})
+  if (ids.length) invoke('ytstream_warm', { ids, cookies: engine.cookies, premium: engine.premium }).catch(() => {})
 }
 
 let resting = 0

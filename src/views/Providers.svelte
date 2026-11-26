@@ -11,6 +11,8 @@
   import { nav } from '../lib/nav.svelte'
   import { settings } from '../lib/settings.svelte'
   import { plural } from '../lib/format'
+  import Artwork from '../components/Artwork.svelte'
+  import { account, signIn as ytSignIn, signOut as ytSignOut } from '../lib/account.svelte'
   import { connect as connectSpotify, disconnect, setClient, spotify } from '../lib/spotify.svelte'
 
   // embedded: shown as the Providers tab in Settings
@@ -33,10 +35,21 @@
     if (server.account) password = ''
   }
 
-  const ytStatus = $derived(settings.ytCookies === 'firefox' ? 'Signed in with Firefox' : settings.ytCookies ? 'Signed in with a cookies file' : 'Guest')
+  const ytStatus = $derived(
+    settings.ytCookies === 'account' && account.info ? account.info.name
+    : settings.ytCookies === 'firefox' ? 'Signed in with Firefox'
+    : settings.ytCookies && settings.ytCookies !== 'account' ? 'Signed in with a cookies file'
+    : 'Guest',
+  )
+  const ytFile = $derived(settings.ytCookies !== 'firefox' && settings.ytCookies !== 'account' ? settings.ytCookies : '')
+  /** Another way to sign in (or none) replaces the account signed in in Qistara's window. */
+  async function useYt(v: string) {
+    if (account.info) await ytSignOut()
+    settings.ytCookies = v
+  }
   async function pickCookies() {
     const f = await open({ multiple: false, title: 'Choose a cookies.txt exported from your browser', filters: [{ name: 'cookies.txt', extensions: ['txt'] }] })
-    if (typeof f === 'string') settings.ytCookies = f
+    if (typeof f === 'string') await useYt(f)
   }
 </script>
 
@@ -62,16 +75,40 @@
     <button class="top press" aria-expanded={openId === 'youtube'} onclick={() => toggle('youtube')}>
       <span class="ic"><Icon name="YoutubeLogo" size={20} /></span>
       <span class="name">YouTube<span class="t-sub">Search and download through yt-dlp; songs stream through Qistara’s engine</span></span>
-      <span class="state" class:on={!!settings.ytCookies}>{ytStatus}</span><span class="caret" class:open={openId === 'youtube'}><Icon name="CaretDown" size={12} weight="bold" /></span>
+      <span class="state" class:on={ytStatus !== 'Guest'}>{ytStatus}</span><span class="caret" class:open={openId === 'youtube'}><Icon name="CaretDown" size={12} weight="bold" /></span>
     </button>
     {#if openId === 'youtube'}
       <div class="body">
-        <p class="t-sub">Signing in lets yt-dlp open your Liked Music, age-restricted videos and, with Premium, 256 kbps audio. It reads the sign-in from your browser's cookies on this PC; your password never leaves the browser.{#if OS === 'windows'} Chrome and Edge lock their cookies to themselves on Windows, so use Firefox or a cookies.txt export.{/if}</p>
-        <div class="choices" role="radiogroup" aria-label="YouTube sign-in">
-          <label class="choice"><input type="radio" name="yt" checked={!settings.ytCookies} onchange={() => (settings.ytCookies = '')} />Guest</label>
-          <label class="choice"><input type="radio" name="yt" checked={settings.ytCookies === 'firefox'} onchange={() => (settings.ytCookies = 'firefox')} />Firefox (signed in to YouTube)</label>
-          <label class="choice"><input type="radio" name="yt" checked={!!settings.ytCookies && settings.ytCookies !== 'firefox'} onchange={pickCookies} />cookies.txt file{#if settings.ytCookies && settings.ytCookies !== 'firefox'}<span class="t-sub ellipsis path">{settings.ytCookies}</span>{/if}</label>
-        </div>
+        {#if account.info}
+          <div class="who">
+            <Artwork art={null} src={account.info.photo} size="40px" radius="50%" shadow={false} />
+            <span class="who-txt"><span>{account.info.name}</span><span class="t-sub">{account.info.handle ?? 'Signed in to YouTube'}</span></span>
+            <button class="btn press" onclick={ytSignOut}>Sign Out</button>
+          </div>
+          <p class="t-sub">YT Music shows your Home and your Library, and age-restricted songs play. The sign-in is kept encrypted on this computer and goes only to YouTube.</p>
+        {:else}
+          <p class="t-sub">Sign in for your own YT Music Home and Library, your Liked Music and age-restricted songs. Google’s sign-in page opens in a small window of Qistara’s: your password goes only to Google, and Qistara keeps the sign-in encrypted on this computer.</p>
+          <button class="btn primary press" onclick={ytSignIn} aria-busy={account.busy}>
+            <Icon name="SignIn" size={15} />{account.busy ? 'Finish signing in in the window…' : 'Sign In with Google'}
+          </button>
+          {#if account.error}<p class="err">Couldn’t sign in: {account.error} You can sign in another way below.</p>{/if}
+        {/if}
+        <label class="quality">
+          <span>Audio quality</span>
+          <select bind:value={settings.ytQuality}>
+            <option value="standard">Standard: starts fastest</option>
+            <option value="premium">Premium 256 kbps when signed in: through yt-dlp</option>
+          </select>
+        </label>
+        <details class="other" open={!!settings.ytCookies && settings.ytCookies !== 'account'}>
+          <summary>Other ways to sign in</summary>
+          <p class="t-sub">yt-dlp can also read a sign-in from your browser’s cookies on this computer; your password never leaves the browser.{#if OS === 'windows'} Chrome and Edge lock their cookies to themselves on Windows, so use Firefox or a cookies.txt export.{/if}</p>
+          <div class="choices" role="radiogroup" aria-label="YouTube sign-in">
+            <label class="choice"><input type="radio" name="yt" checked={!settings.ytCookies} onchange={() => useYt('')} />Guest</label>
+            <label class="choice"><input type="radio" name="yt" checked={settings.ytCookies === 'firefox'} onchange={() => useYt('firefox')} />Firefox (signed in to YouTube)</label>
+            <label class="choice"><input type="radio" name="yt" checked={!!ytFile} onchange={pickCookies} />cookies.txt file{#if ytFile}<span class="t-sub ellipsis path">{ytFile}</span>{/if}</label>
+          </div>
+        </details>
         <button class="btn press" onclick={() => nav.root({ name: 'youtube' })}>Open YouTube</button>
       </div>
     {/if}
@@ -246,4 +283,12 @@
   .form .btn { justify-self: start; }
   code { font-size: 12px; padding: 1px 5px; border-radius: var(--r-xs); background: var(--fill-2); user-select: text; }
   .err { color: #e5484d; }
+  .who { display: flex; align-items: center; gap: 12px; }
+  .who-txt { display: grid; font-weight: 600; }
+  .who-txt .t-sub { font-weight: 400; }
+  .quality { display: flex; align-items: center; gap: 10px; }
+  .other { display: grid; gap: 10px; }
+  .other summary { cursor: pointer; color: var(--text-2); font-size: 13px; }
+  .other[open] summary { margin-bottom: 8px; }
+  .btn[aria-busy='true'] { opacity: 0.7; }
 </style>

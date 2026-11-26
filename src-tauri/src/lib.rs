@@ -1,3 +1,4 @@
+mod account;
 mod apple;
 mod db;
 mod discord;
@@ -708,6 +709,7 @@ pub fn run() {
     .manage(discord::Discord::default())
     .manage(update::Pending::default())
     .manage(ytstream::Engine::default())
+    .manage(account::Pending::default())
     .setup(|app| {
       // a small log file in the OS's log folder (Settings › General › Updates › Show Log), for bug reports and
       // the packaging smoke test (scripts/smoke.sh). It stays on this computer.
@@ -771,7 +773,8 @@ pub fn run() {
       apple::apple_logout, apple::apple_playlists, apple::apple_tracks, mpv::mpv_init, mpv::mpv_command, mpv::mpv_set,
       mpv::mpv_ytdl_sign_in, update::update_check, update::update_install, translate_local::mt_catalog, translate_local::mt_install,
       translate_local::mt_status, translate_local::mt_remove, translate_local::mt_file, ytstream::ytstream_url,
-      ytstream::ytstream_warm, ytstream::ytstream_test
+      ytstream::ytstream_warm, ytstream::ytstream_test, account::account_sign_in, account::account_status,
+      account::account_sign_out, ytmusic::ytm_library
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application")
