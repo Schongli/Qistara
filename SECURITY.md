@@ -28,6 +28,10 @@ Qistara handles files, credentials and network data, so these matter most:
 - the listen-together server (`session.rs`): reading a file that wasn't shared, sharing a path or a server token,
   joining without the invite's key, or a guest's loopback proxy answering anything but this app,
 - the updater installing anything that isn't signed with the release key for the version it claims,
-- a YouTube sign-in's cookies outliving the run that needed them.
+- a YouTube sign-in's cookies outliving the run that needed them, being kept unencrypted (`streaming/account.bin`),
+  reaching the page or any host but YouTube's, or the sign-in window (`account.rs`) reaching the app's commands or
+  leaving Google's and YouTube's sites,
+- the streaming engine's loopback server (`ytstream.rs`) answering anything but this app's mpv, or fetching from
+  anywhere but YouTube's video host.
 
 Bugs in mpv, FFmpeg, yt-dlp or WebView2 themselves belong to those projects, but tell us if Qistara needs to update one.

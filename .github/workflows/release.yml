@@ -2,8 +2,9 @@
 # (Apple Silicon) and the Linux .deb and AppImage; has SignPath sign the Windows installer when SignPath is set up;
 # signs every download for the in-app updater; checks that the macOS and Linux packages start and find mpv
 # (scripts/smoke.sh); and publishes one GitHub release with latest.json, which Settings › General › Updates reads.
-# A tag with a pre-release part (v0.5.0-beta.1) skips Windows and becomes a GitHub pre-release: the updater only
-# reads the latest full release, so nobody is offered it. docs/code-signing.md has the one-time setup.
+# A tag with a pre-release part (v0.6.0-beta.1) becomes a GitHub pre-release with every package, the Windows
+# installer unsigned (SignPath signs full releases only): the updater only reads the latest full release, so nobody
+# is offered it. docs/code-signing.md has the one-time setup.
 name: Release
 
 on:
@@ -39,7 +40,6 @@ jobs:
   windows:
     name: Windows installer
     needs: check
-    if: needs.check.outputs.prerelease == 'false'
     runs-on: windows-latest
     permissions:
       contents: read
@@ -72,9 +72,10 @@ jobs:
           name: qistara-unsigned
           path: src-tauri/target/release/bundle/nsis/*-setup.exe
           if-no-files-found: error
-      # Authenticode signature from the SignPath Foundation; skipped until the repository variables are set
+      # Authenticode signature from the SignPath Foundation, for full releases; skipped until the repository
+      # variables are set
       - name: Sign with SignPath
-        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        if: vars.SIGNPATH_ORGANIZATION_ID != '' && needs.check.outputs.prerelease == 'false'
         uses: signpath/github-action-submit-signing-request@v1
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -232,11 +233,10 @@ jobs:
   publish:
     name: Publish the release
     needs: [check, windows, macos, linux, linux-smoke]
-    # Windows is skipped for a pre-release; everything else must have passed
+    # every package must have built and passed its checks
     if: >-
       always() && needs.check.result == 'success' && needs.macos.result == 'success' &&
-      needs.linux.result == 'success' && needs.linux-smoke.result == 'success' &&
-      (needs.windows.result == 'success' || (needs.windows.result == 'skipped' && needs.check.outputs.prerelease == 'true'))
+      needs.linux.result == 'success' && needs.linux-smoke.result == 'success' && needs.windows.result == 'success'
     runs-on: ubuntu-24.04
     permissions:
       contents: write # create the release
@@ -260,17 +260,14 @@ jobs:
           done
           [ -s notes.md ] || { echo "::error::CHANGELOG.md has no section for $VERSION"; exit 1; }
           node -e '
-            const fs = require("fs"), [v, repo, tag, pre] = process.argv.slice(1)
+            const fs = require("fs"), [v, repo, tag] = process.argv.slice(1)
             const files = fs.readdirSync("out")
             // the updater looks for {os}-{arch}-{package} first, then {os}-{arch}
             const want = { "windows-x86_64": /-setup\.exe$/, "darwin-aarch64": /\.app\.tar\.gz$/, "linux-x86_64-appimage": /\.AppImage$/, "linux-x86_64-deb": /\.deb$/ }
             const platforms = {}
             for (const [key, re] of Object.entries(want)) {
               const f = files.find((n) => re.test(n))
-              if (!f) {
-                if (key === "windows-x86_64" && pre === "true") continue
-                throw new Error(`no file for ${key}`)
-              }
+              if (!f) throw new Error(`no file for ${key}`)
               if (!files.includes(`${f}.sig`)) throw new Error(`${f} has no updater signature`)
               platforms[key] = {
                 signature: fs.readFileSync(`out/${f}.sig`, "utf8").trim(),
@@ -280,7 +277,7 @@ jobs:
             fs.writeFileSync("out/latest.json", JSON.stringify({
               version: v, notes: fs.readFileSync("notes.md", "utf8").trim(), pub_date: new Date().toISOString(), platforms,
             }, null, 2))
-          ' "$VERSION" "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" "$PRERELEASE"
+          ' "$VERSION" "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME"
           cat out/latest.json
           ls -l out
       - name: Publish

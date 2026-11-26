@@ -126,6 +126,7 @@ with the song. Click a line to jump to it. With word-timed lyrics, each word lig
 | Local files | A `.ttml`, `.lrc` or `.txt` file with the same name as the song, or lyrics embedded in its tags. |
 | Navidrome / Subsonic | Your own server's lyrics, for songs played from it. |
 | LRCLIB | A free, open lyrics database. |
+| YT Music | The lyrics YouTube shows, for YouTube and YT Music songs (it gets only the video id). |
 | NetEase, Kugou | Large Chinese services with many Asian songs. Kugou often has word-by-word timing. Off by default. |
 
 **Prefer word-synced lyrics** keeps asking further down the list for word-timed lyrics, and falls back to line-timed
@@ -193,17 +194,35 @@ Secret Service on Linux).
 
 ### YT Music
 
-**YT Music** in the sidebar browses YouTube Music without an account: Home shelves, search by songs, albums,
-artists or playlists, and album, artist and playlist pages. **Start Radio** (in a YT Music or YouTube song's menu)
-keeps playing similar songs, and Autoplay ∞ does the same when the queue ends. Songs play from YouTube through yt-dlp (below),
-so they need its tools once. Nothing is signed in or stored: covers and lyrics for these songs go to the streaming
-cache (Settings › General › Storage). **Links & Videos** keeps the YouTube search, links and Liked Music.
+**YT Music** in the sidebar browses YouTube Music: Home shelves, search by songs, albums, artists or playlists, and
+album, artist and playlist pages. Signed in (below), Home is yours and **Library** shows Liked Music, your playlists,
+saved albums and the artists you follow. **Start Radio** (in a YT Music or YouTube song's menu) keeps playing similar
+songs, and Autoplay ∞ does the same when the queue ends. Covers and lyrics for these songs go to the streaming cache
+(Settings › General › Storage). **Links & Videos** keeps the YouTube search, links and Liked Music.
+
+**How songs play:** Qistara's own streaming engine asks YouTube for the song's sound and starts playing as the first
+bytes arrive; it sends YouTube only the video id. The next songs in the queue, a song your pointer rests on and the
+first song of an album or playlist you open are fetched ahead, so they start at once. A ring around Play shows while a
+song opens. If the engine can't open a song (an age-restricted one, say), yt-dlp plays it instead, signed in if you
+are. **Settings › Playback › Streaming › Test** shows how fast YouTube answers from your connection, and which way
+the song came.
 
 ### YouTube
 
-Search, play and download through [yt-dlp](https://github.com/yt-dlp/yt-dlp), which Qistara downloads from yt-dlp's
-GitHub release and checks against the release's SHA-256 list. You can use it as a guest, or sign in for your Liked
-Music, age-restricted videos and, with Premium, 256 kbps audio:
+Search and download through [yt-dlp](https://github.com/yt-dlp/yt-dlp), which Qistara downloads from yt-dlp's
+GitHub release (unpacked, so it starts quickly) and checks against the release's SHA-256 list. You can use YouTube
+as a guest, or sign in for your YT Music library, Liked Music, age-restricted songs and, with Premium, 256 kbps audio.
+
+**Sign In with Google** (Settings › Providers › YouTube) opens Google's own sign-in page in a small window of
+Qistara's. Sign in as you would in a browser, two-step verification included; when YouTube has signed you in, the
+window closes and Providers shows your name.
+- **Your password** goes only to Google.
+- **The window** is private and can only open Google's and YouTube's pages.
+- **What Qistara keeps** is YouTube's sign-in cookies, encrypted in its data folder, with the key in the OS secret
+  store. They go only to YouTube: to YT Music, and to yt-dlp when it plays or downloads.
+- **Sign Out** deletes them.
+
+If Google won't sign you in there ("This browser or app may not be secure"), use one of the **Other ways to sign in**:
 
 - **Firefox:** sign in to YouTube in Firefox, then choose Firefox in Qistara. Your password never leaves the browser.
 - **cookies.txt:** export your YouTube cookies to a file and choose it. Chrome and Edge lock their cookies on Windows,
@@ -211,6 +230,10 @@ Music, age-restricted videos and, with Premium, 256 kbps audio:
 
 Your cookies reach yt-dlp only as a copy made for that one run and deleted afterwards (yt-dlp writes back to
 the file it's given).
+
+**Audio quality:** **Standard** plays through the streaming engine and starts fastest. **Premium** asks yt-dlp with
+your account first, for YouTube Premium's 256 kbps audio when it's offered to you; songs take a moment longer to
+start.
 
 YouTube needs a JavaScript runtime for yt-dlp. If Node.js 20 or newer is installed, it's used; otherwise choose
 **Get Deno** in Downloads › Tools, which fetches Deno from its GitHub release and checks its SHA-256.
@@ -378,7 +401,7 @@ Everything Qistara keeps is in its app data folder: `%LOCALAPPDATA%\com.qistara.
 | `resume\` | Where each video was stopped |
 | `bin\` | yt-dlp, ffmpeg and Deno, if you installed them from Qistara |
 | `dict\` | The Japanese dictionary, if you installed it |
-| `streaming\` | Covers and lyrics for your server and YT Music, and download scratch space: Settings › General › Storage clears it |
+| `streaming\` | Covers and lyrics for your server and YT Music, yt-dlp's cache and download scratch space: Settings › General › Storage clears them. Also your YouTube sign-in, encrypted (`account.bin`; Sign Out deletes it) |
 
 Qistara's log (what went wrong, for a bug report) is in `%LOCALAPPDATA%\com.qistara.app\logs` on Windows,
 `~/Library/Logs/com.qistara.app` on macOS and `~/.local/share/com.qistara.app/logs` on Linux: **Settings › General ›
@@ -400,7 +423,9 @@ Open **Settings › System › Sound**, choose your device, open **More sound se
 **A song is resampled.** Your device doesn't support that sample rate. Check its supported rates in the same Advanced
 tab, or in your DAC's control panel.
 
-**YouTube stopped working.** YouTube changes often. Open **Downloads › Tools** and choose **Check for Update** for yt-dlp.
+**YouTube stopped working.** YouTube changes often. Open **Downloads › Tools** and choose **Check for Update** for
+yt-dlp, then try **Settings › Playback › Streaming › Test**: it says which way a song came, or why none worked.
+Qistara's log has a line for each song with the time it took.
 
 **"Google Translate is busy."** Qistara waits and tries again by itself. To stop depending on Google, add the language
 pack in Settings › Lyrics › Translation › Language packs: with the default setting, this PC takes over when Google is

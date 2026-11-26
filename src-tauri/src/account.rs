@@ -101,7 +101,7 @@ pub fn signed_in(rows: &[Row]) -> bool {
 pub fn allowed(url: &url::Url) -> bool {
     match url.scheme() {
         "about" => true,
-        "https" => url.host_str().is_some_and(|h| ["google.com", "youtube.com", "gstatic.com"].iter().any(|d| h == *d || h.ends_with(&format!(".{d}")))),
+        "https" => url.host_str().is_some_and(|h| ["google.com", "youtube.com", "gstatic.com", "googleapis.com"].iter().any(|d| h == *d || h.ends_with(&format!(".{d}")))),
         _ => false,
     }
 }
@@ -391,10 +391,10 @@ mod tests {
     #[test]
     fn keeps_the_sign_in_window_on_google_and_youtube() {
         let ok = |u: &str| allowed(&url::Url::parse(u).unwrap());
-        for u in ["https://accounts.google.com/v3/signin", "https://music.youtube.com/", "https://www.youtube.com/signin", "https://ssl.gstatic.com/x", "about:blank"] {
+        for u in ["https://accounts.google.com/v3/signin", "https://music.youtube.com/", "https://www.youtube.com/signin", "https://ssl.gstatic.com/x", "https://content-autofill.googleapis.com/x", "about:blank"] {
             assert!(ok(u), "{u}");
         }
-        for u in ["http://accounts.google.com/", "https://google.com.evil.example/", "https://evil-youtube.com/", "file:///etc/passwd", "javascript:alert(1)", "tauri://localhost/"] {
+        for u in ["http://accounts.google.com/", "https://google.com.evil.example/", "https://evil-youtube.com/", "https://googleapis.com.evil.example/", "file:///etc/passwd", "javascript:alert(1)", "tauri://localhost/"] {
             assert!(!ok(u), "{u}");
         }
     }

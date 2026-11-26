@@ -12,7 +12,7 @@ Phases and status: `ROADMAP.md`.
   A Cargo.toml change rebuilds while the app runs and fails the same way: close the app, then restart `tauri dev`.
 - IPADIC isn't embedded: `japanese_install` downloads it at runtime (fixed URL, md5 + size checked) and builds `dict/ipadic/`.
 - Releases: tag `vX.Y.Z` → `.github/workflows/release.yml` (Windows + SignPath, macOS, Linux, updater signatures, smoke
-  tests); `vX.Y.Z-beta.N` skips Windows and publishes a pre-release. Setup in `docs/code-signing.md`.
+  tests); `vX.Y.Z-beta.N` publishes a pre-release, its Windows installer unsigned. Setup in `docs/code-signing.md`.
 - `scripts/smoke.sh <app>`: starts a packaged build and passes when its log says "mpv started" (Linux: under `xvfb-run`).
 - `bash scripts/make-test-media.sh`: regenerate `test-media/` (FLAC 16/44.1 + 24/96, HEVC10 MKV w/ subs, chapters)
 - `npm run tauri build`: this OS's packages, unsigned (NSIS; app + dmg; deb + AppImage). CI packages and smoke-tests

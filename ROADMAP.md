@@ -113,4 +113,21 @@ missing-libmpv card. macOS: built, signature-checked and started in CI. Not yet 
 - [ ] An in-app update on macOS and Linux (first possible from 0.5.0 to the next version)
 - [ ] Video inside the window on macOS (needs a Mac to try)
 
+## Phase 9: Qistara 0.6 (fast streaming, YouTube sign-in)
+- [x] Streaming engine (`ytstream.rs`): guest InnerTube player request, range probe, loopback server that streams as
+  bytes arrive and renews refused addresses, songs fetched ahead (next in queue, hover, first of a page), yt-dlp
+  and then mpv's hook as fallbacks; a Test in Settings and timings in the log
+- [x] yt-dlp unpacked from its release zip, with a cache in `streaming/`; updates by re-downloading
+- [x] Sign-in window (`account.rs`): Google's page in a private window kept on Google/YouTube, cookies encrypted
+  with the key in the OS secret store; signed-in YT Music Home and Library; Premium quality through yt-dlp
+- [x] Lyrics for YouTube songs (clean titles, LRCLIB search, a YT Music source); adaptive theme and OS media cover
+  for streams; betas build Windows too
+
+Checked here: unit tests (the server against a fake YouTube, ffmpeg reading and seeking through it), the Linux app
+driven through WebDriver (the engine's address and fallback, the sign-in window opening Google's page and closing
+cleanly). This container can't reach YouTube, so these wait for the beta:
+- [ ] Songs start fast on Windows and macOS through the engine (Settings › Streaming › Test; `Qistara.log`)
+- [ ] Signing in through the window on Windows (WebView2), macOS (WKWebView) and Linux (WebKitGTK)
+- [ ] Signed-in Home and Library; Liked Music; an age-restricted song; Premium quality with a Premium account
+
 Not planned: fake-lossless checker, native DSD/DoP (mpv converts DSD to PCM), playing or downloading DRM streams.

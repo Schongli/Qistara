@@ -43,10 +43,13 @@ Built with [Tauri 2](https://tauri.app), [Svelte 5](https://svelte.dev) and [lib
   same song at the same moment, your own files included, and chat beside it. End-to-end encrypted.
 - **Discord.** Show what you're listening to on your Discord profile (off until you turn it on).
 - **Sources (Providers), all optional.**
-  - **YT Music** without an account: Home, search, albums, artists, playlists and radio.
+  - **YT Music:** Home, search, albums, artists, playlists and radio, as a guest or signed in (your Home and your
+    Library: Liked Music, playlists, albums, artists). Songs play from Qistara's own streaming engine, which starts
+    them as the first bytes arrive and fetches the next ones ahead.
   - **Navidrome / Subsonic:** browse and stream your own server; FLAC streams as stored, so it stays bit-perfect.
-  - **YouTube:** search, play and download through [yt-dlp](https://github.com/yt-dlp/yt-dlp), as a guest or
-    signed in with Firefox's cookies or a cookies.txt file (for Liked Music and Premium audio).
+  - **YouTube:** search and download through [yt-dlp](https://github.com/yt-dlp/yt-dlp). Sign in with Google in a
+    small window of Qistara's (or with Firefox's cookies or a cookies.txt file) for your library, age-restricted
+    songs and Premium audio.
   - **Spotify, Apple Music, Tidal:** import your playlists as playlists of your own files, plus a Spotify Connect
     remote. Their streams are DRM-protected, so they never play or download here.
   - Last.fm scrobbling and internet radio ([Radio Browser](https://www.radio-browser.info)).
@@ -122,14 +125,17 @@ Qistara has no account, no telemetry and no servers of its own. It only contacts
 | Service | When | What is sent |
 |---|---|---|
 | LRCLIB | a song has no local lyrics | title, artist, album, length |
+| YT Music lyrics (music.youtube.com) | a YouTube song has no lyrics higher in the list | the video id |
 | NetEase Cloud Music, Kugou | you turn them on in Settings › Lyrics and a song has no lyrics higher in the list | title, artist, length |
 | MusicBrainz, Cover Art Archive | you look up tags or artwork | album and artist |
 | Google Translate | you turn on translation or Learn mode (unless you translate on this PC only) | the lyric lines, or the one word you tap |
 | Mozilla (storage.googleapis.com) | you add a language pack for translating on this PC | nothing but the download |
 | Radio Browser | you search for stations | your search text |
 | quran.com, GitHub (fawazahmed0 quran-api) | a Qur'an recitation plays | the surah number |
-| YouTube (through yt-dlp) | you search, play or download | your search text or link; your cookies only if you sign in |
-| YT Music (music.youtube.com) | you browse or search YT Music | your search text, or the album, artist or playlist id; no cookies, no account |
+| YouTube (Qistara's streaming engine) | a YouTube or YT Music song plays, is next, or your pointer rests on it | the video id; no cookies, no account |
+| YouTube (through yt-dlp) | you search or download, a song the engine can't open, Premium quality | your search text or link; your cookies only if you sign in |
+| YT Music (music.youtube.com) | you browse or search YT Music | your search text, or the album, artist or playlist id; your cookies only if you sign in |
+| Google (sign-in window) | you choose Sign In with Google | what you type into Google's own page; Qistara only keeps the YouTube cookies it ends with |
 | GitHub releases | you install or update yt-dlp, ffmpeg or Deno; the daily update check (can be turned off) | nothing but the download |
 | Lindera.dev | you install the Japanese dictionary | nothing but the download |
 | The people in your session | you host or join one | the shared songs and your chat, straight between you and them, encrypted |
@@ -137,9 +143,10 @@ Qistara has no account, no telemetry and no servers of its own. It only contacts
 | Your Subsonic server | you sign in to it | your user name and a salted password hash, only to that server; a song's id when its lyrics are looked up |
 | Last.fm, Spotify, Apple Music, Tidal | you connect your own account | what that feature needs |
 
-Requests identify themselves only as `Qistara/<version>`. Last.fm keys, your server password and the
-Spotify, Apple Music and Tidal sign-ins are kept in the OS secret store (Windows Credential Manager, the macOS
-Keychain, Secret Service on Linux).
+Requests identify themselves only as `Qistara/<version>` (the streaming engine as the YouTube app it asks as).
+Last.fm keys, your server password and the Spotify, Apple Music and Tidal sign-ins are kept in the OS secret store
+(Windows Credential Manager, the macOS Keychain, Secret Service on Linux). Your YouTube sign-in is kept encrypted in
+Qistara's data folder, its key in that same store.
 
 ### Coming from Confluence Player or Sonora
 

@@ -144,10 +144,11 @@ The updater only accepts a file whose signature is bound to the version `latest.
 
 Copies of a version update themselves from the next release on: 0.4.0 offers 0.4.1 when it's out.
 
-**A test release (beta)** for people trying macOS or Linux first: give it a version like `0.5.0-beta.1` (in the
-same three files) and tag `v0.5.0-beta.1`. The workflow then skips Windows and publishes a GitHub **pre-release**.
-The app only reads the latest full release, so nobody is offered a beta as an update. Its release notes come from the
-`## 0.5.0` section of the changelog.
+**A test release (beta)** for people trying a version first: give it a version like `0.6.0-beta.1` (in the same
+three files) and tag `v0.6.0-beta.1`. The workflow builds every package and publishes a GitHub **pre-release**; its
+Windows installer isn't sent to SignPath, so Windows shows the "unknown publisher" prompt for it. The app only reads
+the latest full release, so nobody is offered a beta as an update. Its release notes come from the `## 0.6.0` section
+of the changelog.
 
 ## 4. SignPath Foundation (once; their review takes a while)
 

@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.6.0 (beta)
+
+- **YouTube and YT Music songs start much faster.** Songs now play from Qistara's own streaming engine instead of
+  running yt-dlp for each one. It asks YouTube for the song's sound directly and starts playing as the first bytes
+  arrive. It also fetches the next songs ahead, as well as the song your pointer rests on and the first song of an
+  album or playlist you open, so they start at once. If YouTube refuses mid-song, the engine asks again and carries
+  on. If the engine can't open a song, yt-dlp plays it as before. YT Music no longer needs yt-dlp at all.
+- **Sign in to YouTube in Qistara's own window.** Providers › YouTube › Sign In with Google opens Google's sign-in
+  page in a small window, the way desktop apps sign in.
+  - **What you get:** YT Music shows your own Home and a Library tab (Liked Music, your playlists, saved albums,
+    followed artists), and age-restricted songs play.
+  - **Where it's kept:** encrypted on your computer, with the key in Credential Manager, the Keychain or the Secret
+    Service, and it is sent only to YouTube.
+  - Firefox and cookies.txt are still there, under "Other ways to sign in".
+- **Audio quality:** Standard starts fastest. Premium uses yt-dlp with your account for YouTube Premium's 256 kbps
+  audio when it's offered to you.
+- **yt-dlp is quicker too** (search, downloads, videos):
+  - It's installed unpacked rather than as a single file that unpacks itself on every run.
+  - It keeps YouTube's player code between runs, in the streaming cache.
+  - Updates fetch the new release, checked against its SHA-256.
+- **Lyrics for YouTube songs.**
+  - Qistara now asks with the song's own title (without "(Official Video)", 【MV】 and the like) and without the
+    "YT Music" placeholder album.
+  - LRCLIB falls back to its search.
+  - A new YT Music lyrics source, on by default, gives YouTube songs the lyrics YouTube itself shows.
+- **The adaptive theme follows YouTube and YT Music covers**, and the system's media controls show the song's cover
+  instead of the app icon.
+- **A spinning ring on Play** while a song or a seek is opening.
+- Settings › Playback › **Streaming › Test** times how long YouTube takes to find a song and to start sounding.
+- macOS: Now Playing's close button sits below the window buttons. Settings › Appearance › Corners says that it
+  shapes buttons, cards and artwork (the window's corners follow the system).
+- Betas include the Windows installer (unsigned), so a beta can be tried on Windows too.
+
 ## 0.5.0 (beta)
 
 - **Qistara on macOS and Linux.** A `.dmg` for Macs with Apple Silicon (macOS 13 or newer), and a `.deb` and an
