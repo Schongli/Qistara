@@ -1,5 +1,5 @@
 // Online lyrics. Each source is a fixed endpoint, and only the song's title, artist, album and length leave the
-// machine (a server song's id goes only to your own server). Everything comes back as LRC; word timing is kept
+// machine (a server song's id goes only to your own server, a YouTube song's video id only to YT Music). Everything comes back as LRC; word timing is kept
 // as enhanced LRC ("<mm:ss.mmm>word"), which lyrics.ts already reads.
 use crate::UA;
 use base64::Engine;
@@ -14,6 +14,8 @@ pub enum Source {
     Lrclib,
     Netease,
     Kugou,
+    /// YT Music's own lyrics, for YouTube and YT Music songs
+    Ytmusic,
 }
 
 impl Source {
@@ -23,6 +25,7 @@ impl Source {
             Source::Lrclib => "lrclib",
             Source::Netease => "netease",
             Source::Kugou => "kugou",
+            Source::Ytmusic => "ytmusic",
         }
     }
 }
@@ -35,7 +38,7 @@ pub struct Song {
     pub album: String,
     #[serde(default)]
     pub duration: f64, // seconds, 0 = unknown
-    /// the song's id on your Subsonic server
+    /// the song's id on your Subsonic server, or a YouTube song's video id (for YT Music)
     pub id: Option<String>,
 }
 
@@ -63,6 +66,10 @@ pub async fn fetch(source: Source, song: &Song) -> Result<String, String> {
         Source::Lrclib => lrclib(&title, &artist, &cap(&song.album), song.duration).await,
         Source::Netease => netease(&title, &artist, ms).await,
         Source::Kugou => kugou(&title, &artist, ms).await,
+        Source::Ytmusic => match &song.id {
+            Some(id) => crate::ytmusic::lyrics(id).await,
+            None => Ok(String::new()),
+        },
     }
 }
 
@@ -74,14 +81,20 @@ async fn json(req: reqwest::RequestBuilder) -> Result<serde_json::Value, String>
     serde_json::from_str(&r.text().await.map_err(|e| e.to_string())?).map_err(|e| e.to_string())
 }
 
+/// LRCLIB: the exact song first (title, artist, album and length all match), then a search by title and artist,
+/// picked like the other sources' results. A streaming song has no album to match, and its length can be off.
 async fn lrclib(title: &str, artist: &str, album: &str, duration: f64) -> Result<String, String> {
-    let mut q = vec![("track_name", title.to_string()), ("artist_name", artist.to_string()), ("album_name", album.to_string())];
+    let mut q = vec![("track_name", title.to_string()), ("artist_name", artist.to_string())];
+    if !album.is_empty() {
+        q.push(("album_name", album.to_string()));
+    }
     if duration > 0.0 {
         q.push(("duration", (duration.round() as i64).to_string()));
     }
     let r = client()?.get("https://lrclib.net/api/get").query(&q).send().await.map_err(|e| format!("network: {e}"))?;
     if r.status().as_u16() == 404 {
-        return Ok(String::new());
+        let found = json(client()?.get("https://lrclib.net/api/search").query(&[("track_name", title), ("artist_name", artist)])).await?;
+        return Ok(lrclib_pick(&found, title, artist, (duration * 1000.0).round() as i64).unwrap_or_default());
     }
     if !r.status().is_success() {
         return Err(format!("HTTP {}", r.status().as_u16()));
@@ -90,6 +103,26 @@ async fn lrclib(title: &str, artist: &str, album: &str, duration: f64) -> Result
     let pick = |k: &str| j[k].as_str().filter(|s| !s.trim().is_empty()).map(str::to_owned);
     // LRCLIB keeps whatever the uploader pasted, credits included
     Ok(pick("syncedLyrics").or_else(|| pick("plainLyrics")).map(|l| drop_credits(&l, title, artist)).unwrap_or_default())
+}
+
+/// The song among LRCLIB's search results, with its lyrics (synced when it has them), credits dropped.
+fn lrclib_pick(found: &serde_json::Value, title: &str, artist: &str, ms: i64) -> Option<String> {
+    let list = found.as_array()?;
+    let lyrics = |v: &serde_json::Value| {
+        let pick = |k: &str| v[k].as_str().filter(|s| !s.trim().is_empty()).map(str::to_owned);
+        pick("syncedLyrics").or_else(|| pick("plainLyrics"))
+    };
+    let cands: Vec<Cand> = list
+        .iter()
+        .enumerate()
+        .filter(|(_, v)| lyrics(v).is_some())
+        .map(|(i, v)| {
+            let s = |k: &str| v[k].as_str().unwrap_or_default().to_string();
+            (i.to_string(), s("trackName"), (v["duration"].as_f64().unwrap_or(0.0) * 1000.0).round() as i64, s("artistName"))
+        })
+        .collect();
+    let i: usize = best(&cands, title, artist, ms)?.parse().ok()?;
+    lyrics(&list[i]).map(|l| drop_credits(&l, title, artist))
 }
 
 /// A search result to choose from: (id, title, length in ms, artists).
@@ -278,6 +311,19 @@ fn drop_credits(lrc: &str, title: &str, artist: &str) -> String {
 mod tests {
     use super::*;
     use std::io::Write;
+
+    #[test]
+    fn picks_the_song_from_lrclib_search_results() {
+        let found = serde_json::json!([
+            { "trackName": "Like Flames (Instrumental)", "artistName": "MindaRyn", "duration": 271.0, "plainLyrics": "" },
+            { "trackName": "Like Flames", "artistName": "Someone Else", "duration": 200.0, "plainLyrics": "wrong song" },
+            { "trackName": "Like Flames", "artistName": "MindaRyn", "duration": 272.0, "syncedLyrics": "[00:10.00]burning", "plainLyrics": "burning" },
+        ]);
+        assert_eq!(lrclib_pick(&found, "Like Flames", "MindaRyn", 271_000).as_deref().map(str::trim), Some("[00:10.00]burning"));
+        // nothing near its length: no guess
+        assert_eq!(lrclib_pick(&found, "Like Flames", "MindaRyn", 100_000), None);
+        assert_eq!(lrclib_pick(&serde_json::json!({}), "x", "y", 0), None);
+    }
 
     #[test]
     fn fuzz_krc_and_credits_never_panic() {

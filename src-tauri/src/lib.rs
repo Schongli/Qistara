@@ -39,6 +39,8 @@ pub struct Lib {
   pub art: scan::Art,
   /// covers of streamed things (your server, YT Music), kept apart from the library's: app data/streaming/art
   pub stream_art: scan::Art,
+  /// YT Music and YouTube covers already in stream_art, by URL (remote_art)
+  remote_art: Mutex<std::collections::HashMap<String, String>>,
   scanning: AtomicBool,
   again: AtomicBool,
   watcher: Mutex<Option<Debouncer<RecommendedWatcher>>>,
@@ -426,7 +428,7 @@ async fn fetch_cover(lib: State<'_, Lib>, url: String) -> Res<String> {
 
 /// A cached cover by the name the page knows it by: "<hash>.jpg" (the library's) or "stream:<hash>.jpg"
 /// (streaming/art). A name only: never a path.
-fn art_file(lib: &Lib, art: &str) -> Option<std::path::PathBuf> {
+pub(crate) fn art_file(lib: &Lib, art: &str) -> Option<std::path::PathBuf> {
   let (stream, name) = art_name(art)?;
   Some(if stream { lib.stream_art.dir.join(name) } else { lib.art.dir.join(name) })
 }
@@ -437,10 +439,54 @@ fn art_name(art: &str) -> Option<(bool, &str)> {
   (!name.is_empty() && !name.contains(['/', '\\', ':']) && !name.contains("..")).then_some((stream, name))
 }
 
-/// Appearance › Match artwork: the vivid colour of a cached cover.
+/// A YT Music or YouTube cover (https, from the thumbnail hosts only) copied into streaming/art, for the adaptive
+/// theme and the OS media overlay, which can't use a URL the page loads: its "stream:<name>". Fetched once per URL.
+pub(crate) async fn remote_art(lib: &Lib, url: &str) -> Option<String> {
+  if !ytmusic::thumb_host(url) {
+    return None;
+  }
+  let known = lib.remote_art.lock().unwrap().get(url).cloned();
+  if let Some(name) = known.filter(|n| art_file(lib, n).is_some_and(|f| f.exists())) {
+    return Some(name);
+  }
+  const MAX: usize = 2 * 1024 * 1024;
+  let client = tauri_plugin_http::reqwest::Client::builder()
+    .user_agent(UA)
+    .redirect(tauri_plugin_http::reqwest::redirect::Policy::none())
+    .timeout(Duration::from_secs(10))
+    .build()
+    .ok()?;
+  let r = client.get(url).send().await.ok()?.error_for_status().ok()?;
+  if r.content_length().is_some_and(|n| n as usize > MAX) {
+    return None;
+  }
+  let bytes = r.bytes().await.ok()?;
+  if bytes.len() > MAX {
+    return None;
+  }
+  let dir = lib.stream_art.dir.clone();
+  let name = tauri::async_runtime::spawn_blocking(move || scan::Art::new(dir).thumb(&bytes)).await.ok()??;
+  let name = format!("stream:{name}");
+  let mut m = lib.remote_art.lock().unwrap();
+  if m.len() > 500 {
+    m.clear();
+  }
+  m.insert(url.to_string(), name.clone());
+  Some(name)
+}
+
+/// The cached file for a cover the page knows by its name or, for a streaming song, by its https URL.
+pub(crate) async fn cover_file(lib: &Lib, art: &str) -> Option<std::path::PathBuf> {
+  let name = if art.starts_with("https://") { remote_art(lib, art).await? } else { art.to_string() };
+  art_file(lib, &name).filter(|f| f.exists())
+}
+
+/// Appearance › Match artwork and the adaptive theme: the vivid colour of a cover (a cached one, or a streaming
+/// song's, fetched once).
 #[tauri::command]
-fn art_color(lib: State<Lib>, art: String) -> Option<String> {
-  vivid(&image::open(art_file(&lib, &art)?).ok()?)
+async fn art_color(lib: State<'_, Lib>, art: String) -> Res<Option<String>> {
+  let Some(file) = cover_file(&lib, &art).await else { return Ok(None) };
+  Ok(tauri::async_runtime::spawn_blocking(move || image::open(file).ok().and_then(|i| vivid(&i))).await.ok().flatten())
 }
 
 /// A listening session shows guests the host's cover of a library song: a 160 px JPEG small enough to send
@@ -690,6 +736,7 @@ pub fn run() {
         db: Mutex::new(db::open(&dir.join("library.db"))?),
         art: scan::Art::new(art),
         stream_art: scan::Art::new(stream_art),
+        remote_art: Mutex::default(),
         scanning: AtomicBool::new(false),
         again: AtomicBool::new(false),
         watcher: Mutex::new(None),

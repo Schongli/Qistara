@@ -2,7 +2,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { untrack } from 'svelte'
 import { parseLyrics, type Lyrics } from './lyrics'
-import { firstLyrics, serverSongId, type LyricsSource } from './lyricsources'
+import { firstLyrics, lookupSong, serverSongId, youtubeSongId, type LyricsSource } from './lyricsources'
 import { queue } from './queue.svelte'
 import { settings } from './settings.svelte'
 import type { Track } from './library.svelte'
@@ -15,11 +15,15 @@ async function ask(t: Track, id: LyricsSource): Promise<Lyrics | null> {
     return f?.text.trim() ? parseLyrics(f.kind, f.text) : null
   }
   const sid = serverSongId(t.path)
-  if (t.kind !== 'audio' || !t.title || (id === 'subsonic' ? !sid : !t.artist)) return null
+  const yid = youtubeSongId(t.path)
+  if (t.kind !== 'audio' || !t.title) return null
+  if (id === 'subsonic' ? !sid : id === 'ytmusic' ? !yid : !t.artist) return null
   // a server song's address is signed afresh each session, so it is cached by its id instead
   // a listening session's song is a loopback URL with a new token each time: cache it by what it is instead
   const key = sid ? `sub:${sid}` : t.path.startsWith('http://127.0.0.1:') ? `session:${t.artist}|${t.title}` : t.path
-  const song = { title: t.title, artist: t.artist, album: t.album, duration: t.duration, id: sid }
+  // a YouTube song is asked about by its song title, not the video's (lyricsources.ts lookupSong)
+  const asked = yid ? lookupSong(t) : { title: t.title, artist: t.artist, album: t.album, duration: t.duration }
+  const song = { ...asked, id: id === 'ytmusic' ? yid : sid }
   const text = await invoke<string>('lyrics_fetch', { source: id, key, song })
   return text.trim() ? parseLyrics('lrc', text) : null
 }

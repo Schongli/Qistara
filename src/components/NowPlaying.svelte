@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { OS } from '../lib/os'
   import { Spring } from 'svelte/motion'
   import { untrack } from 'svelte'
   import Icon from './Icon.svelte'
@@ -93,7 +94,7 @@
     <div class="backdrop" aria-hidden="true">
       {#if cover}<img src={cover} alt="" />{/if}
     </div>
-    <button class="close icon-btn press" aria-label="Close Now Playing" onclick={() => (ui.nowPlaying = false)}><Icon name="CaretDown" size={20} weight="bold" /></button>
+    <button class="close icon-btn press" class:mac={OS === 'macos'} aria-label="Close Now Playing" onclick={() => (ui.nowPlaying = false)}><Icon name="CaretDown" size={20} weight="bold" /></button>
 
     <div class="stage" class:with-side={ui.lyrics || ui.queue}>
       <div class="player">
@@ -161,6 +162,8 @@
   @keyframes drift { from { transform: scale(1.3) rotate(0deg) translate(0, 0); } to { transform: scale(1.45) rotate(8deg) translate(-3%, 2%); } }
 
   .close { position: absolute; top: 14px; left: 16px; z-index: 2; color: rgba(255, 255, 255, 0.85); }
+  /* macOS draws its window buttons in this corner: sit below them */
+  .close.mac { top: 46px; left: 14px; }
   .close:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
 
   .stage { position: relative; height: 100%; display: grid; grid-template-columns: 1fr; place-items: center; padding: 48px 6vw; gap: 5vw; }

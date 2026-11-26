@@ -332,6 +332,7 @@
 
     <section>
       <h2 class="t-h2">Corners</h2>
+      <p class="t-sub">Buttons, cards and artwork inside Qistara. The window's own corners follow your system.</p>
       <div class="corners" role="radiogroup" aria-label="Corners">
         {#each CORNERS as [id, label, k] (id)}
           <button class="corner press" role="radio" aria-checked={settings.corners === id} onclick={() => (settings.corners = id)}>
@@ -437,7 +438,7 @@
   {#if shown('lyrics')}
     <section>
       <h2 class="t-h2">Lyrics sources</h2>
-      <p class="t-sub">Asked from the top until one has lyrics. Online sources get only the title, artist, album and length; what they find is kept on this PC.</p>
+      <p class="t-sub">Asked from the top until one has lyrics. Online sources get only the title, artist, album and length (YT Music only a YouTube song’s video id); what they find is kept on this PC.</p>
       <div class="group">
         <Toggle bind:checked={settings.preferWordSync} label="Prefer word-synced lyrics" hint="Keeps asking further down the list for lyrics timed word by word, and falls back to line-synced ones." />
       </div>
@@ -609,7 +610,7 @@
   section { margin-bottom: 32px; }
   h2 { margin: 0 0 4px; }
   p { margin: 0 0 12px; }
-  h2 + .group, h2 + .themes, h2 + .corners { margin-top: 10px; }
+  h2 + .group, h2 + .themes { margin-top: 10px; }
   .group { border-radius: var(--r-lg); background: var(--fill); overflow: hidden; }
   .line { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 42px; padding: 4px 8px 4px 14px; border-bottom: 1px solid var(--sep); }
   .line:last-child { border-bottom: 0; }

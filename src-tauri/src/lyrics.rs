@@ -75,8 +75,17 @@ pub fn local(path: &Path) -> Option<Found> {
 
 /// A cached result: Some("") records that the source had none.
 /// shortcut: cached results never expire; delete the lyrics folder to look again
+/// A stored answer. "None found" is only trusted for a day: sources add lyrics, and lookups get better.
 pub fn cached(key: &str, source: &str, cache: &Path) -> Option<String> {
-    std::fs::read_to_string(cache_file(key, source, cache)).ok()
+    let f = cache_file(key, source, cache);
+    let text = std::fs::read_to_string(&f).ok()?;
+    if text.is_empty() {
+        let age = std::fs::metadata(&f).ok()?.modified().ok()?.elapsed().ok()?;
+        if age > std::time::Duration::from_secs(24 * 3600) {
+            return None;
+        }
+    }
+    Some(text)
 }
 
 pub fn store(key: &str, source: &str, cache: &Path, text: &str) -> std::io::Result<()> {
@@ -109,6 +118,21 @@ mod tests {
         // a sidecar far too big to be lyrics is ignored
         std::fs::write(d.path().join("song.lrc"), vec![b'a'; MAX_SIDECAR as usize + 1]).unwrap();
         assert_eq!(local(&song), None);
+    }
+
+    #[test]
+    fn none_found_is_asked_again_after_a_day() {
+        let d = tempfile::tempdir().unwrap();
+        store("ytdl://x", "lrclib", d.path(), "").unwrap();
+        assert_eq!(cached("ytdl://x", "lrclib", d.path()).as_deref(), Some(""));
+        let f = std::fs::OpenOptions::new().write(true).open(cache_file("ytdl://x", "lrclib", d.path())).unwrap();
+        f.set_modified(std::time::SystemTime::now() - std::time::Duration::from_secs(2 * 24 * 3600)).unwrap();
+        assert_eq!(cached("ytdl://x", "lrclib", d.path()), None);
+        // lyrics found are kept whatever their age
+        store("ytdl://y", "lrclib", d.path(), "[00:01.00]a").unwrap();
+        let f = std::fs::OpenOptions::new().write(true).open(cache_file("ytdl://y", "lrclib", d.path())).unwrap();
+        f.set_modified(std::time::SystemTime::now() - std::time::Duration::from_secs(400 * 24 * 3600)).unwrap();
+        assert_eq!(cached("ytdl://y", "lrclib", d.path()).as_deref(), Some("[00:01.00]a"));
     }
 
     #[test]

@@ -95,6 +95,11 @@ fn seconds(s: &str) -> Option<f64> {
     Some(parts.iter().fold(0.0, |acc, p| acc * 60.0 + p.parse::<f64>().unwrap_or(0.0)))
 }
 
+/// Whether a cover URL is https on one of the thumbnail hosts (the same ones the CSP lets the page load).
+pub fn thumb_host(url: &str) -> bool {
+    url::Url::parse(url).is_ok_and(|u| u.scheme() == "https" && u.host_str().is_some_and(|h| THUMB_HOSTS.contains(&h)))
+}
+
 /// The best thumbnail (for square art, asked for at 544 px), from a host the page may load.
 fn thumb(v: &Value) -> Option<String> {
     let list = find(v, "thumbnails")?.as_array()?;
@@ -395,6 +400,38 @@ pub async fn ytm_playlist(id: String, hl: String) -> Result<Page, String> {
     Ok(parse_page(&call("browse", &hl, json!({ "browseId": id })).await?))
 }
 
+/// The browse id of a song's lyrics page (MPLY…) in its "next" reply, if YT Music has lyrics for it.
+pub fn lyrics_page(v: &Value) -> Option<String> {
+    match v {
+        Value::Object(m) => m
+            .get("browseId")
+            .and_then(Value::as_str)
+            .filter(|b| b.starts_with("MPLY") && b.len() <= 64 && b.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+            .map(str::to_owned)
+            .or_else(|| m.values().find_map(lyrics_page)),
+        Value::Array(a) => a.iter().find_map(lyrics_page),
+        _ => None,
+    }
+}
+
+/// The lyrics on a lyrics page: plain lines (the web client has no timings); not the "Source: …" footer.
+pub fn parse_lyrics(v: &Value) -> Option<String> {
+    let shelf = find(v, "musicDescriptionShelfRenderer")?;
+    let text: String = shelf["description"]["runs"].as_array()?.iter().filter_map(|r| r["text"].as_str()).collect();
+    let text = text.replace("\r\n", "\n");
+    (!text.trim().is_empty()).then_some(text)
+}
+
+/// A YouTube song's lyrics from YT Music (Settings › Lyrics › YT Music): only the video id is sent.
+pub async fn lyrics(id: &str) -> Result<String, String> {
+    if !valid_video(id) {
+        return Err("bad video id".into());
+    }
+    let next = call("next", "en", json!({ "videoId": id, "isAudioOnly": true })).await?;
+    let Some(page) = lyrics_page(&next) else { return Ok(String::new()) };
+    Ok(parse_lyrics(&call("browse", "en", json!({ "browseId": page })).await?).unwrap_or_default())
+}
+
 /// Songs that follow on from one: YT Music's own radio for it.
 #[tauri::command]
 pub async fn ytm_radio(id: String, hl: String) -> Result<Vec<Item>, String> {
@@ -408,6 +445,31 @@ pub async fn ytm_radio(id: String, hl: String) -> Result<Vec<Item>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn finds_a_songs_lyrics_page_and_reads_its_lines() {
+        let next = serde_json::json!({ "contents": { "tabs": [
+            { "tabRenderer": { "endpoint": { "browseEndpoint": { "browseId": "MPTRt_upnext" } } } },
+            { "tabRenderer": { "endpoint": { "browseEndpoint": { "browseId": "MPLYt_abc123-_X" } } } },
+        ] } });
+        assert_eq!(lyrics_page(&next).as_deref(), Some("MPLYt_abc123-_X"));
+        assert_eq!(lyrics_page(&serde_json::json!({ "browseId": "MPLYt/../x" })), None);
+        assert_eq!(lyrics_page(&serde_json::json!({ "browseId": "FEmusic_home" })), None);
+        let page = serde_json::json!({ "contents": { "sectionListRenderer": { "contents": [{ "musicDescriptionShelfRenderer": {
+            "description": { "runs": [{ "text": "first line\r\nsecond line" }] },
+            "footer": { "runs": [{ "text": "Source: LyricFind" }] } } }] } } });
+        assert_eq!(parse_lyrics(&page).as_deref(), Some("first line\nsecond line"));
+        assert_eq!(parse_lyrics(&serde_json::json!({})), None);
+    }
+
+    #[test]
+    fn only_thumbnail_hosts_count_as_covers_to_fetch() {
+        assert!(thumb_host("https://i.ytimg.com/vi/abcdefghijk/mqdefault.jpg"));
+        assert!(thumb_host("https://lh3.googleusercontent.com/x=w544-h544"));
+        for bad in ["http://i.ytimg.com/vi/x.jpg", "https://evil.example/i.ytimg.com", "https://i.ytimg.com.evil.example/x", "file:///etc/passwd", "stream:abc.jpg", ""] {
+            assert!(!thumb_host(bad), "{bad}");
+        }
+    }
 
     fn fixture(name: &str) -> Value {
         let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ytm").join(name);

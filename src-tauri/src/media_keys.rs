@@ -21,7 +21,7 @@ pub fn init(_window: &WebviewWindow) -> Option<MediaControls> {
 }
 #[cfg(mobile)]
 #[tauri::command]
-pub fn media_track(_media: State<Media>, _path: String, _title: String, _artist: String, _album: String, _duration: f64) {}
+pub fn media_track(_media: State<Media>, _path: String, _title: String, _artist: String, _album: String, _duration: f64, _art: Option<String>) {}
 #[cfg(mobile)]
 #[tauri::command]
 pub fn media_state(_media: State<Media>, _playing: bool, _position: f64) {}
@@ -57,18 +57,40 @@ pub fn init(window: &WebviewWindow) -> Option<MediaControls> {
 }
 
 #[cfg(desktop)]
-#[tauri::command]
-pub fn media_track(media: State<Media>, lib: State<crate::Lib>, path: String, title: String, artist: String, album: String, duration: f64) {
-    let cover = lib.art.large(Path::new(&path)).map(|p| format!("file://{}", p.to_string_lossy()));
+/// The song the overlay shows now: a cover fetched for an earlier one doesn't replace it.
+static SHOWN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+#[cfg(desktop)]
+fn show(media: &Media, title: &str, artist: &str, album: &str, duration: f64, cover: Option<&Path>) {
+    let cover = cover.map(|p| format!("file://{}", p.to_string_lossy()));
     if let Some(c) = media.0.lock().unwrap().as_mut() {
         let _ = c.set_metadata(MediaMetadata {
-            title: Some(&title),
-            artist: Some(&artist),
-            album: Some(&album),
+            title: Some(title),
+            artist: Some(artist),
+            album: Some(album),
             cover_url: cover.as_deref(),
             duration: (duration > 0.0).then(|| Duration::from_secs_f64(duration)),
         });
     }
+}
+
+/// A library song's cover comes from its file; a streaming song's (art: a cached name or a YT Music URL) is fetched
+/// once, then the overlay is updated if that song is still the one playing.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn media_track(media: State<'_, Media>, lib: State<'_, crate::Lib>, path: String, title: String, artist: String, album: String, duration: f64, art: Option<String>) -> Result<(), String> {
+    use std::sync::atomic::Ordering::SeqCst;
+    let me = SHOWN.fetch_add(1, SeqCst) + 1;
+    let local = (!path.contains("://")).then(|| lib.art.large(Path::new(&path))).flatten();
+    show(&media, &title, &artist, &album, duration, local.as_deref());
+    if local.is_none() {
+        if let Some(file) = match art { Some(a) => crate::cover_file(&lib, &a).await, None => None } {
+            if SHOWN.load(SeqCst) == me {
+                show(&media, &title, &artist, &album, duration, Some(&file));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(desktop)]
