@@ -264,8 +264,9 @@ pub fn check_command_on(os: Os, name: &str, args: &[Value]) -> Result<(), String
     let ok = match (name, a.as_slice()) {
         ("set", [p, _]) => return check_prop_on(os, p, &args[1]),
         ("loadfile", [p] | [p, "replace" | "append" | "append-play"]) => media(os, p),
-        // resume, reload and YouTube as video (player.svelte.ts loadTrack): a start time and the video format
-        ("loadfile", [p, "replace" | "append", "-1", opts]) => media(os, p) && file_options(opts),
+        // resume, reload and YouTube as video (player.svelte.ts loadTrack): a start time and the video format.
+        // mpv 0.38+ puts an index before them; 0.37 and older (Ubuntu 24.04, Debian 12) don't (loadfile.ts).
+        ("loadfile", [p, "replace" | "append", "-1", opts] | [p, "replace" | "append", opts]) => media(os, p) && file_options(opts),
         ("video-add", [src, "select"]) => video_source(os, src),
         ("seek", [t, "absolute" | "relative"]) => num(t),
         ("sub-add", [p, "select"]) => local_on(os, p),
@@ -478,6 +479,27 @@ mod tests {
         assert!(!local_on(Os::Windows, "/home/me/a.flac"));
         assert!(check_command_on(Os::Linux, "loadfile", &[json!("/home/me/a.flac"), json!("replace")]).is_ok());
         assert!(check_command_on(Os::Linux, "sub-add", &[json!("/proc/self/fd/0"), json!("select")]).is_err());
+    }
+
+    #[test]
+    fn takes_per_file_options_in_both_loadfile_forms() {
+        // mpv 0.38+: <url> <flags> <index> <options>; 0.37 and older: <url> <flags> <options> (loadfile.ts)
+        let ok = |args: Value| check_command_on(Os::Linux, "loadfile", args.as_array().unwrap()).is_ok();
+        let both = format!("start=61,ytdl-format={VIDEO_FORMAT}");
+        for opts in ["start=12", "start=0", both.as_str()] {
+            assert!(ok(json!(["/home/me/a.flac", "replace", -1, opts])), "{opts}");
+            assert!(ok(json!(["/home/me/a.flac", "replace", opts])), "{opts}");
+            assert!(ok(json!(["ytdl://https://www.youtube.com/watch?v=dQw4w9WgXcQ", "append", opts])), "{opts}");
+        }
+        // the 3-argument form gets the same checks
+        for bad in ["script-opts=ytdl_hook-ytdl_path=/bin/sh", "start=1,stream-record=/tmp/x", "start=1,start=2", "ytdl-format=bestvideo+bestaudio", "-1", "", "start=nan"] {
+            assert!(!ok(json!(["/home/me/a.flac", "replace", bad])), "{bad}");
+        }
+        assert!(!ok(json!(["/home/me/a.flac", "append-play", "start=1"])));
+        assert!(!ok(json!(["/home/me/a.flac", "replace", -1])));
+        for path in ["av://v4l2:/dev/video0", "/dev/snd/pcmC0D0p", "edl:///home/me/a.flac"] {
+            assert!(!ok(json!([path, "replace", "start=1"])), "{path}");
+        }
     }
 
     #[test]

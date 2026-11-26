@@ -3,6 +3,7 @@ import { byName, quality, time, totalTime } from './format'
 import { autoplayPicks, indexAfterMove, insertAfter, move, nextIndex, shuffleRest } from './queue'
 import { project, rubberband, velocity } from './gesture'
 import { matchTracks } from './musicbrainz'
+import { loadfileArgs, mpvRelease } from './loadfile'
 
 describe('gesture', () => {
   it('projects a flick like scroll deceleration', () => {
@@ -92,5 +93,27 @@ describe('autoplay', () => {
   it('pushes down songs played in the last day and caps the count', () => {
     const all = [t(2, { lastPlayed: now - 60 }), t(3, { artist: 'Z', genre: 'Z' }), t(4)]
     expect(autoplayPicks(all, seed, new Set(), 2, () => 0, now).map((x) => x.id)).toEqual([4, 3])
+  })
+})
+
+describe('loadfile', () => {
+  it('reads the release from mpv-version', () => {
+    expect(mpvRelease('mpv 0.35.1')).toEqual([0, 35])
+    expect(mpvRelease('mpv 0.37.0')).toEqual([0, 37])
+    expect(mpvRelease('mpv v0.37.0-412-gabcdef0')).toEqual([0, 37])
+    expect(mpvRelease('mpv v0.38.0')).toEqual([0, 38])
+    expect(mpvRelease('mpv 0.39.0-dirty')).toEqual([0, 39])
+    expect(mpvRelease('mpv 1.0.0')).toEqual([1, 0])
+    expect(mpvRelease('mpv git-1a2b3c4')).toBeNull()
+    expect(mpvRelease(null)).toBeNull()
+  })
+  it('puts the options third before mpv 0.38 and after an index from 0.38', () => {
+    expect(loadfileArgs('/a.flac', 'replace', '', 'mpv 0.37.0')).toEqual(['/a.flac', 'replace'])
+    for (const v of ['mpv 0.35.1', 'mpv 0.37.0', 'mpv v0.37.0-412-gabcdef0']) {
+      expect(loadfileArgs('/a.flac', 'replace', 'start=12', v)).toEqual(['/a.flac', 'replace', 'start=12'])
+    }
+    for (const v of ['mpv v0.38.0', 'mpv 0.39.0', 'mpv 1.0.0', 'mpv git-1a2b3c4', null]) {
+      expect(loadfileArgs('/a.flac', 'append', 'start=12', v)).toEqual(['/a.flac', 'append', -1, 'start=12'])
+    }
   })
 })

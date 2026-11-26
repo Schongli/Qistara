@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { AO, type AudioParams } from './signal'
 import { OS, SHOWS_VIDEO } from './os'
 import { youtubeSongId } from './lyricsources'
+import { loadfileArgs } from './loadfile'
 
 export interface MpvTrack {
   id: number
@@ -60,6 +61,7 @@ const PROPS = [
   ['video-aspect-override', 'string'],
   ['panscan', 'double'],
   ['eof-reached', 'flag', 'none'],
+  ['mpv-version', 'string'],
 ] as const satisfies MpvObservableProperty[]
 
 export const mpv = $state({
@@ -102,6 +104,8 @@ export const mpv = $state({
   aspect: '-1',
   panscan: 0,
   eof: false,
+  /** "mpv 0.37.0": loadTrack's loadfile form depends on it (loadfile.ts) */
+  version: null as string | null,
   /** a file (or a seek) is opening: the play button shows a ring once it takes a moment */
   loading: false,
 })
@@ -115,7 +119,7 @@ const KEY: Record<(typeof PROPS)[number][0], keyof typeof mpv> = {
   'audio-device': 'device', 'sub-delay': 'subDelay', 'audio-delay': 'audioDelay', 'sub-scale': 'subScale', 'ab-loop-a': 'abA',
   'ab-loop-b': 'abB', 'container-fps': 'fps', 'video-codec': 'videoCodec', 'video-bitrate': 'videoBitrate',
   'audio-bitrate': 'audioBitrate', 'file-format': 'container', 'video-aspect-override': 'aspect', panscan: 'panscan',
-  'eof-reached': 'eof',
+  'eof-reached': 'eof', 'mpv-version': 'version',
 }
 const EMPTY: Partial<Record<keyof typeof mpv, unknown>> = { time: 0, duration: 0, af: [], tracks: [], chapters: [], devices: [], abA: 'no', abB: 'no', eof: false }
 
@@ -136,9 +140,13 @@ onMpvEvent(({ event }) => {
   else if (event === 'playback-restart' || event === 'end-file' || event === 'idle') mpv.loading = false
 })
 
+let versionSeen = () => {}
+const versionKnown = new Promise<void>((r) => (versionSeen = r))
+
 function apply(name: (typeof PROPS)[number][0], data: unknown) {
   const k = KEY[name]
   ;(mpv as Record<string, unknown>)[k] = data ?? (k in EMPTY ? EMPTY[k] : null)
+  if (name === 'mpv-version') versionSeen()
 }
 
 export async function startMpv() {
@@ -170,6 +178,8 @@ export async function startMpv() {
         observedProperties: Object.fromEntries(PROPS),
       },
     })
+    // the version comes as an event, apart from init's reply: have it before the restored queue loads (loadTrack)
+    await Promise.race([versionKnown, new Promise((r) => setTimeout(r, 2000))])
     mpv.ready = true
   } catch (e) {
     mpv.error = String(e)
@@ -219,7 +229,7 @@ export async function loadTrack(t: { path: string; kind: 'audio' | 'video' }, mo
     .filter(Boolean)
     .join(',')
   const path = await source(t)
-  await (opts ? cmd('loadfile', path, mode, -1, opts) : cmd('loadfile', path, mode))
+  await cmd('loadfile', ...loadfileArgs(path, mode, opts, mpv.version))
 }
 
 export async function load(path: string, mode: 'replace' | 'append' | 'append-play' = 'replace') {

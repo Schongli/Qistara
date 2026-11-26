@@ -32,6 +32,8 @@
 - macOS: Now Playing's close button sits below the window buttons. Settings › Appearance › Corners says that it
   shapes buttons, cards and artwork (the window's corners follow the system).
 - Betas include the Windows installer (unsigned), so a beta can be tried on Windows too.
+- Linux with mpv 0.37 or older (Ubuntu 24.04, Debian 12): Qistara opens again where you left off, and switching
+  exclusive mode or a YouTube song's video keeps your place. These failed there before.
 
 ## 0.5.0 (beta)
 

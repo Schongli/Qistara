@@ -51,7 +51,8 @@ Phases and status: `ROADMAP.md`.
   command/set_property/init; options holding a path (script-opts, ytdl-raw-options, log/resume/screenshot dirs) are set in Rust.
   The hook's script-opts keep `ytdl_hook-exclude` for `127.0.0.1` (session URLs) and its raw options `ignore-config`.
   loadfile's per-file options are only `start=` and `ytdl-format=` + `VIDEO_FORMAT` (the same constant in mpv.rs and
-  player.svelte.ts `loadTrack`, the one way the queue loads files). `video-add` only takes a local path, https on
+  player.svelte.ts `loadTrack`, the one way the queue loads files), in either loadfile form: `<url> <flags> <options>`
+  before mpv 0.38, `<url> <flags> -1 <options>` from 0.38 (`loadfileArgs`, by the observed `mpv-version`). `video-add` only takes a local path, https on
   `*.googlevideo.com` or the session's `127.0.0.1:<port>`. A music video never replaces the song: the song stays the
   main file (bit-perfect, stats, lyrics) and the video is a picture-only track (`musicvideo.svelte.ts`).
 - Tag writes: copy → write → re-read → atomic rename. Never write tags in place.
