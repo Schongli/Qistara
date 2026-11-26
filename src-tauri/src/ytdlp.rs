@@ -4,6 +4,7 @@
 // before the URLs (a URL can't act as an option). Jobs run one at a time and report `download-progress`.
 // A cookies.txt sign-in reaches yt-dlp only as a copy made for that one run, deleted when the run ends.
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -925,6 +926,57 @@ pub async fn youtube_video_url(app: AppHandle, id: String, cookies: Option<Cooki
     }
 }
 
+/// yt-dlp's arguments for a song's sound (the streaming engine's fallback, ytstream.rs): fixed, one JSON reply.
+pub fn audio_stream_args(id: &str, cache: &Path, js: Option<String>) -> Vec<String> {
+    let mut a: Vec<String> = ["--ignore-config", "--cache-dir", &cache.to_string_lossy(), "--no-warnings", "--no-playlist", "-f", "bestaudio/best", "-j"].map(String::from).into();
+    if let Some(js) = js {
+        a.extend(["--js-runtimes".into(), js]);
+    }
+    a.extend(["--".into(), format!("https://www.youtube.com/watch?v={id}")]);
+    a
+}
+
+/// A song's sound as yt-dlp found it: the address (on YouTube's own video host only), the User-Agent it must be
+/// fetched with, its type and size when known.
+#[derive(Debug, PartialEq)]
+pub struct AudioStream {
+    pub url: String,
+    pub user_agent: Option<String>,
+    pub mime: &'static str,
+    pub len: Option<u64>,
+}
+
+pub fn parse_audio_stream(j: &Value) -> Option<AudioStream> {
+    let url = j["url"].as_str()?;
+    let u = url::Url::parse(url).ok()?;
+    if u.scheme() != "https" || !u.host_str().is_some_and(|h| h.ends_with(".googlevideo.com")) {
+        return None;
+    }
+    let mime = match j["ext"].as_str() {
+        Some("m4a" | "mp4") => "audio/mp4",
+        _ => "audio/webm",
+    };
+    let user_agent = j["http_headers"]["User-Agent"].as_str().filter(|ua| ua.len() <= 512 && ua.chars().all(|c| (' '..='~').contains(&c))).map(String::from);
+    Some(AudioStream { url: url.to_string(), user_agent, mime, len: j["filesize"].as_u64() })
+}
+
+/// A song's sound through yt-dlp, with the sign-in when there is one (age-restricted songs, Premium quality).
+pub async fn audio_stream(app: &AppHandle, id: &str, cookies: &Option<Cookies>) -> Result<AudioStream, String> {
+    if !valid_video_id(id) {
+        return Err("Not a YouTube video.".into());
+    }
+    let exe = ytdlp(app)?;
+    let (mut argv, copy) = cookie_args(cookies, &streaming_dir(app, "session")?)?;
+    argv.extend(audio_stream_args(id, &streaming_dir(app, "ytdlp-cache")?, js_runtime(app).ok()));
+    let o = tauri::async_runtime::spawn_blocking(move || command(&exe).args(&argv).stdin(Stdio::null()).output()).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
+    drop(copy);
+    if !o.status.success() {
+        return Err(last_error(&o.stderr, "yt-dlp couldn't open this song."));
+    }
+    let j: Value = serde_json::from_slice(&o.stdout).map_err(|_| "Unexpected reply from yt-dlp.")?;
+    parse_audio_stream(&j).ok_or_else(|| "yt-dlp gave an address Qistara won't fetch.".into())
+}
+
 fn last_error(stderr: &[u8], fallback: &str) -> String {
     let err = String::from_utf8_lossy(stderr);
     err.lines().rev().find(|l| l.starts_with("ERROR")).map_or(fallback, |l| l).trim_start_matches("ERROR:").trim().to_string()
@@ -1317,6 +1369,22 @@ mod tests {
         let started = std::time::Instant::now();
         let v = version(&exe).expect("the unpacked build runs");
         println!("yt-dlp {v}: --version in {} ms", started.elapsed().as_millis());
+    }
+
+    #[test]
+    fn reads_a_songs_stream_from_yt_dlp_and_keeps_to_youtubes_host() {
+        let a = audio_stream_args("dQw4w9WgXcQ", Path::new("/c"), None);
+        assert_eq!(&a[a.len() - 2..], ["--", "https://www.youtube.com/watch?v=dQw4w9WgXcQ"]);
+        assert!(a.windows(2).any(|w| w == ["-f", "bestaudio/best"]) && a.contains(&"-j".to_string()));
+        let j = serde_json::json!({ "url": "https://rr1---sn-x.googlevideo.com/videoplayback?expire=1", "ext": "m4a", "filesize": 4000,
+            "http_headers": { "User-Agent": "Mozilla/5.0 (X11)" } });
+        assert_eq!(parse_audio_stream(&j), Some(AudioStream { url: j["url"].as_str().unwrap().into(), user_agent: Some("Mozilla/5.0 (X11)".into()), mime: "audio/mp4", len: Some(4000) }));
+        for bad in ["http://rr1---sn-x.googlevideo.com/v", "https://evil.example/googlevideo.com", "https://googlevideo.com.evil.example/v", "file:///etc/passwd"] {
+            assert_eq!(parse_audio_stream(&serde_json::json!({ "url": bad })), None, "{bad}");
+        }
+        // a header that could break the request line is dropped
+        let j = serde_json::json!({ "url": "https://r.googlevideo.com/v", "http_headers": { "User-Agent": "a\r\nHost: evil" } });
+        assert_eq!(parse_audio_stream(&j).unwrap().user_agent, None);
     }
 
     #[test]

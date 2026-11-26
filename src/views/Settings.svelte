@@ -17,7 +17,7 @@
   import { ACCENTS } from '../lib/appearance.svelte'
   import { FAMILIES, LIGHT, OBSIDIAN, presetOf, type Family, type Palette, type ThemeId } from '../lib/themes'
   import { connect, finish, lastfm, refresh } from '../lib/lastfm.svelte'
-  import { defaultFolder } from '../lib/downloads.svelte'
+  import { defaultFolder, ytCookies } from '../lib/downloads.svelte'
   import { plural } from '../lib/format'
   import { LANGUAGES, languageName, targetFor } from '../lib/translate'
   import { installDictionary, learn } from '../lib/learn.svelte'
@@ -124,6 +124,23 @@
   async function clearLyrics() {
     await invoke('clear_lyrics_cache')
     refreshUsage()
+  }
+
+  // ---- streaming (ytstream.rs): how fast a YouTube song starts from here ----
+  const ENGINES: Record<string, string> = { ANDROID_VR: 'Qistara’s engine', IOS: 'Qistara’s engine (second client)', 'yt-dlp': 'yt-dlp (fallback)' }
+  let testing = $state(false)
+  let streamTest = $state('')
+  async function testStreaming() {
+    testing = true
+    streamTest = ''
+    try {
+      const r = await invoke<{ engine: string; resolveMs: number; firstByteMs: number }>('ytstream_test', { cookies: ytCookies() })
+      streamTest = `${ENGINES[r.engine] ?? r.engine}: found in ${r.resolveMs} ms, sound ${r.firstByteMs} ms later`
+    } catch (e) {
+      streamTest = `Couldn’t stream: ${e}`
+    } finally {
+      testing = false
+    }
   }
 
   // ---- updates (update.svelte.ts) ----
@@ -431,6 +448,17 @@
       {#if !SHOWS_VIDEO}<p class="t-sub">On {SYSTEM}, videos play their sound for now: the picture comes in a later version.</p>{/if}
       <div class="group">
         <Toggle bind:checked={settings.hwdec} label="Hardware decoding" hint="Decodes on your GPU. Output is identical; turn off only if a file shows glitches." />
+      </div>
+    </section>
+
+    <section>
+      <h2 class="t-h2">Streaming</h2>
+      <p class="t-sub">YouTube and YT Music songs play from Qistara’s own streaming engine: it asks YouTube for the song’s sound directly and fetches the next songs ahead, so they start at once. A song it can’t open plays through yt-dlp instead.</p>
+      <div class="group">
+        <div class="line">
+          <span class="txt"><span>Test streaming</span><span class="hint" aria-live="polite">{testing ? 'Testing…' : streamTest || 'Times how long a short YouTube video takes to be found and to start sounding'}</span></span>
+          <button class="btn press" onclick={testStreaming} disabled={testing}>Test</button>
+        </div>
       </div>
     </section>
   {/if}

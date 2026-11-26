@@ -16,14 +16,14 @@
 <header class="head">
   <h1 class="t-title">YouTube</h1>
   <p class="t-sub">
-    Songs and videos from YouTube, played through yt-dlp. {signedIn ? `Signed in with ${signedIn}.` : 'As a guest.'}
+    Songs and videos from YouTube, found through yt-dlp. {signedIn ? `Signed in with ${signedIn}.` : 'As a guest.'}
     <button class="link" onclick={() => nav.root({ name: 'providers' })}>{signedIn ? 'Change' : 'Sign in for Liked Music and Premium audio'}</button>
   </p>
 </header>
 
 {#if dl.tools && !dl.tools.ytdlp}
   <div class="card">
-    <p>YouTube plays through yt-dlp, which isn't installed yet.</p>
+    <p>Searching YouTube and opening links needs yt-dlp, which isn't installed yet. YT Music works without it.</p>
     <button class="btn primary press" onclick={() => nav.root({ name: 'downloads' })}>Get yt-dlp in Downloads</button>
   </div>
 {:else}

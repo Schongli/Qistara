@@ -21,6 +21,7 @@ mod update;
 mod user;
 mod ytdlp;
 mod ytmusic;
+mod ytstream;
 
 use notify_debouncer_mini::{new_debouncer, notify::RecommendedWatcher, notify::RecursiveMode, Debouncer};
 use std::path::Path;
@@ -706,6 +707,7 @@ pub fn run() {
     .manage(session::Session::default())
     .manage(discord::Discord::default())
     .manage(update::Pending::default())
+    .manage(ytstream::Engine::default())
     .setup(|app| {
       // a small log file in the OS's log folder (Settings › General › Updates › Show Log), for bug reports and
       // the packaging smoke test (scripts/smoke.sh). It stays on this computer.
@@ -768,7 +770,8 @@ pub fn run() {
       tidal::tidal_logout, tidal::tidal_playlists, tidal::tidal_tracks, apple::apple_status, apple::apple_setup, apple::apple_begin,
       apple::apple_logout, apple::apple_playlists, apple::apple_tracks, mpv::mpv_init, mpv::mpv_command, mpv::mpv_set,
       mpv::mpv_ytdl_sign_in, update::update_check, update::update_install, translate_local::mt_catalog, translate_local::mt_install,
-      translate_local::mt_status, translate_local::mt_remove, translate_local::mt_file
+      translate_local::mt_status, translate_local::mt_remove, translate_local::mt_file, ytstream::ytstream_url,
+      ytstream::ytstream_warm, ytstream::ytstream_test
     ])
     .build(tauri::generate_context!())
     .expect("error while building tauri application")

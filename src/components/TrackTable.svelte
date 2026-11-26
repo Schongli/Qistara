@@ -7,7 +7,7 @@
   import Stars from './Stars.svelte'
   import { love, rate, type Track } from '../lib/library.svelte'
   import { queue } from '../lib/queue.svelte'
-  import { mpv } from '../lib/player.svelte'
+  import { mpv, warmOnHover } from '../lib/player.svelte'
   import { openMenu, trackMenu } from '../lib/menu.svelte'
   import { plural, time } from '../lib/format'
   import { settings } from '../lib/settings.svelte'
@@ -47,6 +47,7 @@
       ondrop={(e) => { e.preventDefault(); if (dragFrom !== null && dragFrom !== i) onreorder?.(dragFrom, i); dragFrom = over = null }}
       ondragend={() => (dragFrom = over = null)}
       {...activate(() => queue.play(tracks, i))}
+      {...(remote ? warmOnHover(() => t) : {})}
       oncontextmenu={(e) => openMenu(e, trackMenu([t], { from: { list: tracks, index: i } }))}
     >
       <span class="num">{#if on}<Playing paused={mpv.pause} />{:else}{counts ? i + 1 : ''}{/if}</span>

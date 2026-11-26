@@ -61,7 +61,7 @@
   <section class="prov">
     <button class="top press" aria-expanded={openId === 'youtube'} onclick={() => toggle('youtube')}>
       <span class="ic"><Icon name="YoutubeLogo" size={20} /></span>
-      <span class="name">YouTube<span class="t-sub">Search, play and download, through yt-dlp</span></span>
+      <span class="name">YouTube<span class="t-sub">Search and download through yt-dlp; songs stream through Qistara’s engine</span></span>
       <span class="state" class:on={!!settings.ytCookies}>{ytStatus}</span><span class="caret" class:open={openId === 'youtube'}><Icon name="CaretDown" size={12} weight="bold" /></span>
     </button>
     {#if openId === 'youtube'}

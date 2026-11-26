@@ -4,6 +4,7 @@ import { destroy, listenEvents, observeProperties, type MpvObservableProperty } 
 import { invoke } from '@tauri-apps/api/core'
 import { AO, type AudioParams } from './signal'
 import { OS, SHOWS_VIDEO } from './os'
+import { youtubeSongId } from './lyricsources'
 
 export interface MpvTrack {
   id: number
@@ -101,6 +102,8 @@ export const mpv = $state({
   aspect: '-1',
   panscan: 0,
   eof: false,
+  /** a file (or a seek) is opening: the play button shows a ring once it takes a moment */
+  loading: false,
 })
 
 const KEY: Record<(typeof PROPS)[number][0], keyof typeof mpv> = {
@@ -127,6 +130,11 @@ export const BIT_PERFECT = {
 type Handler = (e: { event: string; [k: string]: unknown }) => void
 const handlers = new Set<Handler>()
 export const onMpvEvent = (h: Handler) => (handlers.add(h), () => handlers.delete(h))
+
+onMpvEvent(({ event }) => {
+  if (event === 'start-file' || event === 'seek') mpv.loading = true
+  else if (event === 'playback-restart' || event === 'end-file' || event === 'idle') mpv.loading = false
+})
 
 function apply(name: (typeof PROPS)[number][0], data: unknown) {
   const k = KEY[name]
@@ -172,15 +180,45 @@ export async function startMpv() {
 /** The one video format a YouTube video plays in, with its sound (mpv.rs VIDEO_FORMAT allows only this). */
 export const VIDEO_FORMAT = 'bestvideo[height<=?1080]+bestaudio/best[height<=?1080]'
 
+/** YouTube songs play from the streaming engine's loopback server (ytstream.rs). A song it couldn't open plays
+ *  through mpv's ytdl hook instead (youtube.svelte.ts); `cookies` is the sign-in its yt-dlp fallback uses. */
+export const engine = { cookies: null as unknown, viaHook: new Set<string>() }
+
+/** What mpv opens for a track: the engine's address for a YouTube song, else the track's own path. */
+async function source(t: { path: string; kind: 'audio' | 'video' }) {
+  const id = t.kind === 'audio' && !engine.viaHook.has(t.path) ? youtubeSongId(t.path) : null
+  if (!id) return t.path
+  return invoke<string>('ytstream_url', { id, cookies: engine.cookies }).catch((e) => (console.warn('streaming engine:', e), t.path))
+}
+
+/** Looks the next YouTube songs up and fetches their start, so they play at once. */
+export function warm(tracks: ({ path: string; kind: 'audio' | 'video' } | null | undefined)[]) {
+  const ids = tracks.flatMap((t) => (t && t.kind === 'audio' && !engine.viaHook.has(t.path) && youtubeSongId(t.path)) || [])
+  if (ids.length) invoke('ytstream_warm', { ids, cookies: engine.cookies }).catch(() => {})
+}
+
+let resting = 0
+/** Spread onto a row or card that plays a YouTube song: resting the pointer on it, or pressing it, fetches the
+ *  song's start so a click plays at once. `{...warmOnHover(() => track)}` */
+export const warmOnHover = (track: () => { path: string; kind: 'audio' | 'video' } | null) => ({
+  onpointerenter: (e: PointerEvent) => {
+    clearTimeout(resting)
+    if (e.pointerType === 'mouse') resting = window.setTimeout(() => warm([track()]), 150)
+  },
+  onpointerleave: () => clearTimeout(resting),
+  onpointerdown: () => warm([track()]),
+})
+
 /**
  * Loads a track with what it needs for this file only: a start time, and for a YouTube video (youtube.svelte.ts
- * watchTrack) the video format; other YouTube tracks keep the sound-only default.
+ * watchTrack) the video format; YouTube songs come from the streaming engine.
  */
 export async function loadTrack(t: { path: string; kind: 'audio' | 'video' }, mode: 'replace' | 'append', start?: number) {
   const opts = [start !== undefined && `start=${Math.max(0, start)}`, t.kind === 'video' && t.path.startsWith('ytdl://') && `ytdl-format=${VIDEO_FORMAT}`]
     .filter(Boolean)
     .join(',')
-  await (opts ? cmd('loadfile', t.path, mode, -1, opts) : cmd('loadfile', t.path, mode))
+  const path = await source(t)
+  await (opts ? cmd('loadfile', path, mode, -1, opts) : cmd('loadfile', path, mode))
 }
 
 export async function load(path: string, mode: 'replace' | 'append' | 'append-play' = 'replace') {

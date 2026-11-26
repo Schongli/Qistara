@@ -693,7 +693,7 @@ fn read(tx: &mut Sender, rx: &mut Receiver, seq: u64, off: u64, len: u32) -> Res
     Ok(Some((u64::from_be_bytes(r[1..9].try_into().unwrap()), r[9..].to_vec())))
 }
 
-fn read_head(mut s: &TcpStream, buf: &mut Vec<u8>) -> Option<String> {
+pub(crate) fn read_head(mut s: &TcpStream, buf: &mut Vec<u8>) -> Option<String> {
     let mut chunk = [0u8; 2048];
     loop {
         if let Some(end) = buf.windows(4).position(|w| w == b"\r\n\r\n") {

@@ -52,7 +52,7 @@
     <div class="transport">
       <button class="icon-btn press shuf" class:on={queue.shuffle} aria-label="Shuffle" aria-pressed={queue.shuffle} onclick={() => queue.toggleShuffle()}><Icon name="Shuffle" size={16} weight="bold" /></button>
       <button class="icon-btn press prev" aria-label="Previous" onclick={() => queue.prev()} disabled={!t}><Icon name="SkipBack" size={18} weight="fill" /></button>
-      <button class="play press" aria-label={mpv.pause || !t ? 'Play' : 'Pause'} onclick={togglePause} disabled={!t}>
+      <button class="play press" class:loading={mpv.loading && !!t} aria-busy={mpv.loading && !!t} aria-label={mpv.pause || !t ? 'Play' : 'Pause'} onclick={togglePause} disabled={!t}>
         {#if mpv.pause || !t}<Icon name="Play" size={18} weight="fill" />{:else}<Icon name="Pause" size={18} weight="fill" />{/if}
       </button>
       <button class="icon-btn press" aria-label="Next" onclick={() => queue.next()} disabled={!t}><Icon name="SkipForward" size={18} weight="fill" /></button>
@@ -108,6 +108,17 @@
   .transport { display: flex; align-items: center; gap: 6px; }
   .play { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: var(--bg); background: var(--text); }
   .play:hover { transform: scale(1.05); }
+  /* opening a song (a stream being fetched): a ring, only once it takes long enough to notice */
+  .play { position: relative; }
+  .play.loading::after {
+    content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--accent);
+    animation: ring 0.8s linear infinite, appear 0.2s 0.25s both;
+  }
+  @keyframes ring { to { rotate: 360deg; } }
+  @keyframes appear { from { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .play.loading::after { animation: appear 0.2s 0.25s both; border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+  }
   .play:disabled, .icon-btn:disabled { opacity: 0.4; }
   .scrub { width: 100%; display: flex; align-items: center; gap: 8px; }
   .scrub.hidden { visibility: hidden; }

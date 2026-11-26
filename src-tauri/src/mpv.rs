@@ -516,6 +516,9 @@ mod tests {
             ("loadfile", json!([r"\\nas\music\b.flac", "append"])),
             ("loadfile", json!(["ytdl://https://www.youtube.com/watch?v=dQw4w9WgXcQ", "append-play"])),
             ("loadfile", json!(["https://stream.example/radio.mp3", "replace", -1, "start=12.5"])),
+            // a YouTube song from the streaming engine's loopback server (ytstream.rs), and resumed there
+            ("loadfile", json!(["http://127.0.0.1:52345/0f1e2d3c4b5a69788796a5b4c3d2e1f0/yt/dQw4w9WgXcQ", "append"])),
+            ("loadfile", json!(["http://127.0.0.1:52345/0f1e2d3c4b5a69788796a5b4c3d2e1f0/yt/dQw4w9WgXcQ", "replace", -1, "start=30"])),
             ("loadfile", json!(["ytdl://https://www.youtube.com/watch?v=dQw4w9WgXcQ", "append", -1, format!("ytdl-format={VIDEO_FORMAT}")])),
             ("loadfile", json!(["ytdl://https://www.youtube.com/watch?v=dQw4w9WgXcQ", "replace", -1, format!("start=61,ytdl-format={VIDEO_FORMAT}")])),
             ("video-add", json!(["https://rr3---sn-a5mekn6s.googlevideo.com/videoplayback?expire=1&itag=137", "select"])),

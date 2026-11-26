@@ -81,7 +81,7 @@
     {/if}
   </section>
 {/each}
-<p class="t-sub note">From YouTube Music, without signing in. Songs play from YouTube through yt-dlp.</p>
+<p class="t-sub note">From YouTube Music, without signing in. Songs stream straight from YouTube through Qistara’s streaming engine.</p>
 
 <style>
   .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }

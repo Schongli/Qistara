@@ -65,6 +65,8 @@ Phases and status: `ROADMAP.md`.
   import-only: never play, record or download their DRM streams.
 - yt-dlp (`ytdlp.rs`): fixed `Choice`s only, always `--ignore-config` (also `-U`/`--version`) and `--` before URLs,
   URLs must be http(s), `--js-runtimes` from `js_runtime()` (bin/ Deno, Node 20+, Deno on PATH; else `NO_JS`).
+  It's the unpacked release zip in `bin/ytdlp/` (`unzip_all` refuses unsafe paths; updates re-download it, never
+  `-U`), with `--cache-dir streaming/ytdlp-cache` everywhere (mpv's hook too), never `--no-cache-dir`.
   Cookies reach yt-dlp only as a per-run `CookieCopy` in `streaming/session/` (0600, deleted on Drop): yt-dlp writes
   back to it. mpv's hook gets its own copy only while signed in, swept at start and on exit.
   yt-dlp/ffmpeg/Deno are fetched only from their GitHub releases and must match the release's SHA-256 list.
@@ -79,8 +81,15 @@ Phases and status: `ROADMAP.md`.
   is on; never a path.
 - Updates (`update.rs`): the page gets only `update_check`/`update_install`, never the plugin's commands
   (`updater:default`); the endpoint is fixed in tauri.conf.json and `requireSignedVersion` stays on.
-- YouTube tracks are `ytdl://<watch url>` played by mpv's ytdl hook (`ytdl_hook-all_formats=no`, bestaudio); remote
-  tracks (YouTube, server, radio) have negative ids, so they never reach stats, playlists or the restored queue.
+- YouTube tracks keep `ytdl://<watch url>` as their path (their identity everywhere). Songs play from the streaming
+  engine (`loadTrack` → `ytstream_url`); videos, and songs the engine couldn't open (`engine.viaHook`), play through
+  mpv's ytdl hook (`ytdl_hook-all_formats=no`, bestaudio). Remote tracks (YouTube, server, radio) have negative ids,
+  so they never reach stats, playlists or the restored queue.
+- Streaming engine (`ytstream.rs`): guest InnerTube `player` requests from the fixed `CLIENTS` list, carrying only
+  the video id and the client's description: no cookies, and YouTube's visitor id stays in memory for the run.
+  Only https addresses on `*.googlevideo.com` are fetched (`youtube_media`). Its server listens on 127.0.0.1 and
+  answers only `Host: 127.0.0.1:<port>` with `/<run token>/yt/<11-char id>`. When the guest clients fail it falls
+  back to yt-dlp `-j` (`ytdlp::audio_stream`, with the user's sign-in), then the page falls back to the hook.
 - Rename: the data folder was `com.confluenceplayer.app`, before that `com.sonora.player` (`OLD_DATA` in lib.rs, newest
   first); `migrate()` copies the newest once and never deletes it, and `keys.rs` carries "Confluence Player …" and
   "Sonora …" Credential Manager entries over (and forgets all of them on sign-out).

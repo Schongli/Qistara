@@ -1,8 +1,9 @@
 // YT Music as a guest (ytmusic.rs): what the Home shelves, search, album, artist and playlist pages show, and
-// turning songs into tracks. Songs play as YouTube videos through mpv's ytdl hook (youtube.svelte.ts).
+// turning songs into tracks. Songs play from the streaming engine (ytstream.rs, player.svelte.ts loadTrack).
 // Everything fetched stays in memory for the session (never in the database), like a browser tab would.
 import { invoke } from '@tauri-apps/api/core'
 import { queue } from './queue.svelte'
+import { warm } from './player.svelte'
 import { toast } from './nav.svelte'
 import { videoId, videoTrack } from './youtube.svelte'
 import type { Track } from './library.svelte'
@@ -56,8 +57,9 @@ export async function loadHome(again = false) {
 export const search = (query: string, filter: Filter) =>
   once(searches, `${filter}:${query.trim().toLowerCase()}`, () => invoke<Shelf[]>('ytm_search', { query, filter: filter || null, hl: hl() }))
 
+/** An album, artist or playlist page; its first song is fetched ahead, as it's the one most often played. */
 export const page = (kind: 'album' | 'artist' | 'playlist', id: string) =>
-  once(pages, `${kind}:${id}`, () => invoke<Page>(`ytm_${kind}`, { id, hl: hl() }))
+  once(pages, `${kind}:${id}`, () => invoke<Page>(`ytm_${kind}`, { id, hl: hl() }).then((p) => (p.tracks[0] && warm([songTrack(p.tracks[0])]), p)))
 
 /** Plays a song, or the songs of an album, playlist or artist (their top songs). */
 export async function playItem(i: Item, shuffle = false) {

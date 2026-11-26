@@ -1,7 +1,7 @@
 // Up Next. The queue here is the truth; mpv's playlist only ever holds [current, next] so
 // track changes are gapless, and every queue edit re-syncs the "next" slot.
 import { untrack } from 'svelte'
-import { cmd, loadTrack, lock, mpv, seek, set } from './player.svelte'
+import { cmd, engine, loadTrack, lock, mpv, seek, set, warm } from './player.svelte'
 import { autoplayPicks, indexAfterMove, insertAfter, move, nextIndex, shuffleRest, type Repeat } from './queue'
 import { lib, type Track } from './library.svelte'
 import { kvGet, kvSet } from './persist'
@@ -223,8 +223,9 @@ class Queue {
   async #start(paused = false) {
     const t = this.current
     if (!t) return
-    // YouTube needs yt-dlp and a JavaScript runtime: say what's missing rather than fail without a sound
-    if (t.path.startsWith('ytdl://')) {
+    // mpv's ytdl hook (YouTube videos, and songs the streaming engine couldn't open) needs yt-dlp and a JavaScript
+    // runtime: say what's missing rather than fail without a sound
+    if (t.path.startsWith('ytdl://') && (t.kind === 'video' || engine.viaHook.has(t.path))) {
       const missing = await invoke('youtube_ready').then(() => '', String)
       if (missing) return toast(missing)
     }
@@ -290,6 +291,18 @@ class Queue {
     if (n < 0 && this.autoplay && this.repeat === 'off' && t.id <= 0) this.#extend(t)
     this.appended = n >= 0 && this.repeat !== 'one' && !this.stopAfterCurrent ? this.items[n] : null
     if (this.appended) await loadTrack(this.appended, 'append')
+    // the song after that, fetched ahead too (loading the next one already does it for that one)
+    if (this.appended) warm([this.items[n + 1]])
+  }
+
+  /** Opens the current song again from the start, e.g. a YouTube song through mpv's hook once the streaming
+   *  engine couldn't open it (youtube.svelte.ts). */
+  async retry() {
+    const t = this.current
+    if (!t) return
+    await loadTrack(t, 'replace')
+    await set('pause', false)
+    await this.#syncNext()
   }
 }
 
