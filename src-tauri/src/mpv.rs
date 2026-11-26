@@ -39,10 +39,13 @@ pub async fn mpv_ytdl_sign_in(_window: WebviewWindow, _cookies: String) -> Resul
 use crate::ytdlp;
 
 #[cfg(desktop)]
-/// The ytdl hook's yt-dlp options: never a config file or cache of its own (the same as ytdlp.rs runs it), our
+/// The ytdl hook's yt-dlp options: never a config file, the same cache as ytdlp.rs gives it (streaming/), our
 /// JavaScript runtime by path, and the sign-in: Firefox's cookies, or the hook's copy of a cookies.txt.
 fn ytdl_raw(app: &tauri::AppHandle, cookies: &str) -> String {
-    let mut o = vec!["ignore-config=".to_string(), "no-cache-dir=".to_string()];
+    let mut o = vec!["ignore-config=".to_string()];
+    if let Ok(dir) = ytdlp::streaming_dir(app, "ytdlp-cache") {
+        o.push(format!("cache-dir={}", quote(&dir.to_string_lossy())));
+    }
     if let Ok(js) = ytdlp::js_runtime(app) {
         o.push(format!("js-runtimes={}", quote(&js)));
     }
@@ -305,7 +308,7 @@ pub async fn mpv_init(window: WebviewWindow, mut mpv_config: MpvConfig) -> Resul
         check_prop(name, value)?;
     }
     let data = window.path().app_local_data_dir().map_err(|e| e.to_string())?;
-    let ytdlp = ytdlp::bin_dir(window.app_handle())?.join(ytdlp::exe("yt-dlp"));
+    let ytdlp = ytdlp::hook_ytdlp(window.app_handle())?;
     let raw = ytdl_raw(window.app_handle(), "");
     let o = &mut mpv_config.initial_options;
     o.insert("ytdl-raw-options".into(), json!(raw));

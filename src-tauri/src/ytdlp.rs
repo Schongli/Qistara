@@ -11,11 +11,23 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering::SeqCst};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const RELEASES: &str = "https://github.com";
-/// yt-dlp's own build for this OS.
-const YTDLP_ASSET: &str = if cfg!(windows) {
+/// yt-dlp's unpacked build for this OS: a folder with the program and its _internal/ libraries. It starts in a
+/// fraction of the time the single-file build takes, which unpacks itself on every run (seconds on a Mac).
+const YTDLP_ZIP: &str = if cfg!(windows) {
+    "yt-dlp_win.zip"
+} else if cfg!(target_os = "macos") {
+    "yt-dlp_macos.zip"
+} else if cfg!(target_arch = "aarch64") {
+    "yt-dlp_linux_aarch64.zip"
+} else {
+    "yt-dlp_linux.zip"
+};
+/// The program inside that folder.
+const YTDLP_PROGRAM: &str = if cfg!(windows) {
     "yt-dlp.exe"
 } else if cfg!(target_os = "macos") {
     "yt-dlp_macos"
@@ -59,10 +71,16 @@ pub fn bin_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(app.path().app_local_data_dir().map_err(|e| e.to_string())?.join("bin"))
 }
 
-/// Streaming's own corner of app data (session: sign-in copies; tmp: downloads in progress), kept apart from
-/// the library so it can be cleared on its own.
+/// Streaming's own corner of app data (session: sign-in copies; tmp: downloads in progress; ytdlp-cache: what
+/// yt-dlp keeps between runs), kept apart from the library so it can be cleared on its own.
 pub fn streaming_dir(app: &AppHandle, sub: &str) -> Result<PathBuf, String> {
     Ok(app.path().app_local_data_dir().map_err(|e| e.to_string())?.join("streaming").join(sub))
+}
+
+/// yt-dlp keeps YouTube's player code and what it worked out from it between runs, so a song or search after the
+/// first doesn't fetch and solve it again: in streaming/, cleared with the streaming cache.
+pub fn cache_args(app: &AppHandle) -> Result<[String; 2], String> {
+    Ok(["--cache-dir".into(), streaming_dir(app, "ytdlp-cache")?.to_string_lossy().into_owned()])
 }
 
 /// Runs a tool without flashing a console window.
@@ -87,9 +105,26 @@ pub fn on_path(name: &str) -> Option<PathBuf> {
     dirs.into_iter().map(|d| d.join(exe(name))).find(|p| p.is_file())
 }
 
+/// The unpacked build's folder: app data/bin/ytdlp.
+fn ytdlp_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(bin_dir(app)?.join("ytdlp"))
+}
+
+/// The yt-dlp to run: the unpacked build, else a single-file one from before 0.6 (replaced at the next start).
 pub fn ytdlp(app: &AppHandle) -> Result<PathBuf, String> {
-    let p = bin_dir(app)?.join(exe("yt-dlp"));
-    if p.is_file() { Ok(p) } else { Err("yt-dlp isn't installed yet. Get it in Downloads.".into()) }
+    let unpacked = ytdlp_dir(app)?.join(YTDLP_PROGRAM);
+    let single = bin_dir(app)?.join(exe("yt-dlp"));
+    [unpacked, single].into_iter().find(|p| p.is_file()).ok_or_else(|| "yt-dlp isn't installed yet. Get it in Downloads.".into())
+}
+
+/// Where mpv's ytdl hook finds yt-dlp: the one installed, or where it will be once it is.
+pub fn hook_ytdlp(app: &AppHandle) -> Result<PathBuf, String> {
+    ytdlp(app).or_else(|_| Ok(ytdlp_dir(app)?.join(YTDLP_PROGRAM)))
+}
+
+/// Whether this is the unpacked build (which updates by downloading the release again; it has no -U).
+fn is_unpacked(exe: &Path) -> bool {
+    exe.parent().and_then(Path::file_name).is_some_and(|d| d == "ytdlp")
 }
 
 /// Our own ffmpeg, else one on PATH (winget, Chocolatey, Homebrew, the distribution's).
@@ -216,12 +251,24 @@ fn le32(b: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_le_bytes(b.get(at..at + 4)?.try_into().ok()?))
 }
 
-/// One file out of a zip archive, found by its central directory (local headers can carry zero sizes when the
-/// archive was streamed). Stored or deflated, CRC-checked. Enough for Deno's single-file release zips.
-pub fn unzip_one(zip: &[u8], name: &str) -> Result<Vec<u8>, String> {
+/// A file listed in a zip's central directory (local headers can carry zero sizes when the archive was
+/// streamed, so the central directory is what counts).
+struct ZipEntry {
+    name: String,
+    method: usize,
+    crc: u32,
+    packed: usize,
+    size: usize,
+    local: usize,
+    /// Unix permission bits, when the archive was made on Unix
+    mode: u32,
+}
+
+fn zip_entries(zip: &[u8]) -> Result<Vec<ZipEntry>, String> {
     let bad = || "The archive is damaged.".to_string();
     let eocd = (0..zip.len().saturating_sub(21)).rev().take(65_557).find(|&i| zip[i..].starts_with(b"PK\x05\x06")).ok_or_else(bad)?;
     let (count, mut at) = (le16(zip, eocd + 10).ok_or_else(bad)?, le32(zip, eocd + 16).ok_or_else(bad)? as usize);
+    let mut out = Vec::with_capacity(count);
     for _ in 0..count {
         if !zip.get(at..).is_some_and(|z| z.starts_with(b"PK\x01\x02")) {
             return Err(bad());
@@ -229,35 +276,80 @@ pub fn unzip_one(zip: &[u8], name: &str) -> Result<Vec<u8>, String> {
         let (method, crc) = (le16(zip, at + 10).ok_or_else(bad)?, le32(zip, at + 16).ok_or_else(bad)?);
         let (packed, size) = (le32(zip, at + 20).ok_or_else(bad)? as usize, le32(zip, at + 24).ok_or_else(bad)? as usize);
         let (n, extra, comment) = (le16(zip, at + 28).ok_or_else(bad)?, le16(zip, at + 30).ok_or_else(bad)?, le16(zip, at + 32).ok_or_else(bad)?);
+        let made_on_unix = le16(zip, at + 4).ok_or_else(bad)? >> 8 == 3;
+        let mode = if made_on_unix { le32(zip, at + 38).ok_or_else(bad)? >> 16 } else { 0 };
         let local = le32(zip, at + 42).ok_or_else(bad)? as usize;
-        let entry = zip.get(at + 46..at + 46 + n).ok_or_else(bad)?;
+        let name = String::from_utf8_lossy(zip.get(at + 46..at + 46 + n).ok_or_else(bad)?).into_owned();
         at += 46 + n + extra + comment;
-        let entry = String::from_utf8_lossy(entry);
-        if entry != name && !entry.ends_with(&format!("/{name}")) {
+        out.push(ZipEntry { name, method, crc, packed, size, local, mode });
+    }
+    Ok(out)
+}
+
+/// One entry's bytes: stored or deflated, CRC-checked.
+fn zip_read(zip: &[u8], e: &ZipEntry) -> Result<Vec<u8>, String> {
+    let bad = || "The archive is damaged.".to_string();
+    if e.size > 512 << 20 {
+        return Err("The archive holds a file far bigger than expected.".into());
+    }
+    if !zip.get(e.local..).is_some_and(|z| z.starts_with(b"PK\x03\x04")) {
+        return Err(bad());
+    }
+    let start = e.local + 30 + le16(zip, e.local + 26).ok_or_else(bad)? + le16(zip, e.local + 28).ok_or_else(bad)?;
+    let data = zip.get(start..start.checked_add(e.packed).ok_or_else(bad)?).ok_or_else(bad)?;
+    let out = match e.method {
+        0 => data.to_vec(),
+        8 => {
+            let mut v = Vec::with_capacity(e.size);
+            flate2::read::DeflateDecoder::new(data).take(e.size as u64 + 1).read_to_end(&mut v).map_err(|_| bad())?;
+            v
+        }
+        _ => return Err("The archive uses a compression this can't read.".into()),
+    };
+    let mut c = flate2::Crc::new();
+    c.update(&out);
+    if out.len() == e.size && c.sum() == e.crc { Ok(out) } else { Err(bad()) }
+}
+
+/// One file out of a zip archive, by name (at any depth). Enough for Deno's single-file release zips.
+pub fn unzip_one(zip: &[u8], name: &str) -> Result<Vec<u8>, String> {
+    let e = zip_entries(zip)?.into_iter().find(|e| e.name == name || e.name.ends_with(&format!("/{name}"))).ok_or(format!("{name} isn't in the archive."))?;
+    zip_read(zip, &e)
+}
+
+/// A zip entry's path as plain relative parts: no absolute paths, drive letters, "..", "." or backslashes, so
+/// nothing lands outside the folder it's unpacked into.
+fn zip_path(name: &str) -> Option<PathBuf> {
+    let parts: Vec<&str> = name.split('/').filter(|p| !p.is_empty()).collect();
+    let ok = !name.starts_with('/') && !parts.is_empty() && parts.iter().all(|p| *p != ".." && *p != "." && !p.contains(['\\', ':', '\0']));
+    ok.then(|| parts.iter().collect())
+}
+
+/// A whole archive into `dest` (yt-dlp's unpacked builds: the program and its _internal folder). Unix permission
+/// bits come from the archive; a damaged entry or an unsafe path stops it.
+fn unzip_all(zip: &[u8], dest: &Path) -> Result<(), String> {
+    let entries = zip_entries(zip)?;
+    if entries.iter().map(|e| e.size as u64).sum::<u64>() > 1 << 30 {
+        return Err("The archive is far bigger than expected.".into());
+    }
+    for e in &entries {
+        let rel = zip_path(&e.name).ok_or("The archive holds a file with an unsafe name.")?;
+        let to = dest.join(rel);
+        if e.name.ends_with('/') {
+            std::fs::create_dir_all(&to).map_err(|x| x.to_string())?;
             continue;
         }
-        if size > 512 << 20 {
-            return Err("The archive holds a file far bigger than expected.".into());
+        if let Some(dir) = to.parent() {
+            std::fs::create_dir_all(dir).map_err(|x| x.to_string())?;
         }
-        if !zip.get(local..).is_some_and(|z| z.starts_with(b"PK\x03\x04")) {
-            return Err(bad());
+        std::fs::write(&to, zip_read(zip, e)?).map_err(|x| x.to_string())?;
+        #[cfg(unix)]
+        if e.mode & 0o777 != 0 {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&to, std::fs::Permissions::from_mode(e.mode & 0o755)).map_err(|x| x.to_string())?;
         }
-        let start = local + 30 + le16(zip, local + 26).ok_or_else(bad)? + le16(zip, local + 28).ok_or_else(bad)?;
-        let data = zip.get(start..start.checked_add(packed).ok_or_else(bad)?).ok_or_else(bad)?;
-        let out = match method {
-            0 => data.to_vec(),
-            8 => {
-                let mut v = Vec::with_capacity(size);
-                flate2::read::DeflateDecoder::new(data).take(size as u64 + 1).read_to_end(&mut v).map_err(|_| bad())?;
-                v
-            }
-            _ => return Err("The archive uses a compression this can't read.".into()),
-        };
-        let mut c = flate2::Crc::new();
-        c.update(&out);
-        return if out.len() == size && c.sum() == crc { Ok(out) } else { Err(bad()) };
     }
-    Err(format!("{name} isn't in the archive."))
+    Ok(())
 }
 
 /// Unix: a downloaded program must be executable.
@@ -286,9 +378,12 @@ pub async fn tool_install(app: AppHandle, tool: Tool) -> Result<(), String> {
     let latest = |repo: &str, asset: &str| format!("{RELEASES}/{repo}/releases/latest/download/{asset}");
     match tool {
         Tool::Ytdlp => {
-            let to = bin.join(exe("yt-dlp"));
-            fetch_checked(&app, "ytdlp", &latest("yt-dlp/yt-dlp", YTDLP_ASSET), &latest("yt-dlp/yt-dlp", "SHA2-256SUMS"), YTDLP_ASSET, &to).await?;
-            make_executable(&to)
+            let zip = bin.join(YTDLP_ZIP);
+            fetch_checked(&app, "ytdlp", &latest("yt-dlp/yt-dlp", YTDLP_ZIP), &latest("yt-dlp/yt-dlp", "SHA2-256SUMS"), YTDLP_ZIP, &zip).await?;
+            let bytes = std::fs::read(&zip).map_err(|e| e.to_string());
+            let _ = std::fs::remove_file(&zip);
+            let bytes = bytes?;
+            tauri::async_runtime::spawn_blocking(move || install_unpacked(&bin, &bytes)).await.map_err(|e| e.to_string())?
         }
         Tool::Deno => {
             let zip = bin.join(DENO_ASSET);
@@ -331,18 +426,84 @@ pub async fn tool_install(app: AppHandle, tool: Tool) -> Result<(), String> {
     }
 }
 
-/// yt-dlp -U: YouTube changes often and old yt-dlp versions stop working.
+/// The unpacked build into bin/ytdlp, swapped in whole: unpacked beside it first, and the single-file build it
+/// replaces removed. The program must be in it.
+fn install_unpacked(bin: &Path, zip: &[u8]) -> Result<(), String> {
+    let (dir, part, old) = (bin.join("ytdlp"), bin.join("ytdlp.part"), bin.join("ytdlp.old"));
+    let _ = std::fs::remove_dir_all(&part);
+    if let Err(e) = unzip_all(zip, &part).and_then(|_| {
+        if part.join(YTDLP_PROGRAM).is_file() { make_executable(&part.join(YTDLP_PROGRAM)) } else { Err("The download didn't hold yt-dlp.".into()) }
+    }) {
+        let _ = std::fs::remove_dir_all(&part);
+        return Err(e);
+    }
+    let _ = std::fs::remove_dir_all(&old);
+    if dir.exists() {
+        std::fs::rename(&dir, &old).map_err(|_| "yt-dlp is busy (a download or a song is using it). Try again in a moment.".to_string())?;
+    }
+    std::fs::rename(&part, &dir).map_err(|e| e.to_string())?;
+    let _ = std::fs::remove_dir_all(&old);
+    let _ = std::fs::remove_file(bin.join(exe("yt-dlp")));
+    let _ = std::fs::write(dir.join(".checked"), b"");
+    Ok(())
+}
+
+fn version(exe: &Path) -> Option<String> {
+    let o = command(exe).args(["--ignore-config", "--version"]).output().ok().filter(|o| o.status.success())?;
+    Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
+}
+
+/// The newest yt-dlp release's tag ("2026.11.20"), from where GitHub's "latest" link points.
+async fn latest_ytdlp() -> Result<String, String> {
+    use tauri_plugin_http::reqwest::{redirect::Policy, Client};
+    let client = Client::builder().user_agent(crate::UA).redirect(Policy::none()).timeout(Duration::from_secs(15)).build().map_err(|e| e.to_string())?;
+    let r = client.get(format!("{RELEASES}/yt-dlp/yt-dlp/releases/latest")).send().await.map_err(|e| e.to_string())?;
+    let to = r.headers().get("location").and_then(|l| l.to_str().ok()).unwrap_or_default();
+    release_tag(to).ok_or_else(|| "Couldn't find yt-dlp's latest release.".into())
+}
+
+/// The tag at the end of a GitHub release link, when it looks like one of yt-dlp's (digits and dots).
+fn release_tag(link: &str) -> Option<String> {
+    let tag = link.strip_prefix("https://github.com/yt-dlp/yt-dlp/releases/tag/")?;
+    (!tag.is_empty() && tag.len() <= 20 && tag.bytes().all(|b| b.is_ascii_digit() || b == b'.')).then(|| tag.to_string())
+}
+
+/// Downloads › Check for Update: YouTube changes often and old yt-dlp versions stop working. The newest release is
+/// downloaded and checked again, as at install (the unpacked build has no -U).
 #[tauri::command]
 pub async fn ytdlp_update(app: AppHandle) -> Result<String, String> {
     let exe = ytdlp(&app)?;
-    tauri::async_runtime::spawn_blocking(move || {
-        // --ignore-config: a planted config's --update-to could point the update at another repository
-        let o = command(&exe).args(["--ignore-config", "-U"]).output().map_err(|e| e.to_string())?;
-        let text = String::from_utf8_lossy(&o.stdout).lines().last().unwrap_or_default().to_string();
-        if o.status.success() { Ok(text) } else { Err(String::from_utf8_lossy(&o.stderr).lines().last().unwrap_or("update failed").to_string()) }
+    let latest = latest_ytdlp().await?;
+    let current = tauri::async_runtime::spawn_blocking({
+        let exe = exe.clone();
+        move || version(&exe)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    if is_unpacked(&exe) && current.as_deref() == Some(latest.as_str()) {
+        return Ok(format!("yt-dlp is up to date ({latest})."));
+    }
+    tool_install(app, Tool::Ytdlp).await?;
+    Ok(format!("Updated yt-dlp to {latest}."))
+}
+
+/// At start: a single-file yt-dlp from before 0.6 is replaced by the unpacked build, and the unpacked build is
+/// brought up to date once a day. Quietly: if it fails, the yt-dlp there keeps working.
+pub fn maintain(app: &AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let Ok(exe) = ytdlp(&app) else { return };
+        let marker = exe.with_file_name(".checked");
+        let stale = !is_unpacked(&exe) || marker.metadata().and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).is_none_or(|age| age > Duration::from_secs(86_400));
+        if !stale {
+            return;
+        }
+        match ytdlp_update(app).await {
+            Ok(m) => log::info!("{m}"),
+            Err(e) => log::warn!("yt-dlp update: {e}"),
+        }
+        let _ = std::fs::write(&marker, b"");
+    });
 }
 
 // ---- downloads ----
@@ -432,10 +593,10 @@ pub fn valid_url(u: &str) -> bool {
 }
 
 /// The full argument list for one job. `ffmpeg`: the folder holding ffmpeg, if any; `js`: as js_runtime gives it.
-pub fn args(choice: Choice, dest: &Path, tmp: &Path, ffmpeg: Option<&Path>, js: Option<&str>, urls: &[String]) -> Vec<String> {
+pub fn args(choice: Choice, dest: &Path, tmp: &Path, cache: &Path, ffmpeg: Option<&Path>, js: Option<&str>, urls: &[String]) -> Vec<String> {
     let s = |x: &str| x.to_string();
     let mut a: Vec<String> = [
-        "--ignore-config", "--no-cache-dir", "--newline", "--progress", "--quiet", "--no-warnings", "--yes-playlist",
+        "--ignore-config", "--newline", "--progress", "--quiet", "--no-warnings", "--yes-playlist",
         "--progress-template", "download:DL %(progress._percent_str)s|%(progress._eta_str)s|%(info.title)s",
         "--print", "after_move:FILE %(filepath)s",
         // a playlist gets its own folder
@@ -443,6 +604,7 @@ pub fn args(choice: Choice, dest: &Path, tmp: &Path, ffmpeg: Option<&Path>, js: 
     ]
     .map(s)
     .to_vec();
+    a.splice(1..1, [s("--cache-dir"), cache.display().to_string()]);
     if let Some(js) = js {
         a.extend([s("--js-runtimes"), s(js)]);
     }
@@ -547,7 +709,8 @@ pub fn download_add(app: AppHandle, dl: State<Downloads>, urls: Vec<String>, cho
     let (mut argv, copy) = cookie_args(&cookies, &streaming_dir(&app, "session")?)?;
     // without a runtime yt-dlp still handles other sites, and says so for YouTube
     let js = js_runtime(&app).ok();
-    argv.extend(args(choice, &dest, &tmp, ff.as_deref().and_then(Path::parent), js.as_deref(), &urls));
+    let cache = streaming_dir(&app, "ytdlp-cache")?;
+    argv.extend(args(choice, &dest, &tmp, &cache, ff.as_deref().and_then(Path::parent), js.as_deref(), &urls));
 
     let id = dl.next.fetch_add(1, SeqCst) + 1;
     dl.jobs.lock().unwrap().insert(id, None);
@@ -581,8 +744,12 @@ fn pump(app: AppHandle, id: u64, pipe: impl Read) -> Option<String> {
     error
 }
 
-/// Once per day per run of the app, before the first download: yt-dlp -U.
+/// Once per day per run of the app, before the first download: yt-dlp -U, for a single-file build from before 0.6
+/// (the unpacked one is kept up to date by `maintain`).
 fn update_daily(exe: &Path) {
+    if is_unpacked(exe) {
+        return;
+    }
     static LAST: Mutex<u64> = Mutex::new(0);
     let today = crate::scan::now() as u64 / 86_400;
     let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
@@ -708,7 +875,8 @@ pub async fn download_probe(app: AppHandle, url: String, cookies: Option<Cookies
     }
     let exe = ytdlp(&app)?;
     let (mut argv, copy) = cookie_args(&cookies, &streaming_dir(&app, "session")?)?;
-    argv.extend(["--ignore-config", "--no-cache-dir", "--no-warnings", "--no-playlist", "-J"].map(String::from));
+    argv.extend(["--ignore-config", "--no-warnings", "--no-playlist", "-J"].map(String::from));
+    argv.extend(cache_args(&app)?);
     if let Ok(js) = js_runtime(&app) {
         argv.extend(["--js-runtimes".into(), js]);
     }
@@ -726,8 +894,8 @@ pub async fn download_probe(app: AppHandle, url: String, cookies: Option<Cookies
 const MUSIC_VIDEO_FORMAT: &str = "bestvideo[height<=?1080][vcodec^=avc1]/bestvideo[height<=?1080]";
 
 /// yt-dlp's arguments for a video's stream address: fixed, with the watch page after `--`.
-pub fn video_url_args(id: &str, js: Option<String>) -> Vec<String> {
-    let mut a: Vec<String> = ["--ignore-config", "--no-cache-dir", "--no-warnings", "--no-playlist", "-g", "-f", MUSIC_VIDEO_FORMAT].map(String::from).into();
+pub fn video_url_args(id: &str, cache: &Path, js: Option<String>) -> Vec<String> {
+    let mut a: Vec<String> = ["--ignore-config", "--cache-dir", &cache.to_string_lossy(), "--no-warnings", "--no-playlist", "-g", "-f", MUSIC_VIDEO_FORMAT].map(String::from).into();
     if let Some(js) = js {
         a.extend(["--js-runtimes".into(), js]);
     }
@@ -744,7 +912,7 @@ pub async fn youtube_video_url(app: AppHandle, id: String, cookies: Option<Cooki
     }
     let exe = ytdlp(&app)?;
     let (mut argv, copy) = cookie_args(&cookies, &streaming_dir(&app, "session")?)?;
-    argv.extend(video_url_args(&id, js_runtime(&app).ok()));
+    argv.extend(video_url_args(&id, &streaming_dir(&app, "ytdlp-cache")?, js_runtime(&app).ok()));
     let o = tauri::async_runtime::spawn_blocking(move || command(&exe).args(&argv).stdin(Stdio::null()).output()).await.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
     drop(copy);
     if !o.status.success() {
@@ -901,7 +1069,8 @@ pub fn videos(json: &serde_json::Value) -> Vec<Video> {
 async fn flat(app: AppHandle, target: String, cookies: Option<Cookies>) -> Result<Vec<Video>, String> {
     let exe = ytdlp(&app)?;
     let js = js_runtime(&app)?;
-    let mut argv: Vec<String> = ["--ignore-config", "--no-cache-dir", "--no-warnings", "--js-runtimes", &js, "-J", "--flat-playlist", "--playlist-end", "500"].map(String::from).to_vec();
+    let mut argv: Vec<String> = ["--ignore-config", "--no-warnings", "--js-runtimes", &js, "-J", "--flat-playlist", "--playlist-end", "500"].map(String::from).to_vec();
+    argv.extend(cache_args(&app)?);
     let (sign_in, copy) = cookie_args(&cookies, &streaming_dir(&app, "session")?)?;
     argv.extend(sign_in);
     argv.extend(["--".into(), target]);
@@ -947,12 +1116,12 @@ mod tests {
 
     #[test]
     fn asks_for_a_music_videos_picture_with_fixed_arguments() {
-        let a = video_url_args("dQw4w9WgXcQ", Some("deno:/x/deno".into()));
-        assert_eq!(&a[..5], ["--ignore-config", "--no-cache-dir", "--no-warnings", "--no-playlist", "-g"]);
-        assert_eq!(a[6], MUSIC_VIDEO_FORMAT);
+        let a = video_url_args("dQw4w9WgXcQ", Path::new("/c"), Some("deno:/x/deno".into()));
+        assert_eq!(&a[..6], ["--ignore-config", "--cache-dir", "/c", "--no-warnings", "--no-playlist", "-g"]);
+        assert_eq!(&a[6..8], ["-f", MUSIC_VIDEO_FORMAT]);
         assert_eq!(&a[a.len() - 2..], ["--", "https://www.youtube.com/watch?v=dQw4w9WgXcQ"]);
         assert!(a.windows(2).any(|w| w == ["--js-runtimes", "deno:/x/deno"]));
-        assert!(!video_url_args("dQw4w9WgXcQ", None).contains(&"--js-runtimes".to_string()));
+        assert!(!video_url_args("dQw4w9WgXcQ", Path::new("/c"), None).contains(&"--js-runtimes".to_string()));
     }
 
     #[test]
@@ -986,7 +1155,7 @@ mod tests {
     fn builds_fixed_arguments_with_urls_after_the_separator() {
         let urls = vec!["https://a.example/x".to_string()];
         let mp3 = Choice::Audio(AudioQ::Mp3_192);
-        let a = args(mp3, Path::new("D:\\Music"), Path::new("C:\\tmp"), Some(Path::new("C:\\bin")), Some("deno:C:\\bin\\deno.exe"), &urls);
+        let a = args(mp3, Path::new("D:\\Music"), Path::new("C:\\tmp"), Path::new("C:\\cache"), Some(Path::new("C:\\bin")), Some("deno:C:\\bin\\deno.exe"), &urls);
         assert_eq!(a[0], "--ignore-config");
         let sep = a.iter().position(|x| x == "--").unwrap();
         assert_eq!(&a[sep + 1..], &urls[..]);
@@ -994,7 +1163,7 @@ mod tests {
         assert!(a.windows(2).any(|w| w == ["--js-runtimes", "deno:C:\\bin\\deno.exe"]));
         assert!(a.contains(&"--embed-thumbnail".to_string()));
         // without ffmpeg: nothing that needs it
-        let b = args(Choice::Video(VideoQ::P1080), Path::new("D:\\V"), Path::new("C:\\t"), None, None, &urls);
+        let b = args(Choice::Video(VideoQ::P1080), Path::new("D:\\V"), Path::new("C:\\t"), Path::new("C:\\c"), None, None, &urls);
         assert!(!b.iter().any(|x| x == "--merge-output-format" || x == "--embed-metadata" || x == "-x" || x == "--js-runtimes"));
         assert!(b.windows(2).any(|w| w == ["-f", "b[height<=1080]/b"]));
     }
@@ -1002,7 +1171,7 @@ mod tests {
     #[test]
     fn every_choice_maps_to_fixed_formats() {
         let f = |c: Choice, ff: bool| {
-            let a = args(c, Path::new("/d"), Path::new("/t"), ff.then_some(Path::new("/bin")), None, &[]);
+            let a = args(c, Path::new("/d"), Path::new("/t"), Path::new("/c"), ff.then_some(Path::new("/bin")), None, &[]);
             a[a.iter().position(|x| x == "-f").unwrap() + 1].clone()
         };
         assert_eq!(f(Choice::Video(VideoQ::Best), true), "bv*+ba/b/b");
@@ -1102,6 +1271,60 @@ mod tests {
         out.extend(cd.to_le_bytes());
         out.extend(0u16.to_le_bytes());
         out
+    }
+
+    #[test]
+    fn unpacks_a_whole_build_and_refuses_unsafe_paths() {
+        let d = tempfile::tempdir().unwrap();
+        let z = zip(&[(YTDLP_PROGRAM, b"program", true), ("_internal/python.so", &b"lib".repeat(300), true), ("_internal/base_library.zip", b"x", false)]);
+        unzip_all(&z, d.path()).unwrap();
+        assert_eq!(std::fs::read(d.path().join(YTDLP_PROGRAM)).unwrap(), b"program");
+        assert_eq!(std::fs::read(d.path().join("_internal").join("python.so")).unwrap(), b"lib".repeat(300));
+        for bad in ["../evil", "/etc/evil", "_internal/../../evil", "C:\\evil", "a\\..\\evil", "./x"] {
+            let e = tempfile::tempdir().unwrap();
+            assert!(unzip_all(&zip(&[(bad, b"x", false)]), e.path()).is_err(), "{bad}");
+            assert_eq!(std::fs::read_dir(e.path()).unwrap().count(), 0, "{bad}");
+        }
+    }
+
+    #[test]
+    fn swaps_in_the_unpacked_build_and_drops_the_single_file() {
+        let bin = tempfile::tempdir().unwrap();
+        let b = bin.path();
+        std::fs::write(b.join(exe("yt-dlp")), b"old single file").unwrap();
+        std::fs::create_dir_all(b.join("ytdlp")).unwrap();
+        std::fs::write(b.join("ytdlp").join(YTDLP_PROGRAM), b"older build").unwrap();
+        // a download without the program changes nothing
+        assert!(install_unpacked(b, &zip(&[("_internal/x", b"x", false)])).is_err());
+        assert_eq!(std::fs::read(b.join("ytdlp").join(YTDLP_PROGRAM)).unwrap(), b"older build");
+        assert!(!b.join("ytdlp.part").exists());
+        install_unpacked(b, &zip(&[(YTDLP_PROGRAM, b"new build", true), ("_internal/x", b"x", false)])).unwrap();
+        assert_eq!(std::fs::read(b.join("ytdlp").join(YTDLP_PROGRAM)).unwrap(), b"new build");
+        assert!(!b.join(exe("yt-dlp")).exists() && !b.join("ytdlp.old").exists() && b.join("ytdlp").join(".checked").exists());
+        assert!(is_unpacked(&b.join("ytdlp").join(YTDLP_PROGRAM)) && !is_unpacked(&b.join(exe("yt-dlp"))));
+        #[cfg(unix)]
+        assert_eq!(std::os::unix::fs::PermissionsExt::mode(&std::fs::metadata(b.join("ytdlp").join(YTDLP_PROGRAM)).unwrap().permissions()) & 0o111, 0o111);
+    }
+
+    /// QISTARA_YTDLP_ZIP=<a downloaded yt-dlp_*.zip> cargo test --lib real_unpacked_build -- --ignored
+    #[test]
+    #[ignore = "needs a downloaded yt-dlp release zip"]
+    fn real_unpacked_build_installs_and_runs() {
+        let zip = std::fs::read(std::env::var("QISTARA_YTDLP_ZIP").unwrap()).unwrap();
+        let bin = tempfile::tempdir().unwrap();
+        install_unpacked(bin.path(), &zip).unwrap();
+        let exe = bin.path().join("ytdlp").join(YTDLP_PROGRAM);
+        let started = std::time::Instant::now();
+        let v = version(&exe).expect("the unpacked build runs");
+        println!("yt-dlp {v}: --version in {} ms", started.elapsed().as_millis());
+    }
+
+    #[test]
+    fn reads_the_latest_release_tag_from_githubs_link() {
+        assert_eq!(release_tag("https://github.com/yt-dlp/yt-dlp/releases/tag/2026.11.20").as_deref(), Some("2026.11.20"));
+        for bad in ["https://github.com/other/repo/releases/tag/2026.11.20", "https://github.com/yt-dlp/yt-dlp/releases/tag/v1;rm", "https://github.com/yt-dlp/yt-dlp/releases/tag/", ""] {
+            assert_eq!(release_tag(bad), None, "{bad}");
+        }
     }
 
     #[test]

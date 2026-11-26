@@ -742,6 +742,7 @@ pub fn run() {
         watcher: Mutex::new(None),
       });
       ytdlp::sweep_cookies(app.handle());
+      ytdlp::maintain(app.handle());
       watch(app.handle());
       rescan(app.handle().clone());
       let controls = app.get_webview_window("main").and_then(|w| media_keys::init(&w));

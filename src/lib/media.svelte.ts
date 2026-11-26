@@ -11,7 +11,7 @@ $effect.root(() => {
   $effect(() => {
     const t = queue.current
     // a streaming song's cover (a YT Music URL or a cached one) is fetched for the overlay in media_keys.rs
-    if (t) invoke('media_track', { path: t.path, title: t.title, artist: t.artist, album: t.album, duration: t.duration, art: t.art ?? null })
+    if (t) invoke('media_track', { track: { path: t.path, title: t.title, artist: t.artist, album: t.album, duration: t.duration, art: t.art ?? null } })
   })
   // on play/pause only; seeks publish below. Never per tick.
   $effect(() => {
