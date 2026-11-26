@@ -27,8 +27,12 @@
   - A new YT Music lyrics source, on by default, gives YouTube songs the lyrics YouTube itself shows.
 - **The adaptive theme follows YouTube and YT Music covers**, and the system's media controls show the song's cover
   instead of the app icon.
+- **Seeking works in streamed songs** (beta.2). Seeking in a YouTube or YT Music song, or playing on into its middle,
+  no longer skips to the next song. Qistara follows YouTube's servers when they pass a stream on, asks again where a
+  stream dropped, and opens a song again where it stopped if it still does.
 - **A spinning ring on Play** while a song or a seek is opening.
-- Settings › Playback › **Streaming › Test** times how long YouTube takes to find a song and to start sounding.
+- Settings › Playback › **Streaming › Test** times how long YouTube takes to find a song and to start sounding, and
+  checks that seeking works.
 - macOS: Now Playing's close button sits below the window buttons. Settings › Appearance › Corners says that it
   shapes buttons, cards and artwork (the window's corners follow the system).
 - Betas include the Windows installer (unsigned), so a beta can be tried on Windows too.
