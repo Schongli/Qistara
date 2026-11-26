@@ -47,6 +47,9 @@ const KEEP: usize = 32;
 const MAX_AHEAD: usize = 16 << 20;
 /// An address is used until this long before YouTube says it expires.
 const MARGIN: u64 = 30 * 60;
+/// Where an address is tried before it's used: deep in the file, where some clients' addresses stop working
+/// after the first megabyte or so (and where a seek goes).
+const PROBE_AT: u64 = 3 << 20;
 
 struct Client {
     name: &'static str,
@@ -67,6 +70,10 @@ pub struct Stream {
     expires: u64,
     /// which engine found it, for the log and Settings › Streaming › Test
     engine: &'static str,
+    /// the guest client it came from (an index into CLIENTS); None from yt-dlp
+    client: Option<usize>,
+    /// YouTube's format number: a renewed address continues a song only when it's the same format and length
+    itag: Option<u32>,
     ahead: Option<Arc<Vec<u8>>>,
 }
 
@@ -87,6 +94,8 @@ pub struct Engine {
     /// songs no engine could open lately, and why: asked again at once, they fail at once (mpv then plays them
     /// through its hook without waiting for the same lookups twice)
     failed: Mutex<HashMap<String, (Instant, String)>>,
+    /// guest clients whose addresses YouTube stopped serving mid-song this run: not asked again
+    distrusted: Mutex<HashSet<usize>>,
 }
 
 /// How long a song that couldn't be opened isn't looked up again.
@@ -99,6 +108,30 @@ fn now() -> u64 {
 /// The `expire` a stream address carries (unix seconds).
 fn expires(url: &str) -> u64 {
     url::Url::parse(url).ok().and_then(|u| u.query_pairs().find(|(k, _)| k == "expire").and_then(|(_, v)| v.parse().ok())).unwrap_or(0)
+}
+
+/// The `itag` (format number) a stream address carries.
+fn itag(url: &str) -> Option<u32> {
+    url::Url::parse(url).ok().and_then(|u| u.query_pairs().find(|(k, _)| k == "itag").and_then(|(_, v)| v.parse().ok()))
+}
+
+/// The same bytes: the same format and length (YouTube serves a format identically from any address).
+fn same_file(a: &Stream, b: &Stream) -> bool {
+    a.len.is_some() && a.len == b.len && a.itag == b.itag
+}
+
+/// The first byte a `Content-Range: bytes a-b/total` reply starts at.
+pub fn range_start(content_range: &str) -> Option<u64> {
+    content_range.trim().strip_prefix("bytes ")?.split('-').next()?.trim().parse().ok()
+}
+
+/// A reply is the bytes asked for from `at`: a 206 starting there, or (only from the start) the whole file.
+fn fits(status: u16, content_range: Option<&str>, at: u64) -> bool {
+    match status {
+        206 => content_range.and_then(range_start) == Some(at),
+        200 => at == 0,
+        _ => false,
+    }
 }
 
 fn fresh(s: &Stream) -> bool {
@@ -151,12 +184,18 @@ pub fn visitor_in(text: &str) -> Option<String> {
     text.split('"').find(|t| t.starts_with("Cg") && (20..=80).contains(&t.len()) && t.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_%=".contains(&b))).map(str::to_owned)
 }
 
-/// One client for the whole run, so reads from YouTube's video host reuse their connection.
+/// One client for the whole run, so reads from YouTube's video host reuse their connection. YouTube's video
+/// host often sends a range on to another of its servers: redirects are followed there only (https, at most 5).
 fn http() -> &'static reqwest::Client {
     static HTTP: OnceLock<reqwest::Client> = OnceLock::new();
     HTTP.get_or_init(|| {
+        let policy = reqwest::redirect::Policy::custom(|a| {
+            let to = a.url().as_str();
+            // (the tests stand in for YouTube on this machine)
+            if a.previous().len() < 5 && (youtube_media(to) || (cfg!(test) && to.starts_with("http://127.0.0.1:"))) { a.follow() } else { a.stop() }
+        });
         reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
+            .redirect(policy)
             .connect_timeout(Duration::from_secs(10))
             .read_timeout(Duration::from_secs(20))
             .build()
@@ -195,7 +234,8 @@ impl Engine {
     }
 
     /// One guest client: its reply, asked again with a visitor id when YouTube wants one.
-    async fn guest(&self, c: &Client, id: &str) -> Result<Stream, String> {
+    async fn guest(&self, i: usize, id: &str) -> Result<Stream, String> {
+        let c = &CLIENTS[i];
         let known = self.visitor.lock().unwrap().clone();
         let mut reply = self.ask(c, id, known.as_deref()).await?;
         if pick_audio(&reply).is_err() && known.is_none()
@@ -206,7 +246,7 @@ impl Engine {
             self.visitor.lock().unwrap().get_or_insert(v);
         }
         let (url, mime, len) = pick_audio(&reply)?;
-        Ok(Stream { expires: expires(&url), url, user_agent: c.user_agent.into(), mime, len, engine: c.name, ahead: None })
+        Ok(Stream { expires: expires(&url), itag: itag(&url), url, user_agent: c.user_agent.into(), mime, len, engine: c.name, client: Some(i), ahead: None })
     }
 
     /// A song's sound: the guest clients (the one that worked last first), each address checked; then yt-dlp with
@@ -226,14 +266,15 @@ impl Engine {
             }
         }
         let first = self.client.load(SeqCst) % CLIENTS.len();
-        for i in (0..CLIENTS.len()).map(|n| (first + n) % CLIENTS.len()) {
-            match self.guest(&CLIENTS[i], id).await {
+        let distrusted = self.distrusted.lock().unwrap().clone();
+        for i in (0..CLIENTS.len()).map(|n| (first + n) % CLIENTS.len()).filter(|i| !distrusted.contains(i)) {
+            match self.guest(i, id).await {
                 Ok(s) if probe(&s).await => {
                     self.client.store(i, SeqCst);
                     log::info!("stream {id}: {} in {} ms", s.engine, started.elapsed().as_millis());
                     return Ok(s);
                 }
-                Ok(_) => why.push(format!("{}: address refused", CLIENTS[i].name)),
+                Ok(_) => why.push(format!("{}: address refused deep in the file", CLIENTS[i].name)),
                 Err(e) => why.push(format!("{}: {e}", CLIENTS[i].name)),
             }
         }
@@ -258,6 +299,16 @@ impl Engine {
             *wants = (cookies, premium);
             drop(wants);
             self.forget_all();
+        }
+    }
+
+    /// YouTube stopped serving this client's address mid-song even after asking again: its addresses aren't used
+    /// for the rest of the run (the other client and yt-dlp are).
+    fn distrust(&self, s: &Stream) {
+        if let Some(i) = s.client
+            && self.distrusted.lock().unwrap().insert(i)
+        {
+            log::warn!("stream: {} addresses stop mid-song; using the others for this run", CLIENTS[i].name);
         }
     }
 
@@ -342,7 +393,7 @@ impl Engine {
         if let Ok(s) = self.stream(app, id).await
             && s.ahead.is_none() {
                 let end = s.len.map_or(AHEAD as u64, |n| n.min(AHEAD as u64)).saturating_sub(1);
-                if let Ok((206 | 200, bytes)) = fetch(&s, 0, end).await
+                if let Ok(Ok(bytes)) = fetch(&s, 0, end).await
                     && let Some(k) = self.streams.lock().unwrap().get_mut(id).filter(|k| k.url == s.url) {
                         k.ahead = Some(Arc::new(bytes));
                     }
@@ -359,7 +410,7 @@ impl Engine {
 async fn with_ytdlp(app: &AppHandle, id: &str, cookies: &Option<crate::ytdlp::Cookies>) -> Result<Stream, String> {
     let a = crate::ytdlp::audio_stream(app, id, cookies).await?;
     let user_agent = a.user_agent.unwrap_or_else(|| "Mozilla/5.0".into());
-    Ok(Stream { expires: expires(&a.url), url: a.url, user_agent, mime: a.mime, len: a.len, engine: "yt-dlp", ahead: None })
+    Ok(Stream { expires: expires(&a.url), itag: itag(&a.url), url: a.url, user_agent, mime: a.mime, len: a.len, engine: "yt-dlp", client: None, ahead: None })
 }
 
 fn get(s: &Stream, start: u64, end: u64) -> Result<reqwest::RequestBuilder, String> {
@@ -370,19 +421,22 @@ fn get(s: &Stream, start: u64, end: u64) -> Result<reqwest::RequestBuilder, Stri
     Ok(http().get(&s.url).header("User-Agent", &s.user_agent).header("Range", format!("bytes={start}-{end}")))
 }
 
-/// A two-byte read: YouTube serves this address to us.
+/// A two-byte read deep in the file (where a seek goes, and where some clients' addresses stop working): YouTube
+/// serves this address to us all the way through.
 async fn probe(s: &Stream) -> bool {
-    matches!(fetch(s, 0, 1).await, Ok((200 | 206, _)))
+    let at = s.len.map_or(0, |n| n.saturating_sub(2).min(PROBE_AT));
+    matches!(fetch(s, at, at + 1).await, Ok(Ok(_)))
 }
 
-/// Bytes `start..=end` of a stream: (HTTP status, body).
-async fn fetch(s: &Stream, start: u64, end: u64) -> Result<(u16, Vec<u8>), String> {
+/// Bytes `start..=end` of a stream, or the status YouTube answered with instead (a refusal, a redirect it wasn't
+/// allowed to follow, or a reply that isn't that range).
+async fn fetch(s: &Stream, start: u64, end: u64) -> Result<Result<Vec<u8>, u16>, String> {
     let r = get(s, start, end)?.timeout(Duration::from_secs(20)).send().await.map_err(|e| e.to_string())?;
     let status = r.status().as_u16();
-    if status >= 400 {
-        return Ok((status, Vec::new()));
+    if !fits(status, r.headers().get("content-range").and_then(|v| v.to_str().ok()), start) {
+        return Ok(Err(status));
     }
-    Ok((status, r.bytes().await.map_err(|e| e.to_string())?.to_vec()))
+    Ok(Ok(r.bytes().await.map_err(|e| e.to_string())?.to_vec()))
 }
 
 /// The total length from a `Content-Range: bytes a-b/total` reply.
@@ -405,7 +459,8 @@ async fn relay(stream: &Stream, mut out: &TcpStream, at: u64, to: u64) -> Result
         Err(e) => return Ok(Piece::Dropped(e.to_string())),
     };
     let status = r.status().as_u16();
-    if !matches!(status, 200 | 206) {
+    // never pass on bytes from anywhere but `at` (a whole file sent for a range would play as noise)
+    if !fits(status, r.headers().get("content-range").and_then(|v| v.to_str().ok()), at) {
         return Ok(Piece::Refused(status));
     }
     let mut sent = 0u64;
@@ -484,7 +539,14 @@ fn serve(app: &AppHandle, s: &TcpStream, id: &str, head: bool, range: Option<&st
     if range.is_none_or(|r| r.starts_with("bytes=0-")) {
         log::info!("stream {id}: ready for mpv after {} ms{}", started.elapsed().as_millis(), if stream.ahead.is_some() { " (fetched ahead)" } else { "" });
     }
-    respond(s, stream, head, range, || {
+    // a refused address: first a fresh one from the same client (it may just have expired); refused again, that
+    // client is set aside and the others (then yt-dlp) are asked
+    let mut asked = 0;
+    respond(s, id, stream, head, range, |old| {
+        asked += 1;
+        if asked > 1 {
+            engine.distrust(old);
+        }
         engine.forget(id);
         rt(engine.stream(app, id))
     })
@@ -496,7 +558,7 @@ fn fail(mut s: &TcpStream, why: String) -> Result<(), String> {
 }
 
 /// Answers mpv's request for a stream: the range asked for (all of it without one), then the bytes.
-fn respond(mut s: &TcpStream, stream: Stream, head: bool, range: Option<&str>, renew: impl FnMut() -> Result<Stream, String>) -> Result<(), String> {
+fn respond(mut s: &TcpStream, id: &str, stream: Stream, head: bool, range: Option<&str>, renew: impl FnMut(&Stream) -> Result<Stream, String>) -> Result<(), String> {
     let total = match stream.len.or_else(|| rt(total_of(&stream))) {
         Some(n) if n > 0 => n,
         _ => return fail(s, "YouTube didn't say how long the stream is".into()),
@@ -513,12 +575,13 @@ fn respond(mut s: &TcpStream, stream: Stream, head: bool, range: Option<&str>, r
     if head {
         return Ok(());
     }
-    pump(s, stream, start, end, renew)
+    pump(s, id, stream, start, end, renew)
 }
 
 /// Sends bytes `at..=end` of a stream to mpv: what was fetched ahead at once, the rest from YouTube a megabyte per
-/// request. A refused address is asked for again (`renew`, twice at most); a dropped connection is tried again.
-fn pump(out: &TcpStream, mut stream: Stream, mut at: u64, end: u64, mut renew: impl FnMut() -> Result<Stream, String>) -> Result<(), String> {
+/// request. A refused address is asked for again (`renew`, three times at most) and the song carries on only from
+/// the same file; a dropped connection is tried again.
+fn pump(out: &TcpStream, id: &str, mut stream: Stream, mut at: u64, end: u64, mut renew: impl FnMut(&Stream) -> Result<Stream, String>) -> Result<(), String> {
     if let Some(ahead) = stream.ahead.clone().filter(|a| (at as usize) < a.len()) {
         let to = (end as usize + 1).min(ahead.len());
         let mut o = out;
@@ -533,12 +596,16 @@ fn pump(out: &TcpStream, mut stream: Stream, mut at: u64, end: u64, mut renew: i
                 retried = 0;
             }
             // YouTube refused the address (expired, or no longer good for us): ask for a new one
-            Piece::Refused(status) if renewed < 2 => {
+            Piece::Refused(status) if renewed < 3 => {
                 renewed += 1;
-                log::info!("stream: address refused ({status}), asking again");
-                stream = renew()?;
+                log::info!("stream {id}: {} address refused ({status}) at byte {at}, asking again", stream.engine);
+                let next = renew(&stream)?;
+                if !same_file(&stream, &next) {
+                    return Err(format!("the new address is another file ({} {:?}/{:?}), so the song can't carry on from byte {at}", next.engine, next.itag, next.len));
+                }
+                stream = next;
             }
-            Piece::Refused(status) => return Err(format!("YouTube refused the stream ({status})")),
+            Piece::Refused(status) => return Err(format!("YouTube refused the stream ({status}) at byte {at}")),
             Piece::Dropped(e) if retried < 3 => {
                 retried += 1;
                 log::debug!("stream: {e}, trying again");
@@ -584,22 +651,28 @@ pub struct TestResult {
     engine: String,
     resolve_ms: u64,
     first_byte_ms: u64,
+    /// the middle of the song was served too, as a seek would ask for it
+    seek_ok: bool,
 }
 
-/// Settings › Streaming › Test: looks a known video up afresh and reads its start, timing both.
+/// Settings › Streaming › Test: looks a known song up afresh, reads its start (timing both) and its middle.
 #[tauri::command]
 pub async fn ytstream_test(app: AppHandle, engine: State<'_, Engine>, cookies: Option<crate::ytdlp::Cookies>, premium: bool) -> Result<TestResult, String> {
-    const ID: &str = "jNQXAC9IVRw"; // "Me at the zoo": public, short, there for good
+    const ID: &str = "dQw4w9WgXcQ"; // public, a few megabytes of sound, there for good
     engine.ask_with(cookies, premium);
     engine.forget(ID);
     let started = Instant::now();
     let s = engine.resolve(&app, ID).await?;
     let resolve_ms = started.elapsed().as_millis() as u64;
     let at = Instant::now();
-    match fetch(&s, 0, 64 * 1024 - 1).await? {
-        (200 | 206, _) => Ok(TestResult { engine: s.engine.into(), resolve_ms, first_byte_ms: at.elapsed().as_millis() as u64 }),
-        (status, _) => Err(format!("YouTube refused the stream ({status})")),
+    if let Err(status) = fetch(&s, 0, 64 * 1024 - 1).await? {
+        return Err(format!("YouTube refused the stream ({status})"));
     }
+    let first_byte_ms = at.elapsed().as_millis() as u64;
+    let middle = s.len.unwrap_or(0) / 2;
+    let seek_ok = matches!(fetch(&s, middle, middle + 64 * 1024 - 1).await, Ok(Ok(_)));
+    log::info!("streaming test: {} found in {resolve_ms} ms, sound after {first_byte_ms} ms more, seeking {}", s.engine, if seek_ok { "works" } else { "refused" });
+    Ok(TestResult { engine: s.engine.into(), resolve_ms, first_byte_ms, seek_ok })
 }
 
 #[cfg(test)]
@@ -676,7 +749,7 @@ mod tests {
     #[test]
     fn keeps_recent_streams_and_drops_read_ahead_first() {
         let e = Engine::default();
-        let s = |exp: u64, ahead: usize| Stream { url: "https://r.googlevideo.com/a".into(), user_agent: "ua".into(), mime: "audio/webm", len: None, expires: exp, engine: "test", ahead: Some(Arc::new(vec![0; ahead])) };
+        let s = |exp: u64, ahead: usize| Stream { ahead: Some(Arc::new(vec![0; ahead])), expires: exp, ..fake("https://r.googlevideo.com/a", None) };
         for i in 0..40 {
             e.keep(&format!("id{i:09}"), s(0, AHEAD));
         }
@@ -691,10 +764,35 @@ mod tests {
         assert!(e.cached("soon_expire").is_none());
     }
 
-    /// Stands in for YouTube's video host: /old refuses (an expired address), /new serves `body` in ranges.
-    fn fake_youtube(body: Arc<Vec<u8>>) -> u16 {
+    #[test]
+    fn takes_only_the_range_it_asked_for() {
+        assert_eq!(range_start("bytes 1048576-2097151/3500000"), Some(1_048_576));
+        assert_eq!(range_start("bytes */3500000"), None);
+        assert!(fits(206, Some("bytes 100-199/1000"), 100));
+        assert!(!fits(206, Some("bytes 0-99/1000"), 100), "a range from elsewhere");
+        assert!(!fits(206, None, 100));
+        assert!(fits(200, None, 0) && !fits(200, None, 100), "the whole file only when the start was asked for");
+        for refused in [302, 403, 404, 416, 500] {
+            assert!(!fits(refused, Some("bytes 0-1/2"), 0));
+        }
+        assert_eq!(itag("https://r1.googlevideo.com/videoplayback?expire=9&itag=251&clen=4"), Some(251));
+        let a = Stream { itag: Some(251), ..fake("https://r1.googlevideo.com/a", Some(100)) };
+        assert!(same_file(&a, &Stream { url: "https://r9.googlevideo.com/b".into(), ..a.clone() }));
+        assert!(!same_file(&a, &Stream { itag: Some(140), ..a.clone() }) && !same_file(&a, &Stream { len: Some(99), ..a.clone() }));
+    }
+
+    fn fake(url: &str, len: Option<u64>) -> Stream {
+        Stream { url: url.into(), user_agent: "test".into(), mime: "audio/webm", len, expires: 0, engine: "test", client: None, itag: Some(251), ahead: None }
+    }
+
+    /// Stands in for YouTube's video host, serving `body` by path:
+    /// /new in ranges; /old refuses (an expired address); /whole answers every range with the whole file;
+    /// /deep refuses ranges past 1 MiB (an address that stops mid-song); /hop sends ranges past 1 MiB on to
+    /// `hop_to` (another of YouTube's servers); /flaky refuses the first range past 1 MiB, then serves.
+    fn fake_youtube(body: Arc<Vec<u8>>, hop_to: Option<u16>) -> u16 {
         let l = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = l.local_addr().unwrap().port();
+        let refused_once = Arc::new(std::sync::atomic::AtomicBool::new(false));
         std::thread::spawn(move || {
             for mut c in l.incoming().flatten() {
                 let mut buf = Vec::new();
@@ -702,8 +800,16 @@ mod tests {
                 let range = head.lines().find_map(|l| l.strip_prefix("Range: bytes=").or_else(|| l.strip_prefix("range: bytes="))).unwrap();
                 let (a, b) = range.split_once('-').unwrap();
                 let (a, b): (usize, usize) = (a.parse().unwrap(), b.parse::<usize>().unwrap().min(body.len() - 1));
-                if head.starts_with("GET /old") {
+                let path = head.split(' ').nth(1).unwrap_or("");
+                let deep = a >= 1 << 20;
+                let refuse = path == "/old" || (path == "/deep" && deep) || (path == "/flaky" && deep && !refused_once.swap(true, SeqCst));
+                if refuse {
                     let _ = c.write_all(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                } else if path == "/hop" && deep && hop_to.is_some() {
+                    let _ = write!(c, "HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:{}/new\r\nContent-Length: 0\r\nConnection: close\r\n\r\n", hop_to.unwrap());
+                } else if path == "/whole" {
+                    let _ = write!(c, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+                    let _ = c.write_all(&body);
                 } else {
                     let _ = write!(c, "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {a}-{b}/{}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len(), b - a + 1);
                     let _ = c.write_all(&body[a..=b]);
@@ -713,41 +819,112 @@ mod tests {
         port
     }
 
-    /// What mpv receives from `pump` for bytes at..=end.
-    fn played(stream: Stream, at: u64, end: u64, renew: impl FnMut() -> Result<Stream, String> + Send + 'static) -> Result<Vec<u8>, String> {
+    /// What mpv receives from `pump` for bytes at..=end, and how the stream ended.
+    fn played(stream: Stream, at: u64, end: u64, renew: impl FnMut(&Stream) -> Result<Stream, String> + Send + 'static) -> (Vec<u8>, Result<(), String>) {
         use std::io::Read;
         let l = TcpListener::bind("127.0.0.1:0").unwrap();
         let mut mpv = TcpStream::connect(l.local_addr().unwrap()).unwrap();
         let (out, _) = l.accept().unwrap();
-        let sent = std::thread::spawn(move || pump(&out, stream, at, end, renew));
+        let sent = std::thread::spawn(move || {
+            let r = pump(&out, "dQw4w9WgXcQ", stream, at, end, renew);
+            drop(out);
+            r
+        });
         let mut got = Vec::new();
-        mpv.read_to_end(&mut got).unwrap();
-        sent.join().unwrap().map(|()| got)
+        let _ = mpv.read_to_end(&mut got);
+        (got, sent.join().unwrap())
+    }
+
+    fn song() -> Arc<Vec<u8>> {
+        Arc::new((0..(CHUNK as usize * 5 / 2)).map(|i| (i * 7 % 251) as u8).collect())
     }
 
     #[test]
     fn streams_in_ranges_and_asks_again_when_youtube_refuses_the_address() {
-        let body: Arc<Vec<u8>> = Arc::new((0..(CHUNK as usize * 5 / 2)).map(|i| (i * 7 % 251) as u8).collect());
-        let port = fake_youtube(body.clone());
-        let at = |path: &str, ahead: Option<usize>| Stream {
-            url: format!("http://127.0.0.1:{port}{path}"), user_agent: "test".into(), mime: "audio/webm", len: Some(body.len() as u64),
-            expires: 0, engine: "test", ahead: ahead.map(|n| Arc::new(body[..n].to_vec())),
-        };
+        let body = song();
+        let port = fake_youtube(body.clone(), None);
+        let at = |path: &str, ahead: Option<usize>| Stream { ahead: ahead.map(|n| Arc::new(body[..n].to_vec())), ..fake(&format!("http://127.0.0.1:{port}{path}"), Some(body.len() as u64)) };
         let end = body.len() as u64 - 1;
         // the start fetched ahead goes out first, then the refused address is renewed once and the rest follows
         let renewals = Arc::new(AtomicUsize::new(0));
         let (n, fresh) = (renewals.clone(), at("/new", None));
-        let got = played(at("/old", Some(1000)), 0, end, move || {
+        let (got, how) = played(at("/old", Some(1000)), 0, end, move |_| {
             n.fetch_add(1, SeqCst);
             Ok(fresh.clone())
         });
-        assert!(got.as_deref() == Ok(&body[..]), "the whole song arrives in order");
+        assert!(how.is_ok() && got == body[..], "the whole song arrives in order");
         assert_eq!(renewals.load(SeqCst), 1);
         // a seek: just the range asked for
-        assert!(played(at("/new", Some(1000)), 1_500_000, 1_600_000, || Err("not needed".into())).as_deref() == Ok(&body[1_500_000..=1_600_000]));
+        let (got, how) = played(at("/new", Some(1000)), 1_500_000, 1_600_000, |_| Err("not needed".into()));
+        assert!(how.is_ok() && got == body[1_500_000..=1_600_000]);
         // an address that stays refused ends the stream with the reason
         let still = at("/old", None);
-        assert_eq!(played(at("/old", None), 0, end, move || Ok(still.clone())).unwrap_err(), "YouTube refused the stream (403)");
+        assert_eq!(played(at("/old", None), 0, end, move |_| Ok(still.clone())).1.unwrap_err(), "YouTube refused the stream (403) at byte 0");
+    }
+
+    #[test]
+    fn follows_youtube_on_to_another_of_its_servers() {
+        let body = song();
+        let other = fake_youtube(body.clone(), None);
+        let first = fake_youtube(body.clone(), Some(other));
+        let hop = fake(&format!("http://127.0.0.1:{first}/hop"), Some(body.len() as u64));
+        let end = body.len() as u64 - 1;
+        // past the first megabyte every range is redirected: playing through and seeking both carry on there
+        let (got, how) = played(hop.clone(), 0, end, |_| Err("a redirect isn't a refusal".into()));
+        assert!(how.is_ok() && got == body[..], "{how:?}");
+        let (got, how) = played(hop.clone(), 1_500_000, end, |_| Err("a redirect isn't a refusal".into()));
+        assert!(how.is_ok() && got == body[1_500_000..]);
+        assert!(rt(probe(&hop)), "the deep probe follows it too");
+    }
+
+    #[test]
+    fn never_passes_on_bytes_from_the_wrong_place() {
+        let body = song();
+        let port = fake_youtube(body.clone(), None);
+        // a server that answers every range with the whole file: the start is fine, a range from the middle isn't
+        let whole = fake(&format!("http://127.0.0.1:{port}/whole"), Some(body.len() as u64));
+        let w = whole.clone();
+        let (got, how) = played(whole.clone(), 0, body.len() as u64 - 1, move |_| Ok(w.clone()));
+        assert!(how.unwrap_err().contains("(200) at byte 1048576"));
+        assert!(body.starts_with(&got) && got.len() == CHUNK as usize, "what arrived is the song's own start");
+        let w = whole.clone();
+        let (got, how) = played(whole, 1_500_000, 1_600_000, move |_| Ok(w.clone()));
+        assert!(how.is_err() && got.is_empty());
+    }
+
+    #[test]
+    fn tries_an_address_deep_in_the_file_before_using_it() {
+        let body = song();
+        let port = fake_youtube(body.clone(), None);
+        let len = Some(body.len() as u64);
+        assert!(rt(probe(&fake(&format!("http://127.0.0.1:{port}/new"), len))));
+        // serves the start, refuses past the first megabyte: rejected before a song plays from it
+        assert!(!rt(probe(&fake(&format!("http://127.0.0.1:{port}/deep"), len))));
+        assert!(!rt(probe(&fake(&format!("http://127.0.0.1:{port}/whole"), len))));
+    }
+
+    #[test]
+    fn carries_a_song_on_only_from_the_same_file() {
+        let body = song();
+        let port = fake_youtube(body.clone(), None);
+        let len = Some(body.len() as u64);
+        let deep = fake(&format!("http://127.0.0.1:{port}/deep"), len);
+        // the new address is another format: the song stops rather than play the wrong bytes
+        let other = Stream { itag: Some(140), ..fake(&format!("http://127.0.0.1:{port}/new"), len) };
+        let (got, how) = played(deep.clone(), 0, body.len() as u64 - 1, move |_| Ok(other.clone()));
+        assert!(how.unwrap_err().contains("another file") && got == body[..CHUNK as usize]);
+        // the same format from another address: it carries on
+        let same = fake(&format!("http://127.0.0.1:{port}/new"), len);
+        let (got, how) = played(deep, 0, body.len() as u64 - 1, move |_| Ok(same.clone()));
+        assert!(how.is_ok() && got == body[..]);
+    }
+
+    #[test]
+    fn sets_aside_a_client_whose_addresses_stop_mid_song() {
+        let e = Engine::default();
+        e.distrust(&Stream { client: Some(1), ..fake("https://r.googlevideo.com/a", None) });
+        e.distrust(&fake("https://r.googlevideo.com/a", None)); // yt-dlp's: nothing to set aside
+        assert_eq!(*e.distrusted.lock().unwrap(), HashSet::from([1]));
     }
 
     /// On a machine that reaches YouTube: `cargo test --lib real_youtube -- --ignored --nocapture`
@@ -756,12 +933,12 @@ mod tests {
     fn real_youtube_guest_clients_give_a_playable_stream() {
         let e = Engine::default();
         let mut worked = 0;
-        for c in &CLIENTS {
+        for (i, c) in CLIENTS.iter().enumerate() {
             let started = Instant::now();
-            match rt(e.guest(c, "jNQXAC9IVRw")) {
+            match rt(e.guest(i, "dQw4w9WgXcQ")) {
                 Ok(s) => {
                     let ok = rt(probe(&s));
-                    println!("{}: {} {:?} bytes, found in {} ms, address works: {ok}", c.name, s.mime, s.len, started.elapsed().as_millis());
+                    println!("{}: {} itag {:?}, {:?} bytes, found in {} ms, serves deep in the file: {ok}", c.name, s.mime, s.itag, s.len, started.elapsed().as_millis());
                     worked += ok as usize;
                 }
                 Err(err) => println!("{}: {err}", c.name),
@@ -770,30 +947,47 @@ mod tests {
         assert!(worked > 0, "no guest client gave a stream YouTube serves");
     }
 
-    /// mpv reads streams with ffmpeg's HTTP client: a real song through the server, start to end and from a seek.
+    /// mpv reads streams with ffmpeg's HTTP client: a real song through the server, start to end and from a seek,
+    /// and, with the reconnect options mpv.rs gives it, on through a stream the server had to drop midway.
     /// `cargo test --lib ffmpeg_plays -- --ignored`
     #[test]
     #[ignore = "needs ffmpeg"]
     fn ffmpeg_plays_a_song_from_the_server_and_seeks_in_it() {
-        let song = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../test-media/tone_44k16.flac")).unwrap();
-        let len = song.len() as u64;
-        let port = fake_youtube(Arc::new(song));
-        let l = TcpListener::bind("127.0.0.1:0").unwrap();
-        let me = l.local_addr().unwrap().port();
-        std::thread::spawn(move || {
-            for c in l.incoming().flatten() {
-                std::thread::spawn(move || {
-                    let mut buf = Vec::new();
-                    let (_, head, range) = crate::session::read_head(&c, &mut buf).and_then(|h| parse_stream_request(&h, me, "tok")).unwrap();
-                    let st = Stream { url: format!("http://127.0.0.1:{port}/new"), user_agent: "t".into(), mime: "audio/flac", len: Some(len), expires: 0, engine: "t", ahead: None };
-                    let _ = respond(&c, st, head, range.as_deref(), || Err("no".into()));
-                });
-            }
-        });
-        let url = format!("http://127.0.0.1:{me}/tok/yt/dQw4w9WgXcQ");
-        for args in [vec!["-i", &url], vec!["-ss", "2", "-i", &url]] {
-            let out = std::process::Command::new("ffmpeg").args(["-v", "error", "-nostdin"]).args(&args).args(["-f", "null", "-"]).output().unwrap();
-            assert!(out.status.success() && out.stderr.is_empty(), "{args:?}: {}", String::from_utf8_lossy(&out.stderr));
-        }
+        let song = Arc::new(std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../test-media/tone_96k24.flac")).unwrap());
+        assert!(song.len() > 1 << 20, "the song must reach past the first megabyte");
+        // the server mpv plays from, in front of a fake YouTube at `path`; a refused address isn't renewed here
+        let server = |path: &'static str| {
+            let up = fake_youtube(song.clone(), None);
+            let len = song.len() as u64;
+            let l = TcpListener::bind("127.0.0.1:0").unwrap();
+            let me = l.local_addr().unwrap().port();
+            std::thread::spawn(move || {
+                for c in l.incoming().flatten() {
+                    std::thread::spawn(move || {
+                        let mut buf = Vec::new();
+                        let (_, head, range) = crate::session::read_head(&c, &mut buf).and_then(|h| parse_stream_request(&h, me, "tok")).unwrap();
+                        let st = Stream { mime: "audio/flac", ..fake(&format!("http://127.0.0.1:{up}{path}"), Some(len)) };
+                        let _ = respond(&c, "dQw4w9WgXcQ", st, head, range.as_deref(), |_| Err("no".into()));
+                    });
+                }
+            });
+            format!("http://127.0.0.1:{me}/tok/yt/dQw4w9WgXcQ")
+        };
+        // seconds of sound ffmpeg decodes (8 kHz mono 16-bit to its output), and what it said
+        let ffmpeg = |args: &[&str]| {
+            let out = std::process::Command::new("ffmpeg").args(["-v", "error", "-nostdin"]).args(args).args(["-ac", "1", "-ar", "8000", "-f", "s16le", "-"]).output().unwrap();
+            (out.status.success(), out.stdout.len() as f64 / 16000.0, String::from_utf8_lossy(&out.stderr).into_owned())
+        };
+        let url = server("/new");
+        let (ok, secs, said) = ffmpeg(&["-i", &url]);
+        assert!(ok && (secs - 20.0).abs() < 0.1 && said.is_empty(), "start to end: {secs} s, {said}");
+        let (ok, secs, said) = ffmpeg(&["-ss", "12", "-i", &url]);
+        assert!(ok && (secs - 8.0).abs() < 0.1 && said.is_empty(), "from a seek to 12 s: {secs} s, {said}");
+        // the server drops the stream once, past the first megabyte: without reconnecting, the song ends early…
+        let (_, secs, said) = ffmpeg(&["-i", &server("/flaky")]);
+        assert!(secs < 15.0 && said.contains("prematurely"), "the drop shows: {secs} s");
+        // …and with mpv's reconnect options, ffmpeg asks again from where it stopped and plays to the end
+        let (ok, secs, said) = ffmpeg(&["-reconnect", "1", "-reconnect_on_network_error", "1", "-reconnect_delay_max", "4", "-i", &server("/flaky")]);
+        assert!(ok && (secs - 20.0).abs() < 0.1, "reconnected: {secs} s, {said}");
     }
 }

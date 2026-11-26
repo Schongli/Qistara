@@ -301,8 +301,12 @@ async fn on_mpv(
     }
 }
 
+/// A network stream that drops before its end (the streaming engine's server, a radio station) is asked for again
+/// from where it stopped, for up to a few seconds, instead of ending the song there.
+pub const STREAM_LAVF: &str = "reconnect=1,reconnect_on_network_error=1,reconnect_delay_max=4";
+
 #[cfg(desktop)]
-/// Starts mpv with the page's options, once checked, plus the ones that hold a path.
+/// Starts mpv with the page's options, once checked, plus the ones that hold a path or are fixed here.
 #[tauri::command]
 pub async fn mpv_init(window: WebviewWindow, mut mpv_config: MpvConfig) -> Result<String, String> {
     for (name, value) in &mpv_config.initial_options {
@@ -318,6 +322,7 @@ pub async fn mpv_init(window: WebviewWindow, mut mpv_config: MpvConfig) -> Resul
     let hook = format!("ytdl_hook-ytdl_path={},ytdl_hook-all_formats=no,ytdl_hook-exclude=^127%.0%.0%.1[:/]", quote(&ytdlp.to_string_lossy()));
     o.insert("script-opts".into(), json!(hook));
     o.insert("watch-later-dir".into(), json!(data.join("resume").to_string_lossy()));
+    o.insert("stream-lavf-o".into(), json!(STREAM_LAVF));
     // dev builds keep mpv's own log (format negotiation, device errors) next to the library
     if cfg!(debug_assertions) {
         o.insert("log-file".into(), json!(data.join("mpv.log").to_string_lossy()));
@@ -544,6 +549,9 @@ mod tests {
             ("dump-cache", json!([0, "no", r"C:\x.bat"])), ("set", json!(["script-opts", "ytdl_hook-ytdl_path=calc.exe"])),
             ("set", json!(["ytdl-raw-options", "exec=calc"])), ("set", json!(["stream-record", r"C:\x.bat"])),
             ("set", json!(["input-ipc-server", r"\\.\pipe\x"])),
+            // ffmpeg's options are fixed in mpv_init (STREAM_LAVF): the page can't add its own
+            ("set", json!(["stream-lavf-o", "reconnect=1,http_proxy=http://evil.example"])),
+            ("loadfile", json!(["https://stream.example/radio.mp3", "replace", -1, "stream-lavf-o=headers=x"])),
             ("loadfile", json!([r"C:\a.flac", "replace", -1, "script-opts=ytdl_hook-ytdl_path=calc.exe"])),
             ("loadfile", json!([r"C:\a.flac", "replace", -1, "start=1,stream-record=C:\\x.bat"])),
             ("loadfile", json!(["ytdl://https://youtu.be/x", "replace", -1, "ytdl-format=bestvideo+bestaudio"])),

@@ -9,6 +9,8 @@ import { queue } from './queue.svelte'
 import { toast } from './nav.svelte'
 import { settings } from './settings.svelte'
 import type { Track } from './library.svelte'
+import { endedEarly, streamedId } from './streamend'
+import { youtubeSongId } from './lyricsources'
 
 type Video = { id: string; title: string; channel: string; duration: number | null }
 
@@ -87,15 +89,52 @@ $effect.root(() => {
   })
 })
 
-// a YouTube song the streaming engine couldn't open plays through mpv's ytdl hook instead; one that fails there
-// too says so rather than go silent
+// where the playing file was: its path, time and length as mpv last reported them (end-file comes after them)
+let last = { path: '', time: 0, duration: 0 }
+$effect.root(() => {
+  $effect(() => {
+    const { path, time, duration } = mpv
+    if (path && time > 0 && duration > 0) last = { path, time, duration }
+  })
+})
+// songs opened again through the engine because yt-dlp isn't there for the hook: once each
+const again = new Set<string>()
+
+/** Opens a YouTube song again from `at`: through mpv's hook when yt-dlp is there, else once more through the
+ *  engine. False when neither is left to try. */
+async function reopen(t: Track, at: number) {
+  const missing = await invoke('youtube_ready').then(() => '', String)
+  if (!missing) engine.viaHook.add(t.path)
+  else if (again.has(t.path)) return false
+  else again.add(t.path)
+  void queue.resume(t, at)
+  return true
+}
+
 onMpvEvent(async (e) => {
+  if (e.event === 'start-file') return void (last = { path: '', time: 0, duration: 0 })
+  if (e.event !== 'end-file') return
+  const reason = String(e.reason)
+  // a song whose stream stopped before its end isn't finished: it carries on from there (mpv may already have
+  // moved on to the next song)
+  const ended = last
+  const vid = streamedId(ended.path)
+  if (vid && endedEarly(reason, ended.time, ended.duration)) {
+    const t = queue.items.find((x) => x.kind === 'audio' && youtubeSongId(x.path) === vid)
+    if (t && !engine.viaHook.has(t.path)) {
+      console.warn(`YouTube stream stopped at ${Math.round(ended.time)} s of ${Math.round(ended.duration)} s (${reason}): opening it again there`)
+      if (await reopen(t, ended.time)) return
+    }
+  }
+  // a YouTube song the streaming engine couldn't open plays through mpv's hook instead; one that fails there
+  // too says so rather than go silent
   const t = queue.current
-  if (e.event !== 'end-file' || String(e.reason) !== 'error' || !t?.path.startsWith('ytdl://')) return
+  if (reason !== 'error' || !t?.path.startsWith('ytdl://')) return
   if (t.kind === 'audio' && !engine.viaHook.has(t.path)) {
-    engine.viaHook.add(t.path)
     const missing = await invoke('youtube_ready').then(() => '', String)
-    return missing ? toast(`Couldn't open this song. ${missing}`) : void queue.retry()
+    if (missing) return toast(`Couldn't open this song. ${missing}`)
+    engine.viaHook.add(t.path)
+    return void queue.resume(t, 0)
   }
   toast(`Couldn't play this YouTube video${e.file_error ? ` (${e.file_error})` : ''}. Check for a yt-dlp update in Downloads.`)
 })

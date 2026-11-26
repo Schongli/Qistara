@@ -134,8 +134,8 @@
     testing = true
     streamTest = ''
     try {
-      const r = await invoke<{ engine: string; resolveMs: number; firstByteMs: number }>('ytstream_test', { cookies: ytCookies(), premium: settings.ytQuality === 'premium' })
-      streamTest = `${ENGINES[r.engine] ?? r.engine}: found in ${r.resolveMs} ms, sound ${r.firstByteMs} ms later`
+      const r = await invoke<{ engine: string; resolveMs: number; firstByteMs: number; seekOk: boolean }>('ytstream_test', { cookies: ytCookies(), premium: settings.ytQuality === 'premium' })
+      streamTest = `${ENGINES[r.engine] ?? r.engine}: found in ${r.resolveMs} ms, sound ${r.firstByteMs} ms later, ${r.seekOk ? 'seeking works' : 'seeking refused (songs reopen through yt-dlp where they stop)'}`
     } catch (e) {
       streamTest = `Couldn’t stream: ${e}`
     } finally {
@@ -456,7 +456,7 @@
       <p class="t-sub">YouTube and YT Music songs play from Qistara’s own streaming engine: it asks YouTube for the song’s sound directly and fetches the next songs ahead, so they start at once. A song it can’t open plays through yt-dlp instead.</p>
       <div class="group">
         <div class="line">
-          <span class="txt"><span>Test streaming</span><span class="hint" aria-live="polite">{testing ? 'Testing…' : streamTest || 'Times how long a short YouTube video takes to be found and to start sounding'}</span></span>
+          <span class="txt"><span>Test streaming</span><span class="hint" aria-live="polite">{testing ? 'Testing…' : streamTest || 'Times how long a song takes to be found and to start sounding, and checks seeking in it'}</span></span>
           <button class="btn press" onclick={testStreaming} disabled={testing}>Test</button>
         </div>
       </div>

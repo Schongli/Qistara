@@ -242,6 +242,8 @@ class Queue {
   }
 
   async #advanced() {
+    // a streamed song is being opened again where it stopped (resume): mpv moving on doesn't count
+    if (this.#resuming) return
     // following a session, the next item is simply the next one: the guest's own repeat mode doesn't apply
     this.index = lock.following ? Math.min(this.index + 1, this.items.length - 1) : nextIndex(this.items.length, this.index, this.repeat, false)
     await cmd('playlist-remove', 0)
@@ -295,14 +297,25 @@ class Queue {
     if (this.appended) warm([this.items[n + 1]])
   }
 
-  /** Opens the current song again from the start, e.g. a YouTube song through mpv's hook once the streaming
-   *  engine couldn't open it (youtube.svelte.ts). */
-  async retry() {
-    const t = this.current
-    if (!t) return
-    await loadTrack(t, 'replace')
-    await set('pause', false)
-    await this.#syncNext()
+  #resuming = false
+
+  /** Plays `t` again from `at` as the current song: a YouTube song whose stream stopped early, or couldn't open,
+   *  through mpv's hook (youtube.svelte.ts). mpv may already have moved on to the next song; that's undone. */
+  async resume(t: Track, at: number) {
+    const i = this.items.indexOf(t)
+    if (i < 0) return
+    this.#resuming = true
+    try {
+      this.index = i
+      // an mpv older than 0.38 (some Linux systems) can't open a file at a time: from its start, then
+      await loadTrack(t, 'replace', at > 2 ? at - 2 : undefined).catch(() => loadTrack(t, 'replace'))
+      await set('pause', false)
+      await this.#syncNext()
+      // the moved-on notice can still be on its way: let it pass while holding
+      await new Promise((r) => setTimeout(r, 400))
+    } finally {
+      this.#resuming = false
+    }
   }
 }
 
