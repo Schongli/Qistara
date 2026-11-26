@@ -261,7 +261,8 @@ struct ZipEntry {
     packed: usize,
     size: usize,
     local: usize,
-    /// Unix permission bits, when the archive was made on Unix
+    /// Unix permission bits, when the archive was made on Unix (only applied on Unix)
+    #[cfg_attr(not(unix), allow(dead_code))]
     mode: u32,
 }
 
